@@ -17,7 +17,7 @@ export function MapaReportes({ reportes }: MapaReportesProps) {
     : CARTAGENA
 
   return (
-    <MapContainer center={center} zoom={13} scrollWheelZoom style={{ height: '420px', width: '100%' }}>
+    <MapContainer className="leaflet-map" center={center} zoom={13} scrollWheelZoom>
       <TileLayer
         attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

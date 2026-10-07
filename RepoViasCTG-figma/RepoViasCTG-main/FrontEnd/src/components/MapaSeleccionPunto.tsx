@@ -61,10 +61,10 @@ export function MapaSeleccionPunto({ onSeleccionar, puntoInicial }: MapaSeleccio
   }
 
   return (
-    <section>
-      <button type="button" onClick={usarMiUbicacion}>Usar mi ubicación</button>
-      {mensajeError && <p role="alert">{mensajeError}</p>}
-      <MapContainer center={punto ?? CARTAGENA} zoom={13} scrollWheelZoom style={{ height: '360px', width: '100%' }}>
+    <section className="location-picker">
+      <button className="button button-ghost location-button" type="button" onClick={usarMiUbicacion}>Usar mi ubicación</button>
+      {mensajeError && <p className="alert error" role="alert">{mensajeError}</p>}
+      <MapContainer className="leaflet-map leaflet-map-picker" center={punto ?? CARTAGENA} zoom={13} scrollWheelZoom>
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
