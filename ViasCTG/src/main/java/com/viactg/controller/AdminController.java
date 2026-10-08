@@ -23,7 +23,7 @@ public class AdminController {
     @GetMapping("/pendientes") public List<ReporteResponse> pendientes() { return reporteService.listar(EstadoReporte.PENDIENTE).stream().map(reporteMapper::toResponse).toList(); }
     @PatchMapping("/{id}/estado")
     public ReporteResponse cambiarEstado(@PathVariable String id, @AuthenticationPrincipal UsuarioPrincipal principal, @Valid @RequestBody CambioEstadoRequest request) {
-        return reporteMapper.toResponse(reporteService.cambiarEstadoReporte(id, request.nuevoEstado(), principal.getId(), request.comentario()));
+        return reporteMapper.toResponse(reporteService.cambiarEstadoReporte(id, request.nuevoEstado(), principal.getId(), request.comentario(), request.prioridad()));
     }
     @GetMapping("/{id}/historial") public List<HistorialEstadoResponse> historial(@PathVariable String id) { return reporteService.historial(id).stream().map(reporteMapper::toHistorialResponse).toList(); }
 }

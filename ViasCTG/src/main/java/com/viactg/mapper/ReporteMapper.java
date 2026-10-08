@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 public class ReporteMapper {
     public ReporteResponse toResponse(Reporte reporte) {
         return new ReporteResponse(reporte.getId(), reporte.getUsuarioId(), reporte.getCalleId(),
-                reporte.getCategoriaId(), reporte.getDescripcion(), reporte.getFotoUrl(), reporte.getLatitud(),
+                reporte.getCategoriaId(), reporte.getDireccionOsm(), reporte.getDescripcion(), reporte.getFotoUrl(), reporte.getLatitud(),
                 reporte.getLongitud(), reporte.getEstado(), reporte.getPrioridad(), reporte.getFechaCreacion(),
                 reporte.getFechaActualizacion(), reporte.getHistorialEstados().stream().map(this::toHistorialResponse).toList());
     }

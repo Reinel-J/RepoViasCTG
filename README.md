@@ -65,6 +65,66 @@ El avance detallado y las tareas pendientes de cada parte se documentan en su pr
 - Backend: [`ViasCTG/PROGRESS.md`](./ViasCTG/PROGRESS.md)
 - Frontend: (por crear a medida que avance)
 
+## Cambios recientes
+
+### Datos reales en el inicio
+
+La sección **Reportes de la comunidad** ya no muestra tarjetas de demostración. Consume
+`GET /api/reportes` y, mientras la consulta no tenga resultados o no pueda completarse,
+presenta un estado vacío que invita a crear el primer reporte. Las estadísticas también se
+calculan con esa respuesta:
+
+- Reportes ciudadanos: cantidad de reportes recibidos.
+- Problemas resueltos: reportes con estado `RESUELTO`.
+- Barrios participando: `0` por ahora, hasta contar con una relación directa entre un reporte
+  y su barrio.
+- Reciben respuesta: porcentaje de reportes cuyo estado ya no es `PENDIENTE`.
+
+### Creación de reportes y dirección geográfica
+
+El formulario de creación ya no solicita una calle del catálogo. Al seleccionar un punto en
+el mapa, el cliente consulta una previsualización de dirección y muestra la vía detectada.
+Al guardar, el backend vuelve a resolver la dirección por sus propios medios y almacena el
+resultado en el nuevo campo opcional `direccionOsm` del reporte; nunca toma la dirección del
+cliente como fuente de verdad.
+
+El servicio usa la geocodificación inversa pública de OpenStreetMap/Nominatim:
+
+- `GET /api/geocoding/inverso?lat={latitud}&lng={longitud}` es público y devuelve
+  `{ "direccionOsm": "..." }`, o `null` si no se puede resolver.
+- Las consultas se identifican con un `User-Agent` propio, tienen un tiempo máximo de espera
+  de cinco segundos y se limitan a una petición por segundo.
+- Un error o tiempo de espera de Nominatim no bloquea la creación de un reporte; la dirección
+  queda vacía.
+- El constructor principal de `GeocodingService` está marcado con `@Autowired` para que Spring
+  inyecte `ObjectMapper` de forma explícita, mientras el constructor alternativo queda para
+  pruebas.
+
+La categoría también pasó a ser texto libre. El formulario ofrece la guía “Ejemplo: Hueco,
+alumbrado” y el backend conserva ese texto en `categoriaId` sin exigir que exista una categoría
+en MongoDB.
+
+### Prioridad y moderación
+
+Los ciudadanos ya no pueden enviar ni modificar la prioridad. Todo reporte creado inicia con
+prioridad `MEDIA`. Solo un `ADMIN` o `MODERADOR` puede definirla durante un cambio de estado,
+en la misma solicitud administrativa:
+
+```text
+PATCH /api/admin/reportes/{id}/estado
+```
+
+El cuerpo acepta `prioridad` opcional (`BAJA`, `MEDIA` o `ALTA`) además de `nuevoEstado` y
+`comentario`. El panel de moderación incluye el selector correspondiente antes de revisar o
+rechazar un reporte.
+
+### Contratos actualizados
+
+- `POST /api/reportes` ya no recibe `calleId` ni `prioridad`; recibe categoría como texto,
+  descripción, foto opcional y coordenadas.
+- `PUT /api/reportes/{id}` tampoco modifica la prioridad.
+- Las respuestas de reportes incluyen `direccionOsm`, que puede ser `null`.
+
 ## Docker
 
 Los tres servicios (MongoDB, backend y frontend) se orquestan con Docker Compose.

@@ -29,6 +29,7 @@ public class Reporte {
     private String usuarioId;
     private String calleId;
     private String categoriaId;
+    private String direccionOsm;
     private String descripcion;
     private String fotoUrl;
     private Double latitud;
