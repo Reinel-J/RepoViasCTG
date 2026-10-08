@@ -40,14 +40,12 @@ export interface UsuarioRegistroRequest {
 export interface ReporteCrearRequest {
   categoriaId: string
   descripcion: string
-  fotoUrl?: string
   latitud: number
   longitud: number
 }
 
 export interface ReporteActualizarRequest {
   descripcion: string
-  fotoUrl?: string
   latitud: number
   longitud: number
 }
@@ -78,7 +76,7 @@ export interface ReporteResponse {
   categoriaId: string
   direccionOsm: string | null
   descripcion: string
-  fotoUrl: string | null
+  fotos: string[]
   latitud: number
   longitud: number
   estado: EstadoReporte

@@ -9,7 +9,6 @@ import jakarta.validation.constraints.Size;
 public record ReporteCrearRequest(
         @NotBlank String categoriaId,
         @NotBlank @Size(min = 10, max = 2000) String descripcion,
-        @Size(max = 500) String fotoUrl,
         @NotNull
         @DecimalMin(value = "-90.0", message = "La latitud debe ser mayor o igual a -90")
         @DecimalMax(value = "90.0", message = "La latitud debe ser menor o igual a 90")

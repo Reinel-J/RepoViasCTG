@@ -6,11 +6,14 @@ import com.viactg.model.HistorialEstado;
 import com.viactg.model.Reporte;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class ReporteMapper {
     public ReporteResponse toResponse(Reporte reporte) {
         return new ReporteResponse(reporte.getId(), reporte.getUsuarioId(), reporte.getCalleId(),
-                reporte.getCategoriaId(), reporte.getDireccionOsm(), reporte.getDescripcion(), reporte.getFotoUrl(), reporte.getLatitud(),
+                reporte.getCategoriaId(), reporte.getDireccionOsm(), reporte.getDescripcion(),
+                reporte.getFotos() == null ? List.of() : List.copyOf(reporte.getFotos()), reporte.getLatitud(),
                 reporte.getLongitud(), reporte.getEstado(), reporte.getPrioridad(), reporte.getFechaCreacion(),
                 reporte.getFechaActualizacion(), reporte.getHistorialEstados().stream().map(this::toHistorialResponse).toList());
     }

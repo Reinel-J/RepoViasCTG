@@ -121,9 +121,22 @@ rechazar un reporte.
 ### Contratos actualizados
 
 - `POST /api/reportes` ya no recibe `calleId` ni `prioridad`; recibe categoría como texto,
-  descripción, foto opcional y coordenadas.
+  descripción y coordenadas.
 - `PUT /api/reportes/{id}` tampoco modifica la prioridad.
 - Las respuestas de reportes incluyen `direccionOsm`, que puede ser `null`.
+
+### Fotos adjuntas
+
+Los reportes permiten adjuntar hasta tres fotos reales en formato JPEG, PNG o WEBP. El
+formulario muestra miniaturas antes de enviar y crea el reporte antes de transferir los archivos
+mediante `POST /api/reportes/{id}/fotos` como `multipart/form-data` bajo la clave `archivos`.
+Cada archivo puede pesar hasta 5 MB.
+
+El backend valida la firma binaria y la extensión de cada imagen, verifica que quien la sube sea
+el propietario del reporte y genera un nombre UUID para almacenarla fuera de los datos MongoDB.
+Las rutas públicas generadas se exponen en el arreglo `fotos` de cada respuesta y se sirven desde
+`/uploads/**`. El volumen `uploads_data` conserva esos archivos en Docker aunque se reconstruya
+el contenedor del backend.
 
 ## Docker
 
