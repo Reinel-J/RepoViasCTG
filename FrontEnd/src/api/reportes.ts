@@ -23,6 +23,13 @@ export async function crear(data: ReporteCrearRequest): Promise<ReporteResponse>
   return response.data
 }
 
+export async function subirFotos(reporteId: string, archivos: File[]): Promise<ReporteResponse> {
+  const formData = new FormData()
+  archivos.forEach((archivo) => formData.append('archivos', archivo))
+  const response = await client.post<ReporteResponse>(`/reportes/${reporteId}/fotos`, formData)
+  return response.data
+}
+
 export async function actualizar(id: string, data: ReporteActualizarRequest): Promise<ReporteResponse> {
   const response = await client.put<ReporteResponse>(`/reportes/${id}`, data)
   return response.data

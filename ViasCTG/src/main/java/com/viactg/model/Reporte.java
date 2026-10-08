@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.index.GeoSpatialIndexType;
@@ -31,7 +32,9 @@ public class Reporte {
     private String categoriaId;
     private String direccionOsm;
     private String descripcion;
-    private String fotoUrl;
+    @Size(max = 3)
+    @Builder.Default
+    private List<String> fotos = new ArrayList<>();
     private Double latitud;
     private Double longitud;
 

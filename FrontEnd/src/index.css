@@ -1182,6 +1182,40 @@ textarea:focus {
   justify-self: end;
 }
 
+.photo-previews,
+.report-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.photo-previews figure {
+  position: relative;
+  width: min(10rem, 100%);
+  margin: 0;
+}
+
+.photo-previews img {
+  display: block;
+  width: 100%;
+  height: 7rem;
+  object-fit: cover;
+  border-radius: 0.8rem;
+}
+
+.photo-previews button {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--white);
+  cursor: pointer;
+}
+
 .location-picker {
   position: relative;
 }
@@ -1267,6 +1301,11 @@ textarea:focus {
 .report-image {
   max-height: 30rem;
   object-fit: cover;
+}
+
+.report-gallery .report-image {
+  flex: 1 1 14rem;
+  min-width: 0;
 }
 
 .comments h2 {

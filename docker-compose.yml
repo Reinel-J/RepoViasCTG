@@ -16,6 +16,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
     ports:
       - "8080:8080"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       - mongo
 
@@ -32,3 +34,4 @@ services:
 
 volumes:
   mongo_data:
+  uploads_data:

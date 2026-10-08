@@ -69,7 +69,7 @@ class ReporteServiceTests {
                 .thenReturn(actualizado);
 
         Reporte resultado = new ReporteService(reporteRepository, mock(UsuarioRepository.class), usuarioService,
-                mongoTemplate, mock(GeocodingService.class))
+                mongoTemplate, mock(GeocodingService.class), "/tmp/viasctg-test-uploads")
                 .cambiarEstadoReporte("reporte-1", EstadoReporte.EN_REVISION, "admin-1", "En revisión", null);
 
         assertThat(resultado.getEstado()).isEqualTo(EstadoReporte.EN_REVISION);
@@ -77,6 +77,6 @@ class ReporteServiceTests {
 
     private ReporteService crearServicio(MongoTemplate mongoTemplate) {
         return new ReporteService(mock(ReporteRepository.class), mock(UsuarioRepository.class), mock(UsuarioService.class),
-                mongoTemplate, mock(GeocodingService.class));
+                mongoTemplate, mock(GeocodingService.class), "/tmp/viasctg-test-uploads");
     }
 }

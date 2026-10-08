@@ -8,6 +8,12 @@ import { Icon, StatusBadge } from "../app/components/UI"
 import { MapaReportes } from "../components/MapaReportes"
 import { useAuth } from "../context/AuthContext"
 
+const URL_BACKEND = (import.meta.env.VITE_API_URL ?? "http://localhost:8080/api").replace(/\/api\/?$/, "")
+
+function urlFoto(ruta: string) {
+  return ruta.startsWith("http") ? ruta : `${URL_BACKEND}${ruta}`
+}
+
 export function DetalleReporte() {
   const { id } = useParams()
   const { session } = useAuth()
@@ -62,7 +68,9 @@ export function DetalleReporte() {
       <div className="detail-grid">
         <div className="detail-main">
           <div className="detail-title"><StatusBadge status={reporte.estado} /><span className={`priority priority-${reporte.prioridad.toLowerCase()}`}>{reporte.prioridad}</span><h1>{reporte.descripcion}</h1><p>Publicado el {new Date(reporte.fechaCreacion).toLocaleString("es-CO")}</p></div>
-          {reporte.fotoUrl && <img className="report-image" src={reporte.fotoUrl} alt="Daño vial reportado" />}
+          {reporte.fotos.length > 0 && <div className="report-gallery">
+            {reporte.fotos.map((foto, index) => <img className="report-image" key={foto} src={urlFoto(foto)} alt={`Daño vial reportado, foto ${index + 1}`} />)}
+          </div>}
           <div className="detail-map"><MapaReportes reportes={[reporte]} /></div>
           <section className="comments">
             <h2>Conversación <span>{comentarios.length}</span></h2>

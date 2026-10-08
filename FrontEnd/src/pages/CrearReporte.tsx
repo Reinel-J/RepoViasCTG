@@ -1,19 +1,31 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 import * as geocodingApi from "../api/geocoding"
 import * as reportesApi from "../api/reportes"
 import { Icon } from "../app/components/UI"
 import { MapaSeleccionPunto } from "../components/MapaSeleccionPunto"
 
+interface FotoSeleccionada {
+  archivo: File
+  previsualizacion: string
+}
+
+const TIPOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"]
+
 export function CrearReporte() {
   const navigate = useNavigate()
   const [categoriaId, setCategoriaId] = useState("")
   const [descripcion, setDescripcion] = useState("")
-  const [fotoUrl, setFotoUrl] = useState("")
+  const [fotos, setFotos] = useState<FotoSeleccionada[]>([])
   const [coordenadas, setCoordenadas] = useState<[number, number]>()
   const [direccionOsm, setDireccionOsm] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [enviando, setEnviando] = useState(false)
+  const previsualizaciones = useRef<string[]>([])
+
+  useEffect(() => () => {
+    previsualizaciones.current.forEach((url) => URL.revokeObjectURL(url))
+  }, [])
 
   useEffect(() => {
     if (!coordenadas) {
@@ -27,6 +39,31 @@ export function CrearReporte() {
     return () => { vigente = false }
   }, [coordenadas])
 
+  function seleccionarFotos(event: ChangeEvent<HTMLInputElement>) {
+    const archivos = Array.from(event.target.files ?? [])
+    const archivosValidos = archivos.filter((archivo) => TIPOS_IMAGEN_PERMITIDOS.includes(archivo.type))
+    const disponibles = 3 - fotos.length
+    const nuevos = archivosValidos.slice(0, disponibles).map((archivo) => ({
+      archivo,
+      previsualizacion: URL.createObjectURL(archivo),
+    }))
+    previsualizaciones.current.push(...nuevos.map((foto) => foto.previsualizacion))
+    setFotos((actuales) => [...actuales, ...nuevos])
+    event.target.value = ""
+
+    if (archivosValidos.length !== archivos.length) {
+      setError("Solo se permiten imágenes JPEG, PNG o WEBP.")
+    } else if (archivos.length > disponibles) {
+      setError("Puedes seleccionar un máximo de 3 fotos.")
+    }
+  }
+
+  function quitarFoto(previsualizacion: string) {
+    URL.revokeObjectURL(previsualizacion)
+    previsualizaciones.current = previsualizaciones.current.filter((url) => url !== previsualizacion)
+    setFotos((actuales) => actuales.filter((foto) => foto.previsualizacion !== previsualizacion))
+  }
+
   async function manejarEnvio(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!coordenadas) {
@@ -39,10 +76,12 @@ export function CrearReporte() {
       const reporte = await reportesApi.crear({
         categoriaId,
         descripcion,
-        ...(fotoUrl.trim() ? { fotoUrl: fotoUrl.trim() } : {}),
         latitud: coordenadas[0],
         longitud: coordenadas[1],
       })
+      if (fotos.length) {
+        await reportesApi.subirFotos(reporte.id, fotos.map((foto) => foto.archivo))
+      }
       navigate(`/reportes/${reporte.id}`)
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el reporte.")
@@ -68,9 +107,16 @@ export function CrearReporte() {
               <textarea minLength={10} maxLength={2000} value={descripcion} onChange={(event) => setDescripcion(event.target.value)} placeholder="Describe el daño, referencias cercanas y cualquier detalle útil…" required />
               <small>{descripcion.length}/2000 caracteres</small>
             </label>
-            <label>URL de la foto <small>(opcional)</small>
-              <input type="url" value={fotoUrl} onChange={(event) => setFotoUrl(event.target.value)} placeholder="https://…" />
+            <label className="field-wide">Fotos <small>(opcional, máximo 3)</small>
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={seleccionarFotos} disabled={fotos.length === 3} />
+              <small>Formatos admitidos: JPEG, PNG y WEBP. Máximo 5 MB por foto.</small>
             </label>
+            {fotos.length > 0 && <div className="photo-previews field-wide">
+              {fotos.map((foto) => <figure key={foto.previsualizacion}>
+                <img src={foto.previsualizacion} alt={`Previsualización de ${foto.archivo.name}`} />
+                <button type="button" onClick={() => quitarFoto(foto.previsualizacion)} aria-label={`Quitar ${foto.archivo.name}`}>×</button>
+              </figure>)}
+            </div>}
           </div>
         </section>
         <section className="form-card">

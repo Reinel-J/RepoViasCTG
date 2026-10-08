@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
@@ -38,4 +39,9 @@ public class ReporteController {
     public ReporteResponse crear(@AuthenticationPrincipal UsuarioPrincipal principal, @Valid @RequestBody ReporteCrearRequest request) { return reporteMapper.toResponse(reporteService.crear(request, principal.getId())); }
     @PutMapping("/{id}")
     public ReporteResponse actualizar(@PathVariable String id, @AuthenticationPrincipal UsuarioPrincipal principal, @Valid @RequestBody ReporteActualizarRequest request) { return reporteMapper.toResponse(reporteService.actualizar(id, request, principal.getId())); }
+    @PostMapping(path = "/{id}/fotos", consumes = "multipart/form-data")
+    public ReporteResponse subirFotos(@PathVariable String id, @AuthenticationPrincipal UsuarioPrincipal principal,
+                                      @RequestParam("archivos") List<MultipartFile> archivos) {
+        return reporteMapper.toResponse(reporteService.subirFotos(id, archivos, principal.getId()));
+    }
 }
