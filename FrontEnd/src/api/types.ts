@@ -38,13 +38,11 @@ export interface UsuarioRegistroRequest {
 }
 
 export interface ReporteCrearRequest {
-  calleId: string
   categoriaId: string
   descripcion: string
   fotoUrl?: string
   latitud: number
   longitud: number
-  prioridad: PrioridadReporte
 }
 
 export interface ReporteActualizarRequest {
@@ -52,7 +50,6 @@ export interface ReporteActualizarRequest {
   fotoUrl?: string
   latitud: number
   longitud: number
-  prioridad: PrioridadReporte
 }
 
 export interface ComentarioCrearRequest {
@@ -62,6 +59,7 @@ export interface ComentarioCrearRequest {
 export interface CambioEstadoRequest {
   nuevoEstado: EstadoReporte
   comentario?: string
+  prioridad?: PrioridadReporte
 }
 
 export interface HistorialEstadoResponse {
@@ -76,8 +74,9 @@ export interface HistorialEstadoResponse {
 export interface ReporteResponse {
   id: string
   usuarioId: string
-  calleId: string
+  calleId: string | null
   categoriaId: string
+  direccionOsm: string | null
   descripcion: string
   fotoUrl: string | null
   latitud: number

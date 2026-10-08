@@ -2,8 +2,6 @@ package com.viactg.service;
 
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.Reporte;
-import com.viactg.repository.BarrioRepository;
-import com.viactg.repository.CategoriaRepository;
 import com.viactg.repository.ReporteRepository;
 import com.viactg.repository.UsuarioRepository;
 import org.bson.Document;
@@ -70,15 +68,15 @@ class ReporteServiceTests {
         when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Reporte.class)))
                 .thenReturn(actualizado);
 
-        Reporte resultado = new ReporteService(reporteRepository, mock(UsuarioRepository.class), mock(BarrioRepository.class),
-                mock(CategoriaRepository.class), usuarioService, mongoTemplate)
-                .cambiarEstadoReporte("reporte-1", EstadoReporte.EN_REVISION, "admin-1", "En revisión");
+        Reporte resultado = new ReporteService(reporteRepository, mock(UsuarioRepository.class), usuarioService,
+                mongoTemplate, mock(GeocodingService.class))
+                .cambiarEstadoReporte("reporte-1", EstadoReporte.EN_REVISION, "admin-1", "En revisión", null);
 
         assertThat(resultado.getEstado()).isEqualTo(EstadoReporte.EN_REVISION);
     }
 
     private ReporteService crearServicio(MongoTemplate mongoTemplate) {
-        return new ReporteService(mock(ReporteRepository.class), mock(UsuarioRepository.class), mock(BarrioRepository.class),
-                mock(CategoriaRepository.class), mock(UsuarioService.class), mongoTemplate);
+        return new ReporteService(mock(ReporteRepository.class), mock(UsuarioRepository.class), mock(UsuarioService.class),
+                mongoTemplate, mock(GeocodingService.class));
     }
 }

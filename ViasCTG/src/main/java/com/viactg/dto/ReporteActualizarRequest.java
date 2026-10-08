@@ -1,6 +1,5 @@
 package com.viactg.dto;
 
-import com.viactg.model.PrioridadReporte;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -17,7 +16,6 @@ public record ReporteActualizarRequest(
         @NotNull
         @DecimalMin(value = "-180.0", message = "La longitud debe ser mayor o igual a -180")
         @DecimalMax(value = "180.0", message = "La longitud debe ser menor o igual a 180")
-        Double longitud,
-        @NotNull PrioridadReporte prioridad
+        Double longitud
 ) {
 }

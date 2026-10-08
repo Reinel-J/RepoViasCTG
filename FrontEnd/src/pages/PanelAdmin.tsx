@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import * as adminApi from "../api/admin"
-import type { EstadoReporte, ReporteResponse } from "../api/types"
+import type { EstadoReporte, PrioridadReporte, ReporteResponse } from "../api/types"
 import { Icon } from "../app/components/UI"
 
 const SIGUIENTES_ESTADOS: EstadoReporte[] = ["EN_REVISION", "RECHAZADO"]
@@ -10,16 +10,17 @@ export function PanelAdmin() {
   const [error, setError] = useState("")
   const [cargando, setCargando] = useState(true)
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
+  const [prioridades, setPrioridades] = useState<Record<string, PrioridadReporte>>({})
 
   useEffect(() => {
     adminApi.listarPendientes().then(setReportes).catch((exception) => setError(exception instanceof Error ? exception.message : "No fue posible cargar los reportes pendientes.")).finally(() => setCargando(false))
   }, [])
 
-  async function actualizarEstado(reporteId: string, nuevoEstado: EstadoReporte) {
+  async function actualizarEstado(reporteId: string, nuevoEstado: EstadoReporte, prioridad: PrioridadReporte) {
     setProcesandoId(reporteId)
     setError("")
     try {
-      await adminApi.cambiarEstado(reporteId, nuevoEstado)
+      await adminApi.cambiarEstado(reporteId, nuevoEstado, undefined, prioridad)
       setReportes((current) => current.filter((report) => report.id !== reporteId))
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible actualizar el estado.")
@@ -40,7 +41,19 @@ export function PanelAdmin() {
             <span className={`priority priority-${reporte.prioridad.toLowerCase()}`}>{reporte.prioridad}</span>
             <div><small>Reporte #{reporte.id.slice(0, 7)}</small><h2>{reporte.descripcion}</h2><p>{new Date(reporte.fechaCreacion).toLocaleDateString("es-CO")}</p></div>
             <div className="admin-actions">
-              {SIGUIENTES_ESTADOS.map((estado) => <button className={estado === "RECHAZADO" ? "button button-ghost" : "button button-dark"} key={estado} disabled={procesandoId === reporte.id} onClick={() => actualizarEstado(reporte.id, estado)}>{estado === "RECHAZADO" ? "Rechazar" : "Revisar"}</button>)}
+              <label>
+                Prioridad
+                <select
+                  value={prioridades[reporte.id] ?? reporte.prioridad}
+                  disabled={procesandoId === reporte.id}
+                  onChange={(event) => setPrioridades((current) => ({ ...current, [reporte.id]: event.target.value as PrioridadReporte }))}
+                >
+                  <option value="BAJA">Baja</option>
+                  <option value="MEDIA">Media</option>
+                  <option value="ALTA">Alta</option>
+                </select>
+              </label>
+              {SIGUIENTES_ESTADOS.map((estado) => <button className={estado === "RECHAZADO" ? "button button-ghost" : "button button-dark"} key={estado} disabled={procesandoId === reporte.id} onClick={() => actualizarEstado(reporte.id, estado, prioridades[reporte.id] ?? reporte.prioridad)}>{estado === "RECHAZADO" ? "Rechazar" : "Revisar"}</button>)}
             </div>
           </article>
         ))}

@@ -4,65 +4,21 @@ import * as reportesApi from "../../api/reportes"
 import type { ReporteResponse } from "../../api/types"
 import { Icon, StatusBadge } from "../components/UI"
 
-const fallbackReports: ReporteResponse[] = [
-  {
-    id: "demo-1",
-    usuarioId: "",
-    calleId: "",
-    categoriaId: "",
-    descripcion: "Hueco profundo sobre la Avenida Pedro de Heredia",
-    fotoUrl: null,
-    latitud: 10.403,
-    longitud: -75.503,
-    estado: "EN_REVISION",
-    prioridad: "ALTA",
-    fechaCreacion: new Date().toISOString(),
-    fechaActualizacion: new Date().toISOString(),
-    historialEstados: [],
-  },
-  {
-    id: "demo-2",
-    usuarioId: "",
-    calleId: "",
-    categoriaId: "",
-    descripcion: "Tramo sin pavimentar en el barrio Olaya",
-    fotoUrl: null,
-    latitud: 10.401,
-    longitud: -75.466,
-    estado: "PENDIENTE",
-    prioridad: "MEDIA",
-    fechaCreacion: new Date(Date.now() - 86400000).toISOString(),
-    fechaActualizacion: new Date().toISOString(),
-    historialEstados: [],
-  },
-  {
-    id: "demo-3",
-    usuarioId: "",
-    calleId: "",
-    categoriaId: "",
-    descripcion: "Hundimiento atendido en la Avenida San Martín",
-    fotoUrl: null,
-    latitud: 10.405,
-    longitud: -75.556,
-    estado: "RESUELTO",
-    prioridad: "MEDIA",
-    fechaCreacion: new Date(Date.now() - 172800000).toISOString(),
-    fechaActualizacion: new Date().toISOString(),
-    historialEstados: [],
-  },
-]
-
 export function Home() {
   const navigate = useNavigate()
   const [query, setQuery] = useState("")
-  const [reports, setReports] = useState<ReporteResponse[]>(fallbackReports)
+  const [reports, setReports] = useState<ReporteResponse[]>([])
 
   useEffect(() => {
     reportesApi
       .listar()
-      .then((data) => data.length && setReports(data.slice(0, 3)))
+      .then(setReports)
       .catch(() => undefined)
   }, [])
+
+  const resolvedReports = reports.filter((report) => report.estado === "RESUELTO").length
+  const reportsWithResponse = reports.filter((report) => report.estado !== "PENDIENTE").length
+  const responseRate = reports.length ? Math.round((reportsWithResponse / reports.length) * 100) : 0
 
   function search(event: FormEvent) {
     event.preventDefault()
@@ -118,7 +74,7 @@ export function Home() {
       </section>
 
       <section className="stats">
-        {[["1.248", "Reportes ciudadanos"], ["386", "Problemas resueltos"], ["42", "Barrios participando"], ["76%", "Reciben respuesta"]].map(([value, label]) => (
+        {[[String(reports.length), "Reportes ciudadanos"], [String(resolvedReports), "Problemas resueltos"], ["0", "Barrios participando"], [`${responseRate}%`, "Reciben respuesta"]].map(([value, label]) => (
           <div key={label}><strong>{value}</strong><span>{label}</span></div>
         ))}
       </section>
@@ -128,19 +84,28 @@ export function Home() {
           <div><span className="eyebrow">La ciudad en tiempo real</span><h2>Reportes de la comunidad</h2></div>
           <Link className="arrow-link" to="/reportes">Explorar todos <Icon name="arrow" /></Link>
         </div>
-        <div className="report-grid">
-          {reports.map((report) => (
+        {reports.length === 0 ? (
+          <div className="empty-state">
+            <Icon name="road" className="empty-icon" />
+            <h2>Aún no hay reportes</h2>
+            <p>Sé el primero en reportar un daño vial.</p>
+            <Link className="button button-primary" to="/reportes/nuevo">Crear un reporte <Icon name="arrow" /></Link>
+          </div>
+        ) : (
+          <div className="report-grid">
+            {reports.slice(0, 3).map((report) => (
             <article className="report-card" key={report.id}>
               <div className="report-card-top"><span className="category-icon"><Icon name="road" /></span><StatusBadge status={report.estado} /></div>
               <small>{report.prioridad} prioridad</small>
               <h3>{report.descripcion}</h3>
               <div className="report-card-footer">
                 <span>{new Date(report.fechaCreacion).toLocaleDateString("es-CO")}</span>
-                {!report.id.startsWith("demo-") && <Link to={`/reportes/${report.id}`}>Ver detalle →</Link>}
+                <Link to={`/reportes/${report.id}`}>Ver detalle →</Link>
               </div>
             </article>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="how">
