@@ -1711,3 +1711,32 @@ textarea:focus {
     transition-duration: 0.01ms !important;
   }
 }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.alert.success {
+  background: #e7f6ec;
+  color: #1d6b3a;
+}
+
+.notification.is-read {
+  opacity: 0.6;
+}
+
+.notification-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: #eb654c;
+  flex-shrink: 0;
+}
+
+.notification.is-read .notification-dot {
+  background: #c9c9c9;
+}

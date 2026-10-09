@@ -9,8 +9,10 @@ import com.viactg.security.JwtService;
 import com.viactg.security.UsuarioPrincipal;
 import com.viactg.service.UsuarioService;
 import jakarta.validation.Valid;
+import com.viactg.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -41,9 +43,15 @@ public class AuthController {
 
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        Usuario usuario = usuarioService.buscarPorEmail(request.email());
+        Usuario usuario;
+        try {
+            usuario = usuarioService.buscarPorEmail(request.email());
+        } catch (ResourceNotFoundException exception) {
+            // Misma respuesta que una contraseña incorrecta para no revelar qué correos existen.
+            throw new BadCredentialsException("Credenciales inválidas o usuario inactivo");
+        }
         if (!usuario.isActivo() || !passwordEncoder.matches(request.password(), usuario.getPasswordHash())) {
-            throw new com.viactg.exception.ForbiddenOperationException("Credenciales inválidas o usuario inactivo");
+            throw new BadCredentialsException("Credenciales inválidas o usuario inactivo");
         }
         UsuarioPrincipal principal = new UsuarioPrincipal(usuario);
         return new AuthResponse(jwtService.generarToken(principal), "Bearer", usuarioMapper.toResponse(usuario));

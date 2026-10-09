@@ -1,22 +1,8 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import * as authApi from '../api/auth'
-import type { AuthResponse, Rol } from '../api/types'
+import type { AuthResponse } from '../api/types'
+import { AuthContext, type AuthSession } from './authContextValue'
 
-interface AuthSession {
-  token: string
-  usuarioId: string
-  nombre: string
-  rol: Rol
-}
-
-interface AuthContextValue {
-  session: AuthSession | null
-  login: (email: string, password: string) => Promise<void>
-  registro: (nombre: string, email: string, password: string) => Promise<void>
-  logout: () => void
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 const SESSION_STORAGE_KEY = 'authSession'
 
 function obtenerSesionGuardada(): AuthSession | null {
@@ -68,15 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null)
   }
 
-  return <AuthContext.Provider value={{ session, login, registro, logout }}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-
-  if (!context) {
-    throw new Error('useAuth debe utilizarse dentro de AuthProvider')
+  function actualizarNombre(nombre: string) {
+    setSession((actual) => {
+      if (!actual) return actual
+      const nueva = { ...actual, nombre }
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nueva))
+      return nueva
+    })
   }
 
-  return context
+  return <AuthContext.Provider value={{ session, login, registro, logout, actualizarNombre }}>{children}</AuthContext.Provider>
 }

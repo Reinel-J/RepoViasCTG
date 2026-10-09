@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { NavLink, Outlet, useNavigate } from "react-router"
-import { useAuth } from "../../context/AuthContext"
+import { useAuth } from "../../context/useAuth"
 import { BrandMark, Icon } from "./UI"
 
 export function Layout() {
@@ -28,6 +28,7 @@ export function Layout() {
             <nav aria-label="Navegación principal">
               <NavLink to="/reportes" onClick={() => setOpen(false)}>Reportes</NavLink>
               <NavLink to="/mapa" onClick={() => setOpen(false)}>Mapa</NavLink>
+              {session && <NavLink to="/notificaciones" onClick={() => setOpen(false)}>Notificaciones</NavLink>}
               {session && session.rol !== "CIUDADANO" && (
                 <NavLink to="/admin" onClick={() => setOpen(false)}>Moderación</NavLink>
               )}
@@ -35,7 +36,7 @@ export function Layout() {
             <div className="session-actions">
               {session ? (
                 <>
-                  <span className="user-chip"><Icon name="user" /> {session.nombre}</span>
+                  <NavLink className="user-chip" to="/perfil" onClick={() => setOpen(false)}><Icon name="user" /> {session.nombre}</NavLink>
                   <button className="text-button" onClick={signOut}>Cerrar sesión</button>
                 </>
               ) : (

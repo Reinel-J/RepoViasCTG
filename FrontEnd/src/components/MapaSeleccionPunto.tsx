@@ -1,3 +1,5 @@
+import 'leaflet/dist/leaflet.css'
+import './leafletIconFix'
 import { useEffect, useState } from 'react'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 
@@ -29,7 +31,7 @@ function CentrarMapa({ punto }: { punto: Punto }) {
   const map = useMap()
 
   useEffect(() => {
-    map.setView(punto, 15)
+    map.setView(punto, 15, { animate: false })
   }, [map, punto])
 
   return null

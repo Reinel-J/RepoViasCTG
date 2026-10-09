@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { Link, useNavigate } from "react-router"
 import { Icon } from "../app/components/UI"
-import { useAuth } from "../context/AuthContext"
+import { useAuth } from "../context/useAuth"
 
 export function Login() {
   const { login } = useAuth()
