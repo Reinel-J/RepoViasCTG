@@ -15,6 +15,7 @@
 - CORS configurable por entorno (`CORS_ALLOWED_ORIGINS`).
 - Notificación automática al autor cuando cambia el estado de su reporte, y nombre del autor en los comentarios.
 - Gestión de usuarios para `ADMIN` (rol y activación), eliminación de calles y administrador inicial por `ADMIN_EMAIL`/`ADMIN_PASSWORD`; los tokens de cuentas desactivadas dejan de valer.
+- Límite de intentos en login, registro y recuperación; recuperación de contraseña por correo con token de un solo uso; cambio de contraseña; revocación de sesiones por versión de token.
 - OpenAPI/Swagger y documentación de configuración actualizada.
 - Prueba unitaria de la transición de estado; `./mvnw test` pasa.
 
@@ -25,7 +26,7 @@
 - Auditoría, observabilidad y límites de tasa.
 - `User-Agent` de Nominatim con un contacto real (hoy `contacto@ejemplo.com`), configurable.
 - Regla de fotos: permitir a moderadores y restringir por estado del reporte.
-- Limpiar el frontend duplicado (`src/App.tsx` vs `src/app/App.tsx`, `src/pages` vs `src/app/pages`).
+- Mover el límite de intentos a un almacén compartido si se despliegan varias réplicas del backend.
 - Automatización de despliegue y configuración por perfiles (`local`, `test`, `prod`).
 
 ## Decisiones vigentes

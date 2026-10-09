@@ -2,58 +2,58 @@ package com.viactg.controller;
 
 import com.viactg.dto.AuthResponse;
 import com.viactg.dto.LoginRequest;
+import com.viactg.dto.RecuperarPasswordRequest;
+import com.viactg.dto.RestablecerPasswordRequest;
 import com.viactg.dto.UsuarioRegistroRequest;
 import com.viactg.mapper.UsuarioMapper;
 import com.viactg.model.Usuario;
 import com.viactg.security.JwtService;
 import com.viactg.security.UsuarioPrincipal;
-import com.viactg.service.UsuarioService;
+import com.viactg.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import com.viactg.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    private final UsuarioService usuarioService;
+    private final AuthService authService;
     private final UsuarioMapper usuarioMapper;
-    private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public AuthController(UsuarioService usuarioService, UsuarioMapper usuarioMapper, PasswordEncoder passwordEncoder, JwtService jwtService) {
-        this.usuarioService = usuarioService;
+    public AuthController(AuthService authService, UsuarioMapper usuarioMapper, JwtService jwtService) {
+        this.authService = authService;
         this.usuarioMapper = usuarioMapper;
-        this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
 
     @PostMapping("/registro")
-    public ResponseEntity<AuthResponse> registrar(@Valid @RequestBody UsuarioRegistroRequest request) {
-        Usuario usuario = usuarioService.registrar(request);
-        UsuarioPrincipal principal = new UsuarioPrincipal(usuario);
-        return ResponseEntity.status(HttpStatus.CREATED).body(new AuthResponse(jwtService.generarToken(principal), "Bearer", usuarioMapper.toResponse(usuario)));
+    public ResponseEntity<AuthResponse> registrar(@Valid @RequestBody UsuarioRegistroRequest request, HttpServletRequest http) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(respuesta(authService.registrar(request, http.getRemoteAddr())));
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        Usuario usuario;
-        try {
-            usuario = usuarioService.buscarPorEmail(request.email());
-        } catch (ResourceNotFoundException exception) {
-            // Misma respuesta que una contraseña incorrecta para no revelar qué correos existen.
-            throw new BadCredentialsException("Credenciales inválidas o usuario inactivo");
-        }
-        if (!usuario.isActivo() || !passwordEncoder.matches(request.password(), usuario.getPasswordHash())) {
-            throw new BadCredentialsException("Credenciales inválidas o usuario inactivo");
-        }
-        UsuarioPrincipal principal = new UsuarioPrincipal(usuario);
-        return new AuthResponse(jwtService.generarToken(principal), "Bearer", usuarioMapper.toResponse(usuario));
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        return respuesta(authService.login(request.email(), request.password(), http.getRemoteAddr()));
+    }
+
+    @PostMapping("/recuperar") @ResponseStatus(HttpStatus.ACCEPTED)
+    public void recuperar(@Valid @RequestBody RecuperarPasswordRequest request, HttpServletRequest http) {
+        authService.solicitarRecuperacion(request.email(), http.getRemoteAddr());
+    }
+
+    @PostMapping("/restablecer") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restablecer(@Valid @RequestBody RestablecerPasswordRequest request) {
+        authService.restablecer(request.token(), request.passwordNueva());
+    }
+
+    private AuthResponse respuesta(Usuario usuario) {
+        return new AuthResponse(jwtService.generarToken(new UsuarioPrincipal(usuario)), "Bearer", usuarioMapper.toResponse(usuario));
     }
 }

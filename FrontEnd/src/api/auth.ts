@@ -12,3 +12,11 @@ export async function registro(nombre: string, email: string, password: string):
   const response = await client.post<AuthResponse>('/auth/registro', request)
   return response.data
 }
+
+export async function recuperar(email: string): Promise<void> {
+  await client.post('/auth/recuperar', { email })
+}
+
+export async function restablecer(token: string, passwordNueva: string): Promise<void> {
+  await client.post('/auth/restablecer', { token, passwordNueva })
+}

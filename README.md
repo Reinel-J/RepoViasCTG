@@ -150,9 +150,22 @@ el contenedor del backend.
 | `MONGODB_URI` | Conexión a MongoDB | `mongodb://localhost:27017/viasctg_db` |
 | `CORS_ALLOWED_ORIGINS` | Orígenes permitidos, separados por coma | `http://localhost:5173,http://localhost:3000` |
 | `UPLOADS_DIR` | Carpeta de fotos subidas | `uploads` (en Docker: `/app/uploads`) |
+| `FRONTEND_URL` | URL pública del frontend, para el enlace de recuperación de contraseña | `http://localhost:5173` |
+| `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `MAIL_FROM` | SMTP para enviar el correo de recuperación | vacías: el enlace se escribe en el log |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Crea o promueve el primer administrador al arrancar | vacías (no hace nada) |
 
 En producción define `CORS_ALLOWED_ORIGINS` con el dominio real del frontend.
+
+### Seguridad de cuentas
+
+- **Límite de intentos** (en memoria, por instancia): login 20 intentos por IP y 5 fallos por correo cada
+  15 minutos; registro 5 por IP y hora; recuperación 5 por IP y 3 por correo cada hora. Al superarlo la
+  API responde `429`. Un correo inexistente responde igual (y tarda lo mismo) que una contraseña incorrecta.
+- **Recuperar contraseña**: `/recuperar` envía un enlace de un solo uso válido 30 minutos. Solo se guarda
+  el hash del token (colección `tokens_recuperacion`, con borrado automático al vencer).
+- **Cambiar contraseña** desde el perfil, pidiendo la actual.
+- **Revocar sesiones**: cada usuario tiene una versión de token incluida en el JWT. «Cerrar sesión en todos
+  los dispositivos», cambiar o restablecer la contraseña la incrementan e invalidan los tokens anteriores.
 
 ### Panel de administración
 

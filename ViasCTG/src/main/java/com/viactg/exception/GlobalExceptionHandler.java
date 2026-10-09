@@ -59,6 +59,11 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.BAD_REQUEST, "La solicitud contiene parámetros inválidos", errors);
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException exception) {
+        return response(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), Map.of());
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException exception) {
         return response(HttpStatus.UNAUTHORIZED, "Credenciales inválidas o sesión no autorizada", Map.of());
