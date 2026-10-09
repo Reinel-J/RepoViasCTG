@@ -14,7 +14,7 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
-Variables opcionales: `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) y `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución).
+Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`, o lo promueven si ya existe sin cambiar su contraseña), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) y `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución).
 
 No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email` y `confirmaciones(reporteId, usuarioId)`.
 
@@ -78,20 +78,20 @@ marcadores en un mapa Leaflet/OpenStreetMap.
 | Consultar reportes, barrios y categorías; geocodificación inversa; `/uploads/**` | Público |
 | Crear/editar reportes, comentar, confirmar, consultar comentarios/confirmaciones y datos propios | Usuario autenticado |
 | Cambiar estado e historial de reportes | `ADMIN` o `MODERADOR` |
-| Administrar barrios y categorías; listar usuarios | `ADMIN` |
+| Administrar barrios, calles y categorías; listar usuarios, cambiar su rol y activarlos/desactivarlos | `ADMIN` |
 
-El registro público crea un usuario `CIUDADANO`. La base migrada debe contar con un `ADMIN` inicial. Usa el JWT recibido en el encabezado `Authorization: Bearer <token>`.
+El registro público crea un usuario `CIUDADANO`. El primer `ADMIN` se crea con `ADMIN_EMAIL`/`ADMIN_PASSWORD`. Un administrador no puede cambiar su propio rol ni desactivarse. Los permisos se leen de la base en cada petición: un cambio de rol o una desactivación aplica de inmediato, incluso sobre tokens ya emitidos (un usuario desactivado recibe 401). Usa el JWT recibido en el encabezado `Authorization: Bearer <token>`.
 
 ## Rutas principales
 
 | Recurso | Rutas |
 | --- | --- |
 | Autenticación | `POST /api/auth/registro`, `POST /api/auth/login` |
-| Perfil | `GET/PUT /api/usuarios/me`, `GET /api/usuarios` (`ADMIN`) |
+| Perfil y usuarios | `GET/PUT /api/usuarios/me`; `GET /api/usuarios`, `PATCH /api/usuarios/{id}/rol` (`{"rol":"MODERADOR"}`), `PATCH /api/usuarios/{id}/activo?activo=false` (`ADMIN`) |
 | Reportes | `GET/POST /api/reportes`, `GET /api/reportes/cercanos`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
 | Geocodificación | `GET /api/geocoding/inverso` |
 | Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial` |
-| Barrios y calles | `GET/POST /api/barrios`, `GET/PUT/DELETE /api/barrios/{id}`, `POST /api/barrios/{id}/calles` |
+| Barrios y calles | `GET/POST /api/barrios`, `GET/PUT/DELETE /api/barrios/{id}`, `POST /api/barrios/{id}/calles`, `DELETE /api/barrios/{id}/calles/{calleId}` |
 | Categorías | `GET/POST /api/categorias`, `GET/PUT /api/categorias/{id}`, `PATCH /api/categorias/{id}/estado` |
 | Confirmaciones | `GET/POST /api/reportes/{reporteId}/confirmaciones`, `DELETE /api/reportes/{reporteId}/confirmaciones/me` |
 | Comentarios | `GET/POST /api/reportes/{reporteId}/comentarios`, `PUT/DELETE /api/comentarios/{id}` |

@@ -136,3 +136,18 @@ export interface NotificacionResponse {
   leida: boolean
   fecha: string
 }
+
+export interface BarrioRequest {
+  nombre: string
+  localidad: string
+}
+
+export interface CalleRequest {
+  nombre: string
+  codigoPostal: string
+}
+
+export interface CategoriaRequest {
+  nombre: string
+  descripcion?: string
+}

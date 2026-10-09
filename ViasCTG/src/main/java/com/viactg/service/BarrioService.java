@@ -8,6 +8,7 @@ import com.viactg.model.Calle;
 import com.viactg.repository.BarrioRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,7 +41,14 @@ public class BarrioService {
 
     public Barrio agregarCalle(String barrioId, CalleRequest request) {
         Barrio barrio = buscarPorId(barrioId);
-        barrio.getCalles().add(new Calle(UUID.randomUUID().toString(), request.nombre().trim(), request.codigoPostal().trim()));
+        callesMutables(barrio).add(new Calle(UUID.randomUUID().toString(), request.nombre().trim(), request.codigoPostal().trim()));
+        return barrioRepository.save(barrio);
+    }
+
+    public Barrio eliminarCalle(String barrioId, String calleId) {
+        Barrio barrio = buscarPorId(barrioId);
+        boolean eliminada = callesMutables(barrio).removeIf(calle -> calle.getId().equals(calleId));
+        if (!eliminada) throw new ResourceNotFoundException("Calle no encontrada: " + calleId);
         return barrioRepository.save(barrio);
     }
 
@@ -50,6 +58,12 @@ public class BarrioService {
 
     public void eliminar(String id) {
         barrioRepository.delete(buscarPorId(id));
+    }
+
+    // Las listas creadas con toList() son inmutables; se copia antes de modificar.
+    private List<Calle> callesMutables(Barrio barrio) {
+        barrio.setCalles(barrio.getCalles() == null ? new ArrayList<>() : new ArrayList<>(barrio.getCalles()));
+        return barrio.getCalles();
     }
 
     private List<Calle> mapearCalles(List<CalleRequest> calles) {

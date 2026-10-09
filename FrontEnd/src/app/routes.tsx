@@ -35,7 +35,7 @@ export const router = createBrowserRouter([
       { path: "reportes/nuevo", lazy: paginaProtegida(() => import("../pages/CrearReporte"), "CrearReporte") },
       { path: "reportes/:id", lazy: pagina(() => import("../pages/DetalleReporte"), "DetalleReporte") },
       { path: "mapa", lazy: pagina(() => import("../pages/MapaGeneral"), "MapaGeneral") },
-      { path: "admin", lazy: paginaProtegida(() => import("../pages/PanelAdmin"), "PanelAdmin", "ADMIN") },
+      { path: "admin", lazy: paginaProtegida(() => import("../pages/admin/PanelAdmin"), "PanelAdmin", "ADMIN") },
       { path: "notificaciones", lazy: paginaProtegida(() => import("../pages/Notificaciones"), "Notificaciones") },
       { path: "perfil", lazy: paginaProtegida(() => import("../pages/Perfil"), "Perfil") },
       {

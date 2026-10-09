@@ -150,8 +150,17 @@ el contenedor del backend.
 | `MONGODB_URI` | Conexión a MongoDB | `mongodb://localhost:27017/viasctg_db` |
 | `CORS_ALLOWED_ORIGINS` | Orígenes permitidos, separados por coma | `http://localhost:5173,http://localhost:3000` |
 | `UPLOADS_DIR` | Carpeta de fotos subidas | `uploads` (en Docker: `/app/uploads`) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Crea o promueve el primer administrador al arrancar | vacías (no hace nada) |
 
 En producción define `CORS_ALLOWED_ORIGINS` con el dominio real del frontend.
+
+### Panel de administración
+
+`/admin` reúne la gestión interna. Un `MODERADOR` ve **Resumen** (indicadores y distribución por estado y
+prioridad) y **Reportes** (todos los estados, búsqueda, cambio de estado con prioridad y comentario,
+historial). Un `ADMIN` además gestiona **Usuarios** (rol y activación), **Barrios** (con sus calles) y
+**Categorías** (crear, editar, activar/desactivar). El primer administrador se crea con `ADMIN_EMAIL` y
+`ADMIN_PASSWORD`; después se promueve a otros desde el propio panel.
 
 ## Docker
 
