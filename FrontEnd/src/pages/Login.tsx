@@ -39,6 +39,7 @@ export function Login() {
             {enviando ? "Ingresando…" : "Iniciar sesión"} <Icon name="arrow" />
           </button>
         </form>
+        <p className="auth-switch"><Link to="/recuperar">¿Olvidaste tu contraseña?</Link></p>
         <p className="auth-switch">¿No tienes una cuenta? <Link to="/registro">Regístrate gratis</Link></p>
       </section>
       <aside className="auth-aside">

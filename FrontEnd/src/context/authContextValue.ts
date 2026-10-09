@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { Rol } from '../api/types'
+import type { AuthResponse, Rol } from '../api/types'
 
 export interface AuthSession {
   token: string
@@ -14,6 +14,8 @@ export interface AuthContextValue {
   registro: (nombre: string, email: string, password: string) => Promise<void>
   logout: () => void
   actualizarNombre: (nombre: string) => void
+  /** Guarda el token nuevo que devuelve el backend al cambiar la contraseña. */
+  renovarSesion: (response: AuthResponse) => void
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)

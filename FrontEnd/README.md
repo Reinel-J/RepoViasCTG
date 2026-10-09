@@ -100,12 +100,13 @@ Las rutas se declaran en `src/app/routes.tsx`:
 |------|----------|--------|
 | `/` | Inicio con estadísticas y reportes recientes | Público |
 | `/login`, `/registro` | Inicio de sesión y registro | Público |
+| `/recuperar`, `/restablecer?token=` | Solicitar enlace y crear contraseña nueva | Público |
 | `/reportes` | Lista con filtro por estado, dirección detectada y paginación (10 por página) | Público |
 | `/reportes/:id` | Detalle con fotos, mapa, dirección, comentarios y confirmaciones | Público (comentar y confirmar requieren sesión) |
 | `/mapa` | Mapa general de reportes | Público |
 | `/reportes/nuevo` | Formulario: categoría libre, descripción, hasta 3 fotos y ubicación en el mapa | Sesión iniciada |
 | `/notificaciones` | Notificaciones del usuario, con marcado como leída | Sesión iniciada |
-| `/perfil` | Ver y editar nombre y teléfono | Sesión iniciada |
+| `/perfil` | Editar nombre y teléfono, cambiar contraseña y cerrar sesión en todos los dispositivos | Sesión iniciada |
 | `/admin` | Panel de administración por pestañas (ver abajo) | `MODERADOR` o `ADMIN` |
 
 Notas de comportamiento:
@@ -113,6 +114,7 @@ Notas de comportamiento:
 - Al crear un reporte, las fotos se suben en una segunda petición (`POST /api/reportes/{id}/fotos`).
 - El backend resuelve la dirección de forma asíncrona, así que un reporte recién creado puede
   llegar con `direccionOsm` en `null`. El detalle lo vuelve a consultar a los 4 segundos.
+- Al cambiar la contraseña el backend devuelve un token nuevo y `renovarSesion` lo guarda, así que la sesión actual sigue abierta y las demás se cierran.
 - Los comentarios muestran el nombre real del autor (`usuarioNombre`, que entrega el backend).
 - La paginación de la lista se hace en el cliente sobre la respuesta completa de `GET /api/reportes`;
   mientras el backend no pagine, conviene pasar a paginación del lado del servidor si crece el volumen.

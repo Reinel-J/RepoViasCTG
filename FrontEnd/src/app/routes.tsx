@@ -31,6 +31,8 @@ export const router = createBrowserRouter([
       { index: true, Component: Home },
       { path: "login", lazy: pagina(() => import("../pages/Login"), "Login") },
       { path: "registro", lazy: pagina(() => import("../pages/Registro"), "Registro") },
+      { path: "recuperar", lazy: pagina(() => import("../pages/RecuperarPassword"), "RecuperarPassword") },
+      { path: "restablecer", lazy: pagina(() => import("../pages/RestablecerPassword"), "RestablecerPassword") },
       { path: "reportes", lazy: pagina(() => import("../pages/ListaReportes"), "ListaReportes") },
       { path: "reportes/nuevo", lazy: paginaProtegida(() => import("../pages/CrearReporte"), "CrearReporte") },
       { path: "reportes/:id", lazy: pagina(() => import("../pages/DetalleReporte"), "DetalleReporte") },

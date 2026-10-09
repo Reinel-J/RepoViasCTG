@@ -35,4 +35,6 @@ public class Usuario {
     private Rol rol;
     private boolean activo;
     private Instant fechaRegistro;
+    // Se incrementa para invalidar todos los JWT emitidos antes (cerrar sesiones, cambio de contraseña).
+    private int versionToken;
 }
