@@ -14,6 +14,7 @@
 - Geocodificación inversa con Nominatim, asíncrona y recalculada al editar coordenadas.
 - CORS configurable por entorno (`CORS_ALLOWED_ORIGINS`).
 - Notificación automática al autor cuando cambia el estado de su reporte, y nombre del autor en los comentarios.
+- Gestión de usuarios para `ADMIN` (rol y activación), eliminación de calles y administrador inicial por `ADMIN_EMAIL`/`ADMIN_PASSWORD`; los tokens de cuentas desactivadas dejan de valer.
 - OpenAPI/Swagger y documentación de configuración actualizada.
 - Prueba unitaria de la transición de estado; `./mvnw test` pasa.
 
@@ -21,7 +22,6 @@
 
 - Pruebas de integración con MongoDB desechable (Testcontainers) y pruebas HTTP de seguridad/controladores.
 - Paginación, ordenamiento y filtros avanzados para reportes, comentarios y notificaciones.
-- Flujo controlado para promover usuarios a `MODERADOR` o `ADMIN` y datos iniciales del primer administrador.
 - Auditoría, observabilidad y límites de tasa.
 - `User-Agent` de Nominatim con un contacto real (hoy `contacto@ejemplo.com`), configurable.
 - Regla de fotos: permitir a moderadores y restringir por estado del reporte.

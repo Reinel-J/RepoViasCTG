@@ -2,6 +2,7 @@ package com.viactg.service;
 
 import com.viactg.dto.UsuarioActualizacionRequest;
 import com.viactg.dto.UsuarioRegistroRequest;
+import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.DuplicateResourceException;
 import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.model.Rol;
@@ -52,6 +53,35 @@ public class UsuarioService {
         Usuario usuario = buscarPorId(id);
         if (request.nombre() != null) usuario.setNombre(request.nombre().trim());
         if (request.telefono() != null) usuario.setTelefono(request.telefono());
+        return usuarioRepository.save(usuario);
+    }
+
+    public Usuario cambiarRol(String id, Rol rol, String solicitanteId) {
+        if (id.equals(solicitanteId)) {
+            throw new BusinessRuleException("No puedes cambiar tu propio rol");
+        }
+        Usuario usuario = buscarPorId(id);
+        usuario.setRol(rol);
+        return usuarioRepository.save(usuario);
+    }
+
+    public Usuario cambiarActivo(String id, boolean activo, String solicitanteId) {
+        if (id.equals(solicitanteId)) {
+            throw new BusinessRuleException("No puedes desactivar tu propia cuenta");
+        }
+        Usuario usuario = buscarPorId(id);
+        usuario.setActivo(activo);
+        return usuarioRepository.save(usuario);
+    }
+
+    /** Crea o promueve el administrador inicial; no cambia la contraseña de una cuenta existente. */
+    public Usuario asegurarAdministrador(String email, String password, String nombre) {
+        String emailNormalizado = email.trim().toLowerCase();
+        Usuario usuario = usuarioRepository.findByEmail(emailNormalizado).orElseGet(() -> Usuario.builder()
+                .nombre(nombre).email(emailNormalizado).passwordHash(passwordEncoder.encode(password))
+                .fechaRegistro(Instant.now()).build());
+        usuario.setRol(Rol.ADMIN);
+        usuario.setActivo(true);
         return usuarioRepository.save(usuario);
     }
 

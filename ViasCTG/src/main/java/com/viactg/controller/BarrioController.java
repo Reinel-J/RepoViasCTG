@@ -26,6 +26,8 @@ public class BarrioController {
     public BarrioResponse actualizar(@PathVariable String id, @Valid @RequestBody BarrioRequest request) { return barrioMapper.toResponse(barrioService.actualizar(id, request)); }
     @PostMapping("/{id}/calles") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasRole('ADMIN')")
     public BarrioResponse agregarCalle(@PathVariable String id, @Valid @RequestBody CalleRequest request) { return barrioMapper.toResponse(barrioService.agregarCalle(id, request)); }
+    @DeleteMapping("/{id}/calles/{calleId}") @PreAuthorize("hasRole('ADMIN')")
+    public BarrioResponse eliminarCalle(@PathVariable String id, @PathVariable String calleId) { return barrioMapper.toResponse(barrioService.eliminarCalle(id, calleId)); }
     @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasRole('ADMIN')")
     public void eliminar(@PathVariable String id) { barrioService.eliminar(id); }
 }

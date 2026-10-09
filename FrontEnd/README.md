@@ -68,7 +68,8 @@ Los módulos API disponibles están en `src/api/`:
 - `barrios.ts` y `categorias.ts`: catálogos disponibles en la API; el formulario de reporte ya no
   los usa (la categoría es texto libre).
 - `comentarios.ts` y `confirmaciones.ts`: interacciones por reporte.
-- `admin.ts`: reportes pendientes y transición de estado.
+- `admin.ts`: reportes pendientes, transición de estado, historial y gestión de usuarios.
+- `barrios.ts` y `categorias.ts` también incluyen las operaciones de administración.
 - `notificaciones.ts`: listado y marcado como leída.
 - `usuarios.ts`: perfil propio y actualización de nombre y teléfono.
 
@@ -105,7 +106,7 @@ Las rutas se declaran en `src/app/routes.tsx`:
 | `/reportes/nuevo` | Formulario: categoría libre, descripción, hasta 3 fotos y ubicación en el mapa | Sesión iniciada |
 | `/notificaciones` | Notificaciones del usuario, con marcado como leída | Sesión iniciada |
 | `/perfil` | Ver y editar nombre y teléfono | Sesión iniciada |
-| `/admin` | Panel de moderación: revisar o rechazar pendientes y definir prioridad | `MODERADOR` o `ADMIN` |
+| `/admin` | Panel de administración por pestañas (ver abajo) | `MODERADOR` o `ADMIN` |
 
 Notas de comportamiento:
 
@@ -119,11 +120,25 @@ Notas de comportamiento:
   Al guardar el perfil se actualiza también el nombre mostrado en la barra superior.
 - Cada pantalla se carga bajo demanda (`lazy` del router) y Leaflet solo se descarga al abrir un
   mapa, así que el paquete inicial pesa ~377 kB (antes ~555 kB).
-- El panel de moderación solo gestiona reportes `PENDIENTE` (pasan a `EN_REVISION` o `RECHAZADO`).
+
+## Panel de administración
+
+Vive en `src/pages/admin/`. La pestaña activa va en la URL (`/admin?seccion=reportes&estado=PENDIENTE`),
+así que se puede enlazar directamente.
+
+| Pestaña | Rol | Qué permite |
+|---------|-----|-------------|
+| Resumen | Moderador y admin | Totales, pendientes, activos con prioridad alta, % atendido, antigüedad del pendiente más viejo y distribución por estado y prioridad. Los indicadores enlazan a Reportes filtrado |
+| Reportes | Moderador y admin | Todos los reportes con filtro por estado, búsqueda y paginación; mover al siguiente estado (`PENDIENTE → EN_REVISION → EN_PROCESO → RESUELTO`, o `RECHAZADO`) fijando prioridad y comentario; ver el historial |
+| Usuarios | Admin | Buscar y filtrar por rol, cambiar el rol y activar/desactivar cuentas (no sobre uno mismo) |
+| Barrios | Admin | Crear, editar y eliminar barrios; agregar y quitar calles |
+| Categorías | Admin | Crear, editar, activar y desactivar (no se eliminan) |
+
+Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coincidir con
+`ReporteService.validarTransicion` del backend. Las acciones destructivas piden confirmación.
 
 ## Pendiente
 
-- Avanzar reportes a `EN_PROCESO` y `RESUELTO` desde el panel de moderación.
 - Editar un reporte propio mientras está `PENDIENTE`.
 - Paginación del lado del servidor.
 - Estadística «Barrios participando» (muestra `0`: el reporte no tiene relación con un barrio).

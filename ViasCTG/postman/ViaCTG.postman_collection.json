@@ -1,0 +1,1225 @@
+{
+  "info": {
+    "name": "ViaCTG",
+    "description": "Backend ViaCTG. Haz Login (o Registro) primero: el token se guarda en {{token}} y la colección lo envía como Bearer en todas las peticiones. Las carpetas marcadas (ADMIN/MODERADOR) exigen ese rol: un usuario nuevo es CIUDADANO.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "reporteId",
+      "value": ""
+    },
+    {
+      "key": "barrioId",
+      "value": ""
+    },
+    {
+      "key": "categoriaId",
+      "value": ""
+    },
+    {
+      "key": "comentarioId",
+      "value": ""
+    },
+    {
+      "key": "notificacionId",
+      "value": ""
+    },
+    {
+      "key": "usuarioId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Registro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Crea un usuario CIUDADANO y devuelve el JWT (se guarda en {{token}}). 409 si el correo ya existe.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Postman\",\n  \"email\": \"postman@test.com\",\n  \"password\": \"Password123\",\n  \"telefono\": \"300 123 4567\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.token) { pm.collectionVariables.set('token', d.token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Devuelve el JWT (se guarda en {{token}}). 401 si las credenciales son inválidas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman@test.com\",\n  \"password\": \"Password123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.token) { pm.collectionVariables.set('token', d.token); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reportes",
+      "item": [
+        {
+          "name": "Listar reportes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "PENDIENTE",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Estados: PENDIENTE, EN_REVISION, EN_PROCESO, RESUELTO, RECHAZADO. Guarda el primer id en {{reporteId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const l = pm.response.json();",
+                  "if (Array.isArray(l) && l.length) { pm.collectionVariables.set('reporteId', l[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reportes cercanos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/cercanos?lat=10.391&lng=-75.479&radioKm=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "cercanos"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "10.391",
+                  "disabled": false
+                },
+                {
+                  "key": "lng",
+                  "value": "-75.479",
+                  "disabled": false
+                },
+                {
+                  "key": "radioKm",
+                  "value": "2",
+                  "disabled": false
+                },
+                {
+                  "key": "estado",
+                  "value": "PENDIENTE",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "radioKm debe ser > 0."
+          }
+        },
+        {
+          "name": "Detalle de reporte",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/{{reporteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "{{reporteId}}"
+              ]
+            },
+            "description": "404 si el id no existe."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Barrios",
+      "item": [
+        {
+          "name": "Listar barrios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/barrios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "barrios"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const l = pm.response.json();",
+                  "if (Array.isArray(l) && l.length) { pm.collectionVariables.set('barrioId', l[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle de barrio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/barrios/{{barrioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "barrios",
+                "{{barrioId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categorías",
+      "item": [
+        {
+          "name": "Listar categorías",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categorias?soloActivas=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categorias"
+              ],
+              "query": [
+                {
+                  "key": "soloActivas",
+                  "value": "true",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const l = pm.response.json();",
+                  "if (Array.isArray(l) && l.length) { pm.collectionVariables.set('categoriaId', l[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle de categoría",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categorias/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categorias",
+                "{{categoriaId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Geocodificación",
+      "item": [
+        {
+          "name": "Dirección de un punto (Nominatim)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/geocoding/inverso?lat=10.391&lng=-75.479",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "geocoding",
+                "inverso"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "10.391",
+                  "disabled": false
+                },
+                {
+                  "key": "lng",
+                  "value": "-75.479",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Devuelve { direccionOsm } o null. Limitado a 1 petición por segundo."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documentación",
+      "item": [
+        {
+          "name": "OpenAPI JSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/swagger-ui/index.html",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swagger-ui",
+                "index.html"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Perfil (autenticado)",
+      "item": [
+        {
+          "name": "Mi perfil",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "me"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Actualizar mi perfil",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "me"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Postman\",\n  \"telefono\": \"300 123 4567\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reportes (autenticado)",
+      "item": [
+        {
+          "name": "Crear reporte",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes"
+              ]
+            },
+            "description": "Guarda el id en {{reporteId}}. La dirección OSM llega unos segundos después.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoriaId\": \"Hueco\",\n  \"descripcion\": \"Hueco grande frente al colegio\",\n  \"latitud\": 10.391,\n  \"longitud\": -75.479\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.id) { pm.collectionVariables.set('reporteId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar reporte (solo PENDIENTE)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/{{reporteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "{{reporteId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descripcion\": \"Descripción actualizada del hueco\",\n  \"latitud\": 10.391,\n  \"longitud\": -75.479\n}"
+            }
+          }
+        },
+        {
+          "name": "Subir fotos (máx. 3, JPEG/PNG/WEBP, 5 MB)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/{{reporteId}}/fotos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "{{reporteId}}",
+                "fotos"
+              ]
+            },
+            "description": "En Body > form-data, clave 'archivos' tipo File. No pongas Content-Type a mano.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivos",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comentarios (autenticado)",
+      "item": [
+        {
+          "name": "Listar comentarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/{{reporteId}}/comentarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "{{reporteId}}",
+                "comentarios"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const l = pm.response.json();",
+                  "if (Array.isArray(l) && l.length) { pm.collectionVariables.set('comentarioId', l[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear comentario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/{{reporteId}}/comentarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "{{reporteId}}",
+                "comentarios"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"Confirmo, es peligroso\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.id) { pm.collectionVariables.set('comentarioId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar comentario",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/comentarios/{{comentarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "comentarios",
+                "{{comentarioId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"Texto editado\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar comentario",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comentarios/{{comentarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "comentarios",
+                "{{comentarioId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirmaciones (autenticado)",
+      "item": [
+        {
+          "name": "Listar confirmaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/{{reporteId}}/confirmaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "{{reporteId}}",
+                "confirmaciones"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Confirmar reporte",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/{{reporteId}}/confirmaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "{{reporteId}}",
+                "confirmaciones"
+              ]
+            },
+            "description": "409 si ya confirmaste."
+          }
+        },
+        {
+          "name": "Quitar mi confirmación",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/{{reporteId}}/confirmaciones/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "{{reporteId}}",
+                "confirmaciones",
+                "me"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notificaciones (autenticado)",
+      "item": [
+        {
+          "name": "Listar mis notificaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notificaciones"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const l = pm.response.json();",
+                  "if (Array.isArray(l) && l.length) { pm.collectionVariables.set('notificacionId', l[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Marcar como leída",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notificaciones/{{notificacionId}}/leida",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notificaciones",
+                "{{notificacionId}}",
+                "leida"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Moderación (ADMIN o MODERADOR)",
+      "item": [
+        {
+          "name": "Reportes pendientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reportes/pendientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reportes",
+                "pendientes"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Cambiar estado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reportes/{{reporteId}}/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reportes",
+                "{{reporteId}}",
+                "estado"
+              ]
+            },
+            "description": "Transiciones: PENDIENTE→EN_REVISION/RECHAZADO, EN_REVISION→EN_PROCESO/RECHAZADO, EN_PROCESO→RESUELTO/RECHAZADO. Notifica al autor.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nuevoEstado\": \"EN_REVISION\",\n  \"comentario\": \"Lo revisamos\",\n  \"prioridad\": \"ALTA\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Historial de estados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reportes/{{reporteId}}/historial",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reportes",
+                "{{reporteId}}",
+                "historial"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Administración (solo ADMIN)",
+      "item": [
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const l = pm.response.json();",
+                  "const otro = Array.isArray(l) && l.find(u => u.rol !== 'ADMIN');",
+                  "if (otro) { pm.collectionVariables.set('usuarioId', otro.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar rol de usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{usuarioId}}/rol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "{{usuarioId}}",
+                "rol"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rol\": \"MODERADOR\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Activar/desactivar usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{usuarioId}}/activo?activo=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "{{usuarioId}}",
+                "activo"
+              ],
+              "query": [
+                {
+                  "key": "activo",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear barrio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/barrios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "barrios"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Bocagrande\",\n  \"localidad\": \"Histórica y del Caribe Norte\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.id) { pm.collectionVariables.set('barrioId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar barrio",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/barrios/{{barrioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "barrios",
+                "{{barrioId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Bocagrande\",\n  \"localidad\": \"Histórica y del Caribe Norte\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Agregar calle a barrio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/barrios/{{barrioId}}/calles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "barrios",
+                "{{barrioId}}",
+                "calles"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Avenida San Martín\",\n  \"codigoPostal\": \"130001\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar calle",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/barrios/{{barrioId}}/calles/<calleId>",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "barrios",
+                "{{barrioId}}",
+                "calles",
+                "<calleId>"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Eliminar barrio",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/barrios/{{barrioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "barrios",
+                "{{barrioId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Crear categoría",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categorias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categorias"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Hueco\",\n  \"descripcion\": \"Daño en la capa de rodadura\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.id) { pm.collectionVariables.set('categoriaId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar categoría",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categorias/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categorias",
+                "{{categoriaId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Hueco\",\n  \"descripcion\": \"Daño en la capa de rodadura\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Activar/desactivar categoría",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categorias/{{categoriaId}}/estado?activa=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categorias",
+                "{{categoriaId}}",
+                "estado"
+              ],
+              "query": [
+                {
+                  "key": "activa",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
+}

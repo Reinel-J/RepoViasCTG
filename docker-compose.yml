@@ -14,6 +14,8 @@ services:
     environment:
       MONGODB_URI: mongodb://mongo:27017/viasctg_db
       JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       UPLOADS_DIR: /app/uploads
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
     ports:
