@@ -1,22 +1,26 @@
+import type { ComponentType } from "react"
 import { createBrowserRouter } from "react-router"
-import { AuthProvider } from "../context/AuthContext"
-import { CrearReporte } from "../pages/CrearReporte"
-import { DetalleReporte } from "../pages/DetalleReporte"
-import { ListaReportes } from "../pages/ListaReportes"
-import { Login } from "../pages/Login"
-import { MapaGeneral } from "../pages/MapaGeneral"
-import { PanelAdmin } from "../pages/PanelAdmin"
-import { Registro } from "../pages/Registro"
+import type { Rol } from "../api/types"
 import { ProtectedRoute } from "../routes/ProtectedRoute"
-import { Layout } from "./components/Layout"
+import { Root } from "./components/Root"
 import { Home } from "./pages/Home"
 
-function Root() {
-  return (
-    <AuthProvider>
-      <Layout />
-    </AuthProvider>
-  )
+type Carga = () => Promise<Record<string, unknown>>
+
+// Cada pantalla se descarga bajo demanda para mantener pequeño el paquete inicial.
+const pagina = (carga: Carga, nombre: string) => async () => ({
+  Component: (await carga())[nombre] as ComponentType,
+})
+
+const paginaProtegida = (carga: Carga, nombre: string, requiredRole?: Rol) => async () => {
+  const Pantalla = (await carga())[nombre] as ComponentType
+  return {
+    Component: () => (
+      <ProtectedRoute requiredRole={requiredRole}>
+        <Pantalla />
+      </ProtectedRoute>
+    ),
+  }
 }
 
 export const router = createBrowserRouter([
@@ -25,27 +29,15 @@ export const router = createBrowserRouter([
     Component: Root,
     children: [
       { index: true, Component: Home },
-      { path: "login", Component: Login },
-      { path: "registro", Component: Registro },
-      { path: "reportes", Component: ListaReportes },
-      {
-        path: "reportes/nuevo",
-        element: (
-          <ProtectedRoute>
-            <CrearReporte />
-          </ProtectedRoute>
-        ),
-      },
-      { path: "reportes/:id", Component: DetalleReporte },
-      { path: "mapa", Component: MapaGeneral },
-      {
-        path: "admin",
-        element: (
-          <ProtectedRoute requiredRole="ADMIN">
-            <PanelAdmin />
-          </ProtectedRoute>
-        ),
-      },
+      { path: "login", lazy: pagina(() => import("../pages/Login"), "Login") },
+      { path: "registro", lazy: pagina(() => import("../pages/Registro"), "Registro") },
+      { path: "reportes", lazy: pagina(() => import("../pages/ListaReportes"), "ListaReportes") },
+      { path: "reportes/nuevo", lazy: paginaProtegida(() => import("../pages/CrearReporte"), "CrearReporte") },
+      { path: "reportes/:id", lazy: pagina(() => import("../pages/DetalleReporte"), "DetalleReporte") },
+      { path: "mapa", lazy: pagina(() => import("../pages/MapaGeneral"), "MapaGeneral") },
+      { path: "admin", lazy: paginaProtegida(() => import("../pages/PanelAdmin"), "PanelAdmin", "ADMIN") },
+      { path: "notificaciones", lazy: paginaProtegida(() => import("../pages/Notificaciones"), "Notificaciones") },
+      { path: "perfil", lazy: paginaProtegida(() => import("../pages/Perfil"), "Perfil") },
       {
         path: "*",
         element: (

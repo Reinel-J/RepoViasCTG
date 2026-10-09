@@ -11,7 +11,7 @@ import java.nio.file.Path;
 public class WebConfig implements WebMvcConfigurer {
     private final String uploadsResourceLocation;
 
-    public WebConfig(@Value("${app.uploads.dir:/app/uploads}") String uploadsDirectory) {
+    public WebConfig(@Value("${app.uploads.dir:uploads}") String uploadsDirectory) {
         this.uploadsResourceLocation = Path.of(uploadsDirectory).toAbsolutePath().toUri() + "/";
     }
 

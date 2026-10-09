@@ -63,7 +63,9 @@ Por defecto corre en `http://localhost:5173` y espera que el backend esté dispo
 El avance detallado y las tareas pendientes de cada parte se documentan en su propio `PROGRESS.md`:
 
 - Backend: [`ViasCTG/PROGRESS.md`](./ViasCTG/PROGRESS.md)
-- Frontend: (por crear a medida que avance)
+- Frontend: pendientes al final de [`FrontEnd/README.md`](./FrontEnd/README.md)
+
+Pendientes principales: ver la sección «Pendiente recomendado» de `ViasCTG/PROGRESS.md`.
 
 ## Cambios recientes
 
@@ -94,8 +96,10 @@ El servicio usa la geocodificación inversa pública de OpenStreetMap/Nominatim:
   `{ "direccionOsm": "..." }`, o `null` si no se puede resolver.
 - Las consultas se identifican con un `User-Agent` propio, tienen un tiempo máximo de espera
   de cinco segundos y se limitan a una petición por segundo.
-- Un error o tiempo de espera de Nominatim no bloquea la creación de un reporte; la dirección
-  queda vacía.
+- La dirección del reporte se resuelve de forma asíncrona: `POST /api/reportes` responde de
+  inmediato con `direccionOsm` en `null` y la dirección se guarda segundos después, de modo que
+  aparece al volver a consultar el reporte. Si Nominatim falla o tarda demasiado, queda vacía.
+- Al editar un reporte con coordenadas distintas, la dirección se limpia y se vuelve a resolver.
 - El constructor principal de `GeocodingService` está marcado con `@Autowired` para que Spring
   inyecte `ObjectMapper` de forma explícita, mientras el constructor alternativo queda para
   pruebas.
@@ -137,6 +141,17 @@ el propietario del reporte y genera un nombre UUID para almacenarla fuera de los
 Las rutas públicas generadas se exponen en el arreglo `fotos` de cada respuesta y se sirven desde
 `/uploads/**`. El volumen `uploads_data` conserva esos archivos en Docker aunque se reconstruya
 el contenedor del backend.
+
+### Configuración por entorno
+
+| Variable | Uso | Valor por defecto |
+|----------|-----|-------------------|
+| `JWT_SECRET` | Secreto JWT (obligatorio) | — |
+| `MONGODB_URI` | Conexión a MongoDB | `mongodb://localhost:27017/viasctg_db` |
+| `CORS_ALLOWED_ORIGINS` | Orígenes permitidos, separados por coma | `http://localhost:5173,http://localhost:3000` |
+| `UPLOADS_DIR` | Carpeta de fotos subidas | `uploads` (en Docker: `/app/uploads`) |
+
+En producción define `CORS_ALLOWED_ORIGINS` con el dominio real del frontend.
 
 ## Docker
 

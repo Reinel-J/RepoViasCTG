@@ -110,6 +110,7 @@ export interface ComentarioResponse {
   id: string
   reporteId: string
   usuarioId: string
+  usuarioNombre: string | null
   texto: string
   fecha: string
   editado: boolean
@@ -119,5 +120,19 @@ export interface ConfirmacionResponse {
   id: string
   reporteId: string
   usuarioId: string
+  fecha: string
+}
+
+export interface UsuarioActualizacionRequest {
+  nombre?: string
+  telefono?: string
+}
+
+export interface NotificacionResponse {
+  id: string
+  usuarioId: string
+  reporteId: string | null
+  mensaje: string
+  leida: boolean
   fecha: string
 }

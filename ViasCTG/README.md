@@ -14,6 +14,8 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
+Variables opcionales: `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) y `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución).
+
 No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email` y `confirmaciones(reporteId, usuarioId)`.
 
 ## Arquitectura
@@ -37,15 +39,26 @@ Ejemplo de cuerpo para crear o actualizar un reporte:
 
 ```json
 {
-  "calleId": "id-de-la-calle",
-  "categoriaId": "id-de-la-categoria",
+  "categoriaId": "Hueco",
   "descripcion": "Hueco de gran tamaño cerca de la intersección.",
-  "fotoUrl": "https://ejemplo.com/foto.jpg",
   "latitud": 10.391,
-  "longitud": -75.479,
-  "prioridad": "ALTA"
+  "longitud": -75.479
 }
 ```
+
+`categoriaId` es texto libre. La prioridad no la envía el ciudadano: todo reporte inicia en `MEDIA` y solo `ADMIN` o `MODERADOR` la modifican al cambiar el estado (`prioridad` opcional en `PATCH /api/admin/reportes/{id}/estado`). La edición (`PUT`) solo aplica a reportes `PENDIENTE` y solo recibe descripción y coordenadas.
+
+### Dirección (OpenStreetMap)
+
+El backend resuelve `direccionOsm` con Nominatim (geocodificación inversa). Se hace de forma asíncrona: la respuesta de `POST /api/reportes` trae `direccionOsm: null` y el valor se completa segundos después. Si cambian las coordenadas en un `PUT`, se recalcula. `GET /api/geocoding/inverso?lat=..&lng=..` es público y sirve para previsualizar la dirección.
+
+### Comentarios y notificaciones
+
+`ComentarioResponse` incluye `usuarioNombre` (nombre del autor, `null` si el usuario ya no existe). Cada vez que un `ADMIN` o `MODERADOR` cambia el estado de un reporte, se crea una notificación para su autor (por ejemplo: «Tu reporte "…" cambió a en revisión»), visible en `GET /api/notificaciones`.
+
+### Fotos
+
+`POST /api/reportes/{id}/fotos` (`multipart/form-data`, clave `archivos`) acepta hasta 3 imágenes JPEG, PNG o WEBP de máximo 5 MB cada una. Solo el propietario puede subirlas. Se guardan en `UPLOADS_DIR` y se sirven desde `/uploads/**`; las rutas quedan en el arreglo `fotos` del reporte.
 
 La consulta pública de reportes cercanos usa este índice geoespacial:
 
@@ -62,7 +75,7 @@ marcadores en un mapa Leaflet/OpenStreetMap.
 | Acción | Acceso |
 | --- | --- |
 | Registro y login | Público |
-| Consultar reportes, barrios y categorías | Público |
+| Consultar reportes, barrios y categorías; geocodificación inversa; `/uploads/**` | Público |
 | Crear/editar reportes, comentar, confirmar, consultar comentarios/confirmaciones y datos propios | Usuario autenticado |
 | Cambiar estado e historial de reportes | `ADMIN` o `MODERADOR` |
 | Administrar barrios y categorías; listar usuarios | `ADMIN` |
@@ -75,7 +88,8 @@ El registro público crea un usuario `CIUDADANO`. La base migrada debe contar co
 | --- | --- |
 | Autenticación | `POST /api/auth/registro`, `POST /api/auth/login` |
 | Perfil | `GET/PUT /api/usuarios/me`, `GET /api/usuarios` (`ADMIN`) |
-| Reportes | `GET/POST /api/reportes`, `GET /api/reportes/cercanos`, `GET/PUT /api/reportes/{id}` |
+| Reportes | `GET/POST /api/reportes`, `GET /api/reportes/cercanos`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
+| Geocodificación | `GET /api/geocoding/inverso` |
 | Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial` |
 | Barrios y calles | `GET/POST /api/barrios`, `GET/PUT/DELETE /api/barrios/{id}`, `POST /api/barrios/{id}/calles` |
 | Categorías | `GET/POST /api/categorias`, `GET/PUT /api/categorias/{id}`, `PATCH /api/categorias/{id}/estado` |

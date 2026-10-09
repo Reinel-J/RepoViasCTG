@@ -69,14 +69,35 @@ class ReporteServiceTests {
                 .thenReturn(actualizado);
 
         Reporte resultado = new ReporteService(reporteRepository, mock(UsuarioRepository.class), usuarioService,
-                mongoTemplate, mock(GeocodingService.class), "/tmp/viasctg-test-uploads")
+                mongoTemplate, mock(GeocodingService.class), mock(NotificacionService.class), "/tmp/viasctg-test-uploads")
                 .cambiarEstadoReporte("reporte-1", EstadoReporte.EN_REVISION, "admin-1", "En revisión", null);
 
         assertThat(resultado.getEstado()).isEqualTo(EstadoReporte.EN_REVISION);
     }
 
+    @Test
+    void cambiarEstadoNotificaAlAutorDelReporte() {
+        ReporteRepository reporteRepository = mock(ReporteRepository.class);
+        UsuarioService usuarioService = mock(UsuarioService.class);
+        MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+        NotificacionService notificacionService = mock(NotificacionService.class);
+        Reporte reporte = Reporte.builder().id("reporte-1").usuarioId("autor-1").estado(EstadoReporte.PENDIENTE).build();
+        Reporte actualizado = Reporte.builder().id("reporte-1").usuarioId("autor-1").descripcion("Hueco grande")
+                .estado(EstadoReporte.EN_REVISION).build();
+        when(usuarioService.esAdministradorOModerador("admin-1")).thenReturn(true);
+        when(reporteRepository.findById("reporte-1")).thenReturn(Optional.of(reporte));
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Reporte.class)))
+                .thenReturn(actualizado);
+
+        new ReporteService(reporteRepository, mock(UsuarioRepository.class), usuarioService, mongoTemplate,
+                mock(GeocodingService.class), notificacionService, "/tmp/viasctg-test-uploads")
+                .cambiarEstadoReporte("reporte-1", EstadoReporte.EN_REVISION, "admin-1", null, null);
+
+        verify(notificacionService).crear("autor-1", "reporte-1", "Tu reporte \"Hueco grande\" cambió a en revisión");
+    }
+
     private ReporteService crearServicio(MongoTemplate mongoTemplate) {
         return new ReporteService(mock(ReporteRepository.class), mock(UsuarioRepository.class), mock(UsuarioService.class),
-                mongoTemplate, mock(GeocodingService.class), "/tmp/viasctg-test-uploads");
+                mongoTemplate, mock(GeocodingService.class), mock(NotificacionService.class), "/tmp/viasctg-test-uploads");
     }
 }

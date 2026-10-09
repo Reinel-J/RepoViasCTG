@@ -55,6 +55,16 @@ public class UsuarioService {
         return usuarioRepository.save(usuario);
     }
 
+    public String nombrePorId(String id) {
+        return usuarioRepository.findById(id).map(Usuario::getNombre).orElse(null);
+    }
+
+    public java.util.Map<String, String> nombresPorId(java.util.Collection<String> ids) {
+        java.util.Map<String, String> nombres = new java.util.HashMap<>();
+        usuarioRepository.findAllById(ids).forEach(usuario -> nombres.put(usuario.getId(), usuario.getNombre()));
+        return nombres;
+    }
+
     public boolean esAdministradorOModerador(String id) {
         Rol rol = buscarPorId(id).getRol();
         return rol == Rol.ADMIN || rol == Rol.MODERADOR;

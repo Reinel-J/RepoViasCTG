@@ -32,7 +32,6 @@ export function CrearReporte() {
       return
     }
     let vigente = true
-    setDireccionOsm(null)
     geocodingApi.inverso(coordenadas[0], coordenadas[1])
       .then((response) => vigente && setDireccionOsm(response.direccionOsm))
       .catch(() => vigente && setDireccionOsm(null))
@@ -121,7 +120,7 @@ export function CrearReporte() {
         </section>
         <section className="form-card">
           <div className="form-card-heading"><span>2</span><div><h2>Ubica el daño</h2><p>Haz clic sobre el mapa o usa la ubicación de tu dispositivo.</p></div></div>
-          <MapaSeleccionPunto onSeleccionar={(lat, lng) => setCoordenadas([lat, lng])} puntoInicial={coordenadas} />
+          <MapaSeleccionPunto onSeleccionar={(lat, lng) => { setDireccionOsm(null); setCoordenadas([lat, lng]) }} puntoInicial={coordenadas} />
           {coordenadas && <p className="coordinate"><Icon name="location" /> Punto seleccionado: {coordenadas[0].toFixed(5)}, {coordenadas[1].toFixed(5)}</p>}
           {direccionOsm && <p className="coordinate"><Icon name="road" /> Calle detectada: {direccionOsm}</p>}
         </section>

@@ -6,7 +6,7 @@ import * as reportesApi from "../api/reportes"
 import type { ComentarioResponse, ConfirmacionResponse, ReporteResponse } from "../api/types"
 import { Icon, StatusBadge } from "../app/components/UI"
 import { MapaReportes } from "../components/MapaReportes"
-import { useAuth } from "../context/AuthContext"
+import { useAuth } from "../context/useAuth"
 
 const URL_BACKEND = (import.meta.env.VITE_API_URL ?? "http://localhost:8080/api").replace(/\/api\/?$/, "")
 
@@ -28,6 +28,15 @@ export function DetalleReporte() {
     if (!id) return
     reportesApi.obtener(id).then(setReporte).catch((exception) => setError(exception instanceof Error ? exception.message : "No fue posible cargar el reporte.")).finally(() => setCargando(false))
   }, [id])
+
+  // La dirección se resuelve de forma asíncrona en el backend: si aún no está, se consulta de nuevo.
+  useEffect(() => {
+    if (!id || !reporte || reporte.direccionOsm) return
+    const temporizador = setTimeout(() => {
+      reportesApi.obtener(id).then(setReporte).catch(() => undefined)
+    }, 4000)
+    return () => clearTimeout(temporizador)
+  }, [id, reporte])
 
   useEffect(() => {
     if (!id || !session) return
@@ -75,7 +84,7 @@ export function DetalleReporte() {
           <section className="comments">
             <h2>Conversación <span>{comentarios.length}</span></h2>
             {comentarios.length === 0 && <p className="muted">Todavía no hay comentarios.</p>}
-            {comentarios.map((comentario) => <article key={comentario.id}><span><Icon name="user" /></span><div><strong>Miembro de la comunidad</strong><p>{comentario.texto}</p></div></article>)}
+            {comentarios.map((comentario) => <article key={comentario.id}><span><Icon name="user" /></span><div><strong>{comentario.usuarioNombre ?? "Miembro de la comunidad"}</strong><p>{comentario.texto}</p></div></article>)}
             {session ? (
               <form onSubmit={enviarComentario}><label>Añadir comentario<textarea maxLength={1000} value={textoComentario} onChange={(event) => setTextoComentario(event.target.value)} placeholder="Comparte información útil sobre este reporte…" required /></label><button className="button button-dark" type="submit">Comentar</button></form>
             ) : <p className="signin-note"><Link to="/login">Inicia sesión</Link> para participar en la conversación.</p>}
@@ -83,7 +92,7 @@ export function DetalleReporte() {
         </div>
         <aside className="detail-aside">
           <div className="confirm-card"><span className="confirm-icon"><Icon name="check" /></span><strong>{confirmaciones.length}</strong><h2>personas confirman este problema</h2><p>Tu confirmación ayuda a darle más visibilidad.</p>{session ? <button className="button button-primary button-wide" onClick={confirmarReporte}>Confirmar reporte</button> : <Link className="button button-primary button-wide" to="/login">Inicia sesión</Link>}</div>
-          <div className="info-card"><h3>Ubicación</h3><p>{reporte.latitud.toFixed(5)}, {reporte.longitud.toFixed(5)}</p><h3>Última actualización</h3><p>{new Date(reporte.fechaActualizacion).toLocaleDateString("es-CO")}</p></div>
+          <div className="info-card"><h3>Ubicación</h3>{reporte.direccionOsm && <p>{reporte.direccionOsm}</p>}<p>{reporte.latitud.toFixed(5)}, {reporte.longitud.toFixed(5)}</p><h3>Última actualización</h3><p>{new Date(reporte.fechaActualizacion).toLocaleDateString("es-CO")}</p></div>
         </aside>
       </div>
     </main>

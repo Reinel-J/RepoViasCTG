@@ -1,3 +1,5 @@
+import 'leaflet/dist/leaflet.css'
+import './leafletIconFix'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import type { ReporteResponse } from '../api/types'
 
