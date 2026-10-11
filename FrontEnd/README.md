@@ -63,12 +63,13 @@ Si existe un token en `localStorage` bajo la clave `token`, lo envía como
 Los módulos API disponibles están en `src/api/`:
 
 - `auth.ts`: login y registro.
-- `reportes.ts`: listado, detalle, creación, actualización, subida de fotos y búsqueda cercana.
+- `reportes.ts`: listado, detalle, creación, actualización, subida de fotos, búsqueda cercana y posibles duplicados.
+- `seguimiento.ts`: votos «¿ya lo arreglaron?» de un reporte.
 - `geocoding.ts`: previsualización de la dirección de un punto (OpenStreetMap/Nominatim).
 - `barrios.ts` y `categorias.ts`: catálogos disponibles en la API; el formulario de reporte ya no
   los usa (la categoría es texto libre).
 - `comentarios.ts` y `confirmaciones.ts`: interacciones por reporte.
-- `admin.ts`: reportes pendientes, transición de estado, historial y gestión de usuarios.
+- `admin.ts`: reportes pendientes, transición de estado, historial, votos de seguimiento, estadísticas y gestión de usuarios.
 - `barrios.ts` y `categorias.ts` también incluyen las operaciones de administración.
 - `notificaciones.ts`: listado y marcado como leída.
 - `usuarios.ts`: perfil propio y actualización de nombre y teléfono.
@@ -112,6 +113,11 @@ Las rutas se declaran en `src/app/routes.tsx`:
 Notas de comportamiento:
 
 - Al crear un reporte, las fotos se suben en una segunda petición (`POST /api/reportes/{id}/fotos`).
+- Al marcar el punto, el formulario consulta `GET /api/reportes/posibles-duplicados` y, si hay reportes
+  activos a menos de 100 m, muestra «¿Ya lo reportaron?» (primero los de la misma categoría, comparada sin
+  mayúsculas ni tildes) con la opción «Es el mismo: confirmar», que confirma el existente y abre su detalle.
+- El detalle muestra la tarjeta «¿Ya lo arreglaron?» con los votos de la comunidad; con sesión se responde
+  «Ya está arreglado» o «Sigue igual» mientras el reporte esté activo.
 - El backend resuelve la dirección de forma asíncrona, así que un reporte recién creado puede
   llegar con `direccionOsm` en `null`. El detalle lo vuelve a consultar a los 4 segundos.
 - Al cambiar la contraseña el backend devuelve un token nuevo y `renovarSesion` lo guarda, así que la sesión actual sigue abierta y las demás se cierran.
@@ -131,7 +137,8 @@ así que se puede enlazar directamente.
 | Pestaña | Rol | Qué permite |
 |---------|-----|-------------|
 | Resumen | Moderador y admin | Totales, pendientes, activos con prioridad alta, % atendido, antigüedad del pendiente más viejo y distribución por estado y prioridad. Los indicadores enlazan a Reportes filtrado |
-| Reportes | Moderador y admin | Todos los reportes con filtro por estado, búsqueda y paginación; mover al siguiente estado (`PENDIENTE → EN_REVISION → EN_PROCESO → RESUELTO`, o `RECHAZADO`) fijando prioridad y comentario; ver el historial |
+| Reportes | Moderador y admin | Todos los reportes con filtro por estado, búsqueda y paginación; mover al siguiente estado (`PENDIENTE → EN_REVISION → EN_PROCESO → RESUELTO`, o `RECHAZADO`) fijando prioridad y comentario; ver el historial; etiqueta «Comunidad: ya arreglado / sigue igual» según los votos |
+| Estadísticas | Moderador y admin | Días promedio hasta la primera respuesta y hasta resolver, % resuelto, columnas de creados y resueltos por mes (con tooltip y vista de tabla), categorías con más reportes y mapa de densidad de daños activos |
 | Usuarios | Admin | Buscar y filtrar por rol, cambiar el rol y activar/desactivar cuentas (no sobre uno mismo) |
 | Barrios | Admin | Crear, editar y eliminar barrios; agregar y quitar calles |
 | Categorías | Admin | Crear, editar, activar y desactivar (no se eliminan) |
@@ -145,6 +152,8 @@ Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coinc
 - Paginación del lado del servidor.
 - Estadística «Barrios participando» (muestra `0`: el reporte no tiene relación con un barrio).
 - Contador de notificaciones sin leer en la barra superior.
+- El icono de los marcadores Leaflet se ve roto («Mark»): `leafletIconFix.ts` debe borrar
+  `L.Icon.Default.prototype._getIconUrl` antes de `mergeOptions`.
 - Pruebas automatizadas.
 - El token JWT se guarda en `localStorage`, expuesto a XSS; considerar cookies `HttpOnly`.
 

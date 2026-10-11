@@ -153,6 +153,8 @@ el contenedor del backend.
 | `FRONTEND_URL` | URL pública del frontend, para el enlace de recuperación de contraseña | `http://localhost:5173` |
 | `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `MAIL_FROM` | SMTP para enviar el correo de recuperación | vacías: el enlace se escribe en el log |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Crea o promueve el primer administrador al arrancar | vacías (no hace nada) |
+| `SEGUIMIENTO_DIAS` | Días sin cambios antes de preguntar «¿ya lo arreglaron?» al autor y a quienes confirmaron | `30` |
+| `SEGUIMIENTO_CRON` | Hora de la tarea diaria de recordatorios (zona `America/Bogota`) | `0 0 9 * * *` |
 
 En producción define `CORS_ALLOWED_ORIGINS` con el dominio real del frontend.
 
@@ -170,8 +172,9 @@ En producción define `CORS_ALLOWED_ORIGINS` con el dominio real del frontend.
 ### Panel de administración
 
 `/admin` reúne la gestión interna. Un `MODERADOR` ve **Resumen** (indicadores y distribución por estado y
-prioridad) y **Reportes** (todos los estados, búsqueda, cambio de estado con prioridad y comentario,
-historial). Un `ADMIN` además gestiona **Usuarios** (rol y activación), **Barrios** (con sus calles) y
+prioridad), **Reportes** (todos los estados, búsqueda, cambio de estado con prioridad y comentario,
+historial y lo que la comunidad dice sobre si ya se arregló) y **Estadísticas** (tiempos de respuesta y
+resolución, creados y resueltos por mes, categorías y mapa de densidad de daños activos). Un `ADMIN` además gestiona **Usuarios** (rol y activación), **Barrios** (con sus calles) y
 **Categorías** (crear, editar, activar/desactivar). El primer administrador se crea con `ADMIN_EMAIL` y
 `ADMIN_PASSWORD`; después se promueve a otros desde el propio panel.
 

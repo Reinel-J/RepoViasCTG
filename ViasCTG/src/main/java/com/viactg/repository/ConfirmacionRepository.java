@@ -11,5 +11,7 @@ public interface ConfirmacionRepository extends MongoRepository<Confirmacion, St
 
     List<Confirmacion> findByReporteId(String reporteId);
 
+    long countByReporteId(String reporteId);
+
     java.util.Optional<Confirmacion> findByReporteIdAndUsuarioId(String reporteId, String usuarioId);
 }

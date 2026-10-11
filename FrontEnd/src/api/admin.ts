@@ -1,11 +1,13 @@
 import client from './client'
 import type {
   CambioEstadoRequest,
+  EstadisticasResponse,
   EstadoReporte,
   HistorialEstadoResponse,
   PrioridadReporte,
   ReporteResponse,
   Rol,
+  SeguimientoResumenResponse,
   UsuarioResponse,
 } from './types'
 
@@ -27,6 +29,17 @@ export async function cambiarEstado(
 
 export async function historial(reporteId: string): Promise<HistorialEstadoResponse[]> {
   const response = await client.get<HistorialEstadoResponse[]>(`/admin/reportes/${reporteId}/historial`)
+  return response.data
+}
+
+export async function estadisticas(): Promise<EstadisticasResponse> {
+  const response = await client.get<EstadisticasResponse>('/admin/estadisticas')
+  return response.data
+}
+
+// Votos "¿ya lo arreglaron?" de todos los reportes que tienen alguno.
+export async function seguimientos(): Promise<SeguimientoResumenResponse[]> {
+  const response = await client.get<SeguimientoResumenResponse[]>('/admin/reportes/seguimiento')
   return response.data
 }
 

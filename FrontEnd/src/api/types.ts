@@ -86,6 +86,35 @@ export interface ReporteResponse {
   historialEstados: HistorialEstadoResponse[]
 }
 
+export interface PosibleDuplicadoResponse {
+  reporte: ReporteResponse
+  distanciaMetros: number
+  confirmaciones: number
+}
+
+export interface SeguimientoResumenResponse {
+  reporteId: string
+  arreglado: number
+  sigue: number
+  ultimaRespuesta: string | null
+  // null si el usuario no ha respondido o no inició sesión.
+  miRespuesta: boolean | null
+}
+
+export interface EstadisticasResponse {
+  total: number
+  porEstado: Record<EstadoReporte, number>
+  // Sobre los reportes no rechazados; null si no hay ninguno.
+  porcentajeResuelto: number | null
+  diasPrimeraRespuesta: number | null
+  diasResolucion: number | null
+  // Últimos 12 meses, del más antiguo al actual; mes en formato yyyy-MM.
+  meses: { mes: string; creados: number; resueltos: number }[]
+  categorias: { nombre: string; total: number; resueltos: number }[]
+  // Celdas de ~110 m con los reportes activos que contienen.
+  densidad: { latitud: number; longitud: number; total: number }[]
+}
+
 export interface CalleResponse {
   id: string
   nombre: string

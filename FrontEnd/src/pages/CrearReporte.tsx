@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
-import { useNavigate } from "react-router"
+import { Link, useNavigate } from "react-router"
+import * as confirmacionesApi from "../api/confirmaciones"
 import * as geocodingApi from "../api/geocoding"
 import * as reportesApi from "../api/reportes"
-import { Icon } from "../app/components/UI"
+import type { PosibleDuplicadoResponse } from "../api/types"
+import { Icon, StatusBadge } from "../app/components/UI"
 import { MapaSeleccionPunto } from "../components/MapaSeleccionPunto"
+import { useAuth } from "../context/useAuth"
 
 interface FotoSeleccionada {
   archivo: File
@@ -12,13 +15,25 @@ interface FotoSeleccionada {
 
 const TIPOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"]
 
+// La categoría es texto libre: "Hueco", "hueco " y "huéco" deben contar como la misma.
+function normalizarCategoria(categoria: string) {
+  return categoria.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+}
+
+function resumir(texto: string) {
+  return texto.length > 110 ? `${texto.slice(0, 110)}…` : texto
+}
+
 export function CrearReporte() {
   const navigate = useNavigate()
+  const { session } = useAuth()
   const [categoriaId, setCategoriaId] = useState("")
   const [descripcion, setDescripcion] = useState("")
   const [fotos, setFotos] = useState<FotoSeleccionada[]>([])
   const [coordenadas, setCoordenadas] = useState<[number, number]>()
   const [direccionOsm, setDireccionOsm] = useState<string | null>(null)
+  const [duplicados, setDuplicados] = useState<PosibleDuplicadoResponse[]>([])
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [enviando, setEnviando] = useState(false)
   const previsualizaciones = useRef<string[]>([])
@@ -35,8 +50,30 @@ export function CrearReporte() {
     geocodingApi.inverso(coordenadas[0], coordenadas[1])
       .then((response) => vigente && setDireccionOsm(response.direccionOsm))
       .catch(() => vigente && setDireccionOsm(null))
+    // Si falla la búsqueda de duplicados no se bloquea el reporte: simplemente no se muestra el aviso.
+    reportesApi.posiblesDuplicados(coordenadas[0], coordenadas[1])
+      .then((lista) => vigente && setDuplicados(lista))
+      .catch(() => vigente && setDuplicados([]))
     return () => { vigente = false }
   }, [coordenadas])
+
+  function seleccionarUbicacion(lat: number, lng: number) {
+    setDireccionOsm(null)
+    setDuplicados([])
+    setCoordenadas([lat, lng])
+  }
+
+  async function confirmarExistente(reporteId: string) {
+    setError("")
+    setConfirmandoId(reporteId)
+    try {
+      await confirmacionesApi.crear(reporteId)
+      navigate(`/reportes/${reporteId}`)
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible confirmar el reporte.")
+      setConfirmandoId(null)
+    }
+  }
 
   function seleccionarFotos(event: ChangeEvent<HTMLInputElement>) {
     const archivos = Array.from(event.target.files ?? [])
@@ -120,10 +157,40 @@ export function CrearReporte() {
         </section>
         <section className="form-card">
           <div className="form-card-heading"><span>2</span><div><h2>Ubica el daño</h2><p>Haz clic sobre el mapa o usa la ubicación de tu dispositivo.</p></div></div>
-          <MapaSeleccionPunto onSeleccionar={(lat, lng) => { setDireccionOsm(null); setCoordenadas([lat, lng]) }} puntoInicial={coordenadas} />
+          <MapaSeleccionPunto onSeleccionar={seleccionarUbicacion} puntoInicial={coordenadas} />
           {coordenadas && <p className="coordinate"><Icon name="location" /> Punto seleccionado: {coordenadas[0].toFixed(5)}, {coordenadas[1].toFixed(5)}</p>}
           {direccionOsm && <p className="coordinate"><Icon name="road" /> Calle detectada: {direccionOsm}</p>}
         </section>
+        {duplicados.length > 0 && <section className="form-card duplicate-panel" aria-live="polite">
+          <div className="form-card-heading"><span>!</span><div><h2>¿Ya lo reportaron?</h2><p>Hay {duplicados.length === 1 ? "un reporte activo" : `${duplicados.length} reportes activos`} a menos de 100 m. Si es el mismo daño, confírmalo: un reporte con más confirmaciones gana visibilidad.</p></div></div>
+          <ul className="duplicate-list">
+            {[...duplicados]
+              .sort((a, b) => Number(normalizarCategoria(b.reporte.categoriaId) === normalizarCategoria(categoriaId))
+                - Number(normalizarCategoria(a.reporte.categoriaId) === normalizarCategoria(categoriaId)))
+              .map(({ reporte, distanciaMetros, confirmaciones }) => {
+                const mismaCategoria = categoriaId.trim() !== "" && normalizarCategoria(reporte.categoriaId) === normalizarCategoria(categoriaId)
+                const esPropio = reporte.usuarioId === session?.usuarioId
+                return <li className={`duplicate-card${mismaCategoria ? " is-match" : ""}`} key={reporte.id}>
+                  <div className="duplicate-info">
+                    <div className="duplicate-meta">
+                      <StatusBadge status={reporte.estado} />
+                      <span>{reporte.categoriaId}</span>
+                      {mismaCategoria && <strong>Misma categoría</strong>}
+                    </div>
+                    <p>{resumir(reporte.descripcion)}</p>
+                    <small>A {distanciaMetros} m · {confirmaciones} {confirmaciones === 1 ? "confirmación" : "confirmaciones"}{reporte.direccionOsm ? ` · ${reporte.direccionOsm}` : ""}</small>
+                  </div>
+                  <div className="duplicate-actions">
+                    <Link className="button button-ghost button-small" to={`/reportes/${reporte.id}`} target="_blank" rel="noreferrer">Ver reporte</Link>
+                    {esPropio
+                      ? <span className="muted">Es un reporte tuyo</span>
+                      : <button className="button button-primary button-small" type="button" disabled={confirmandoId !== null} onClick={() => confirmarExistente(reporte.id)}>{confirmandoId === reporte.id ? "Confirmando…" : "Es el mismo: confirmar"}</button>}
+                  </div>
+                </li>
+              })}
+          </ul>
+          <p className="muted">¿Es un daño distinto? Continúa y publica tu reporte normalmente.</p>
+        </section>}
         {error && <p className="alert error" role="alert">{error}</p>}
         <div className="form-actions">
           <button className="button button-ghost" type="button" onClick={() => navigate(-1)}>Cancelar</button>

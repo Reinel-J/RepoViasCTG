@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Link } from "react-router"
 import * as adminApi from "../../api/admin"
 import * as reportesApi from "../../api/reportes"
-import type { EstadoReporte, HistorialEstadoResponse, PrioridadReporte, ReporteResponse } from "../../api/types"
+import type { EstadoReporte, HistorialEstadoResponse, PrioridadReporte, ReporteResponse, SeguimientoResumenResponse } from "../../api/types"
 import { Icon, StatusBadge } from "../../app/components/UI"
 import { ACCION_ESTADO, ESTADOS, ETIQUETA_ESTADO, PRIORIDADES, SIGUIENTES, mensajeError } from "./estados"
 
@@ -17,6 +17,18 @@ interface Borrador {
   comentario: string
 }
 
+// Resume los votos "¿ya lo arreglaron?" en una etiqueta corta para el moderador.
+function SenalComunidad({ seguimiento }: { seguimiento?: SeguimientoResumenResponse }) {
+  if (!seguimiento) return null
+  const total = seguimiento.arreglado + seguimiento.sigue
+  if (total === 0) return null
+  const mayoriaArreglado = seguimiento.arreglado > seguimiento.sigue
+  const texto = mayoriaArreglado
+    ? `Comunidad: ya arreglado (${seguimiento.arreglado} de ${total})`
+    : `Comunidad: sigue igual (${seguimiento.sigue} de ${total})`
+  return <span className={`admin-chip followup-signal${mayoriaArreglado ? "" : " is-mixed"}`} title={`Última respuesta: ${seguimiento.ultimaRespuesta ? new Date(seguimiento.ultimaRespuesta).toLocaleString("es-CO") : "—"}`}>{texto}</span>
+}
+
 export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null }) {
   const [reportes, setReportes] = useState<ReporteResponse[]>([])
   const [estado, setEstado] = useState<EstadoReporte | "">(ESTADOS.includes(estadoInicial as EstadoReporte) ? estadoInicial as EstadoReporte : "")
@@ -28,6 +40,14 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
   const [borradores, setBorradores] = useState<Record<string, Borrador>>({})
   const [historiales, setHistoriales] = useState<Record<string, HistorialEstadoResponse[]>>({})
+  const [seguimientos, setSeguimientos] = useState<Record<string, SeguimientoResumenResponse>>({})
+
+  // Si falla, el panel sigue funcionando: solo no se muestran las señales de la comunidad.
+  useEffect(() => {
+    adminApi.seguimientos()
+      .then((lista) => setSeguimientos(Object.fromEntries(lista.map((seguimiento) => [seguimiento.reporteId, seguimiento]))))
+      .catch(() => setSeguimientos({}))
+  }, [])
 
   useEffect(() => {
     reportesApi.listar(estado || undefined)
@@ -122,6 +142,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
                   <StatusBadge status={reporte.estado} />
                   <span className={`priority priority-${reporte.prioridad.toLowerCase()}`}>{reporte.prioridad}</span>
                   <span className="admin-chip">{reporte.categoriaId}</span>
+                  {siguientes.length > 0 && <SenalComunidad seguimiento={seguimientos[reporte.id]} />}
                 </div>
                 <h2><Link to={`/reportes/${reporte.id}`}>{reporte.descripcion}</Link></h2>
                 <p>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(5)}, ${reporte.longitud.toFixed(5)}`} · {new Date(reporte.fechaCreacion).toLocaleDateString("es-CO")} · {reporte.fotos.length} foto(s)</p>

@@ -14,9 +14,9 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
-Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`, o lo promueven si ya existe sin cambiar su contraseña), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) y `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución).
+Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`, o lo promueven si ya existe sin cambiar su contraseña), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) y `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`).
 
-No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email` y `confirmaciones(reporteId, usuarioId)`.
+No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`.
 
 ## Arquitectura
 
@@ -70,14 +70,44 @@ GET /api/reportes/cercanos?lat=10.391&lng=-75.479&radioKm=2&estado=PENDIENTE
 `ReporteResponse` ordenada por cercanía. El frontend la puede consumir para mostrar
 marcadores en un mapa Leaflet/OpenStreetMap.
 
+## Funciones inspiradas en FixMyStreet
+
+### Posibles duplicados
+
+`GET /api/reportes/posibles-duplicados?lat=..&lng=..` (público) devuelve hasta 5 reportes **activos**
+(`PENDIENTE`, `EN_REVISION`, `EN_PROCESO`) a menos de 100 m, del más cercano al más lejano, como
+`{reporte, distanciaMetros, confirmaciones}`. El formulario de creación lo usa para ofrecer «Es el mismo:
+confirmar» en vez de crear un reporte repetido (`DuplicadoService`).
+
+### «¿Ya lo arreglaron?»
+
+- `POST /api/reportes/{id}/seguimiento` con `{"arreglado": true|false}` registra o cambia el voto del usuario
+  (uno por usuario y reporte, colección `seguimientos`). Solo para reportes activos (si no, `409`).
+- `GET /api/reportes/{id}/seguimiento` (público) devuelve `{reporteId, arreglado, sigue, ultimaRespuesta, miRespuesta}`.
+- Los votos **no cambian el estado**: son una señal para el moderador, que los ve en
+  `GET /api/admin/reportes/seguimiento` (una agregación `$group` por reporte).
+- Una tarea diaria (`SeguimientoService.tareaDiaria`) busca reportes activos sin cambios ni recordatorios en
+  `SEGUIMIENTO_DIAS` y avisa al autor y a quienes lo confirmaron, con notificación y correo. Cada reporte se
+  marca en `fechaUltimoSeguimiento` antes de avisar, así que dos ejecuciones no envían el mismo aviso.
+  `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) la ejecuta en el momento.
+
+### Estadísticas
+
+`GET /api/admin/estadisticas` (`ADMIN` o `MODERADOR`) calcula en una sola agregación `$facet` sobre `reportes`:
+totales por estado, porcentaje resuelto (sin contar rechazados), días promedio hasta la primera respuesta y
+hasta resolver (a partir de `historialEstados`), creados y resueltos por mes en los últimos 12 meses (hora de
+Colombia), las 8 categorías con más reportes (sin distinguir mayúsculas ni espacios) y la densidad de reportes
+activos en celdas de ~110 m (coordenadas redondeadas a 3 decimales).
+
 ## Seguridad
 
 | Acción | Acceso |
 | --- | --- |
 | Registro y login | Público |
-| Consultar reportes, barrios y categorías; geocodificación inversa; `/uploads/**` | Público |
-| Crear/editar reportes, comentar, confirmar, consultar comentarios/confirmaciones y datos propios | Usuario autenticado |
-| Cambiar estado e historial de reportes | `ADMIN` o `MODERADOR` |
+| Consultar reportes, posibles duplicados y votos de seguimiento, barrios y categorías; geocodificación inversa; `/uploads/**` | Público |
+| Crear/editar reportes, comentar, confirmar, votar «¿ya lo arreglaron?», consultar comentarios/confirmaciones y datos propios | Usuario autenticado |
+| Cambiar estado e historial de reportes; votos de seguimiento de todos los reportes; estadísticas | `ADMIN` o `MODERADOR` |
+| Ejecutar los recordatorios de seguimiento en el momento | `ADMIN` |
 | Administrar barrios, calles y categorías; listar usuarios, cambiar su rol y activarlos/desactivarlos | `ADMIN` |
 
 El registro público crea un usuario `CIUDADANO`. El primer `ADMIN` se crea con `ADMIN_EMAIL`/`ADMIN_PASSWORD`. Un administrador no puede cambiar su propio rol ni desactivarse. Los permisos se leen de la base en cada petición: un cambio de rol o una desactivación aplica de inmediato, incluso sobre tokens ya emitidos (un usuario desactivado recibe 401). Usa el JWT recibido en el encabezado `Authorization: Bearer <token>`.
@@ -95,9 +125,11 @@ El registro público crea un usuario `CIUDADANO`. El primer `ADMIN` se crea con 
 | --- | --- |
 | Autenticación | `POST /api/auth/registro`, `POST /api/auth/login`, `POST /api/auth/recuperar` (`{"email"}`, siempre `202`), `POST /api/auth/restablecer` (`{"token","passwordNueva"}`) |
 | Perfil y usuarios | `GET/PUT /api/usuarios/me`, `PUT /api/usuarios/me/password` (`{"passwordActual","passwordNueva"}`, devuelve un token nuevo), `POST /api/usuarios/me/cerrar-sesiones`; `GET /api/usuarios`, `PATCH /api/usuarios/{id}/rol` (`{"rol":"MODERADOR"}`), `PATCH /api/usuarios/{id}/activo?activo=false` (`ADMIN`) |
-| Reportes | `GET/POST /api/reportes`, `GET /api/reportes/cercanos`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
+| Reportes | `GET/POST /api/reportes`, `GET /api/reportes/cercanos`, `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
+| Seguimiento | `GET/POST /api/reportes/{reporteId}/seguimiento` |
 | Geocodificación | `GET /api/geocoding/inverso` |
-| Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial` |
+| Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial`, `GET /api/admin/reportes/seguimiento`, `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) |
+| Estadísticas | `GET /api/admin/estadisticas` |
 | Barrios y calles | `GET/POST /api/barrios`, `GET/PUT/DELETE /api/barrios/{id}`, `POST /api/barrios/{id}/calles`, `DELETE /api/barrios/{id}/calles/{calleId}` |
 | Categorías | `GET/POST /api/categorias`, `GET/PUT /api/categorias/{id}`, `PATCH /api/categorias/{id}/estado` |
 | Confirmaciones | `GET/POST /api/reportes/{reporteId}/confirmaciones`, `DELETE /api/reportes/{reporteId}/confirmaciones/me` |

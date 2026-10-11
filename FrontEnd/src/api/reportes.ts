@@ -1,6 +1,7 @@
 import client from './client'
 import type {
   EstadoReporte,
+  PosibleDuplicadoResponse,
   ReporteActualizarRequest,
   ReporteCrearRequest,
   ReporteResponse,
@@ -43,6 +44,14 @@ export async function cercanos(
 ): Promise<ReporteResponse[]> {
   const response = await client.get<ReporteResponse[]>('/reportes/cercanos', {
     params: { lat, lng, radioKm, ...(estado ? { estado } : {}) },
+  })
+  return response.data
+}
+
+// Reportes activos a menos de 100 m del punto, del más cercano al más lejano.
+export async function posiblesDuplicados(lat: number, lng: number): Promise<PosibleDuplicadoResponse[]> {
+  const response = await client.get<PosibleDuplicadoResponse[]>('/reportes/posibles-duplicados', {
+    params: { lat, lng },
   })
   return response.data
 }
