@@ -45,6 +45,8 @@ public class Reporte {
     private PrioridadReporte prioridad;
     private Instant fechaCreacion;
     private Instant fechaActualizacion;
+    // Último recordatorio "¿ya lo arreglaron?" enviado; null si nunca se envió.
+    private Instant fechaUltimoSeguimiento;
 
     @Field("historialEstados")
     @Builder.Default

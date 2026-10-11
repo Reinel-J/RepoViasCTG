@@ -18,6 +18,11 @@
 - Límite de intentos en login, registro y recuperación; recuperación de contraseña por correo con token de un solo uso; cambio de contraseña; revocación de sesiones por versión de token.
 - OpenAPI/Swagger y documentación de configuración actualizada.
 - Prueba unitaria de la transición de estado; `./mvnw test` pasa.
+- Inspirado en FixMyStreet: detección de posibles duplicados (activos a ≤100 m) al crear un reporte.
+- Inspirado en FixMyStreet: «¿ya lo arreglaron?» con votos por usuario (colección `seguimientos`) y recordatorio
+  diario programado al autor y a quienes confirmaron; los votos son una señal para el moderador.
+- Inspirado en FixMyStreet: estadísticas para moderadores en una agregación `$facet` (tiempos de respuesta y
+  resolución, serie mensual, categorías y densidad de daños activos).
 
 ## Pendiente recomendado
 
@@ -28,6 +33,11 @@
 - Regla de fotos: permitir a moderadores y restringir por estado del reporte.
 - Mover el límite de intentos a un almacén compartido si se despliegan varias réplicas del backend.
 - Automatización de despliegue y configuración por perfiles (`local`, `test`, `prod`).
+- `ReporteService.actualizar` y `subirFotos` guardan el documento completo con `save()`: una escritura
+  concurrente (cambio de estado, dirección OSM, `fechaUltimoSeguimiento`) puede perderse. Usar `@Version` o
+  actualizaciones parciales.
+- Opción de resolver automáticamente un reporte `EN_PROCESO` cuando suficientes votos digan «ya está arreglado».
+- Las estadísticas agrupan categorías sin distinguir mayúsculas, pero «Inundación» e «Inundacion» siguen separadas.
 
 ## Decisiones vigentes
 
@@ -35,3 +45,4 @@
 - Las categorías se activan o desactivan; no se eliminan físicamente.
 - Los reportes no exponen una operación de borrado y los rechazados se conservan.
 - La integridad referencial se valida desde los servicios porque MongoDB no la impone.
+- Los votos «¿ya lo arreglaron?» no cambian el estado del reporte; lo decide un moderador.
