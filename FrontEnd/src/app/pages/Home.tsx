@@ -1,13 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react"
-import { cargarReportes, fotoReporte, type Reporte } from "../../api"
+import { NavLink, useNavigate } from "react-router"
+import { cargarReportes, fotoReporte, type Reporte } from "../../api/reporteVista"
 import { useAuth } from "../../context/useAuth"
 
-type IconName = "arrow" | "bell" | "check" | "chevron" | "clock" | "location" | "map" | "menu" | "plus" | "search"
+type IconName = "arrow" | "bell" | "camera" | "check" | "chevron" | "clock" | "location" | "map" | "menu" | "plus" | "search"
 
 function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
     arrow: <><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></>,
     bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
+    camera: <><path d="M14.5 5 13 3h-2L9.5 5H5a2 2 0 0 0-2 2v11h18V7a2 2 0 0 0-2-2Z" /><circle cx="12" cy="12" r="3.5" /></>,
     check: <path d="m5 12 4 4L19 6" />,
     chevron: <path d="m9 18 6-6-6-6" />,
     clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
@@ -27,15 +29,19 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 
 export function Home() {
   const { session, logout } = useAuth()
+  const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [filtro, setFiltro] = useState("Todos")
   const [totalReportes, setTotalReportes] = useState<Reporte[]>([])
+  const [recientes, setRecientes] = useState<number | null>(null)
   const [error, setError] = useState("")
 
   useEffect(() => {
     cargarReportes()
       .then((datos) => {
         setTotalReportes(datos)
+        const haceUnDia = Date.now() - 86_400_000
+        setRecientes(datos.filter((reporte) => reporte.fechaCreacion && new Date(reporte.fechaCreacion).getTime() >= haceUnDia).length)
       })
       .catch((exception) => setError(exception instanceof Error ? exception.message : "No fue posible cargar los reportes."))
   }, [])
@@ -53,7 +59,7 @@ export function Home() {
       </div>
 
       <header className="site-header">
-        <a className="brand" href="#" aria-label="ViaCTG, inicio">
+        <NavLink className="brand" to="/" aria-label="ViaCTG, inicio">
           <span className="brand-mark">
             <span className="brand-road" />
           </span>
@@ -61,18 +67,19 @@ export function Home() {
             <strong>Vía<span>CTG</span></strong>
             <small>Cartagena se mueve</small>
           </span>
-        </a>
+        </NavLink>
 
         <nav className={menuOpen ? "main-nav open" : "main-nav"} aria-label="Navegación principal">
           <a className="active" href="#inicio">Inicio</a>
-          <a href="/reportes">Reportes</a>
-          <a href="/mapa">Mapa ciudadano</a>
+          <NavLink to="/reportes">Reportes</NavLink>
+          <NavLink to="/mapa">Mapa ciudadano</NavLink>
           <a href="#como-funciona">Cómo funciona</a>
+          {(session?.rol === "ADMIN" || session?.rol === "MODERADOR") && <NavLink to="/admin">Panel de gestión</NavLink>}
         </nav>
 
         <div className="header-actions">
-          {session && <button className="icon-button" onClick={() => { window.location.href = "/notificaciones" }} aria-label="Notificaciones"><Icon name="bell" /></button>}
-          <button className="login-button" onClick={() => { if (session) logout(); else window.location.href = "/login" }}>{session ? "Cerrar sesión" : "Iniciar sesión"}</button>
+          {session && <button className="icon-button" onClick={() => navigate("/notificaciones")} aria-label="Notificaciones"><Icon name="bell" /></button>}
+          <button className="login-button" onClick={() => { if (session) logout(); else navigate("/login") }}>{session ? "Cerrar sesión" : "Iniciar sesión"}</button>
           <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="Abrir menú"><Icon name="menu" /></button>
         </div>
       </header>
@@ -89,16 +96,18 @@ export function Home() {
             <h1>Por unas calles<br /><em>bacanas pa’ todos.</em></h1>
             <p>Reporta daños en tu barrio, súmale tu voz a la comunidad y sigue cada solución de principio a fin.</p>
             <div className="hero-actions">
-              <button className="primary-button" onClick={() => { window.location.href = "/reportes/nuevo" }}><Icon name="plus" /> Hacer un reporte</button>
-              <button className="text-button" onClick={() => { window.location.href = "/mapa" }}><Icon name="map" /> Explorar el mapa <Icon name="arrow" /></button>
+              <button className="primary-button" onClick={() => navigate("/reportes/nuevo")}><Icon name="plus" /> Hacer un reporte</button>
+              <button className="text-button" onClick={() => navigate("/mapa")}><Icon name="map" /> Explorar el mapa <Icon name="arrow" /></button>
             </div>
           </div>
 
-          <div className="hero-status-card">
-            <span className="pulse" />
-            <div><strong>Comunidad activa</strong><small>37 reportes actualizados hoy</small></div>
-            <Icon name="chevron" />
-          </div>
+          {recientes !== null && (
+            <div className="hero-status-card">
+              <span className="pulse" />
+              <div><strong>Comunidad activa</strong><small>{recientes === 1 ? "1 reporte creado" : `${recientes} reportes creados`} en las últimas 24 horas</small></div>
+              <Icon name="chevron" />
+            </div>
+          )}
           <div className="wave" />
         </section>
 
@@ -125,16 +134,17 @@ export function Home() {
                   <button key={item} className={filtro === item ? "selected" : ""} onClick={() => setFiltro(item)}>{item}</button>
                 ))}
               </div>
-              <button className="search-button" aria-label="Buscar reportes"><Icon name="search" /></button>
+              <button className="search-button" onClick={() => navigate("/reportes")} aria-label="Buscar reportes"><Icon name="search" /></button>
             </div>
           </div>
 
           <div className="report-grid">
-            {reportes.map((reporte, index) => (
-              <article className="report-card" key={reporte.categoria}>
+            {reportes.map((reporte, index) => {
+              const foto = fotoReporte(reporte)
+              return (
+              <article className="report-card" key={reporte.id}>
                 <div className="card-image-wrap">
-                  <img src={fotoReporte(reporte)} alt={reporte.fotos?.length ? `Evidencia de ${reporte.categoria}` : ""} />
-                  {!reporte.fotos?.length && <span className="no-evidence"><Icon name="map" size={14} /> Imagen ambiental · sin evidencia</span>}
+                  {foto ? <img src={foto} alt={`Evidencia de ${reporte.categoria}`} /> : <div className="no-photo"><Icon name="camera" size={26} /><span>Sin fotografía</span></div>}
                   <span className={`category-chip ${reporte.color}`}>{reporte.categoria}</span>
                   <span className="card-number">0{index + 1}</span>
                 </div>
@@ -144,15 +154,16 @@ export function Home() {
                     <span><Icon name="clock" size={15} /> {reporte.fecha}</span>
                     <span className={`status ${reporte.estadoClase}`}><i />{reporte.estado}</span>
                   </div>
-                  <a href={`/reportes/${reporte.id}`}>Ver reporte <Icon name="arrow" size={17} /></a>
+                  <NavLink to={`/reportes/${reporte.id}`}>Ver reporte <Icon name="arrow" size={17} /></NavLink>
                 </div>
               </article>
-            ))}
+              )
+            })}
           </div>
           {error && <div className="empty-panel"><h2>No pudimos cargar los reportes</h2><p>{error}</p></div>}
           {!error && reportes.length === 0 && <div className="empty-panel"><h2>Aún no hay reportes</h2><p>Sé la primera persona en reportar un problema de tu sector.</p></div>}
 
-          <button className="outline-button" onClick={() => { window.location.href = "/reportes" }}>Ver todos los reportes <Icon name="arrow" /></button>
+          <button className="outline-button" onClick={() => navigate("/reportes")}>Ver todos los reportes <Icon name="arrow" /></button>
         </section>
 
         <section className="map-section" id="mapa">
@@ -160,10 +171,10 @@ export function Home() {
             <span className="section-kicker light">Mapa ciudadano</span>
             <h2>Tu barrio,<br /><em>a un vistazo.</em></h2>
             <p>Descubre qué está pasando cerca de ti. Cada punto es una historia que la comunidad está ayudando a mover.</p>
-            <button className="sand-button">Abrir mapa completo <Icon name="arrow" /></button>
+            <button className="sand-button" onClick={() => navigate("/mapa")}>Abrir mapa completo <Icon name="arrow" /></button>
           </div>
           <div className="map-visual" aria-label="Mapa ilustrativo de Cartagena">
-            <svg viewBox="0 0 720 430" role="img" aria-label="Mapa estilizado con reportes">
+            <svg viewBox="0 0 720 430" aria-hidden="true">
               <path className="water-line" d="M-20 80C95 38 171 138 279 92s191-26 240 27 144 40 226 13" />
               <path className="road-line thick" d="M35 347c86-40 144-111 231-110 89 1 114-73 196-84 74-10 136 36 235 19" />
               <path className="road-line" d="M61 83c84 37 98 101 165 128 101 40 169 6 212 63 52 69 94 82 221 67" />
@@ -175,18 +186,6 @@ export function Home() {
                 <path d="m82 226 66-15 18 51-70 20z" /><path d="m583 71 74-12 18 53-70 15z" />
               </g>
             </svg>
-            <span className="map-pin pin-one"><Icon name="location" size={18} /></span>
-            <span className="map-pin pin-two yellow"><Icon name="location" size={18} /></span>
-            <span className="map-pin pin-three green"><Icon name="check" size={18} /></span>
-            <div className="map-popover">
-              <span className="map-popover-image" />
-              <div><small>Nuevo reporte</small><strong>Hueco en la vía</strong><span>Pie de la Popa · hace 12 min</span></div>
-            </div>
-            <div className="map-legend">
-              <span><i className="legend-coral" /> Pendiente</span>
-              <span><i className="legend-yellow" /> En proceso</span>
-              <span><i className="legend-green" /> Resuelto</span>
-            </div>
           </div>
         </section>
 
@@ -206,15 +205,15 @@ export function Home() {
           <div className="cta-pattern" />
           <span>¿Viste algo que podemos mejorar?</span>
           <h2>Échale una mano<br />a tu Cartagena.</h2>
-          <button className="primary-button dark">Crear mi primer reporte <Icon name="arrow" /></button>
+          <button className="primary-button dark" onClick={() => navigate("/reportes/nuevo")}>Crear mi primer reporte <Icon name="arrow" /></button>
         </section>
       </main>
 
       <footer>
-        <a className="brand footer-brand" href="#">
+        <NavLink className="brand footer-brand" to="/">
           <span className="brand-mark"><span className="brand-road" /></span>
           <span className="brand-copy"><strong>Vía<span>CTG</span></strong><small>Cartagena se mueve</small></span>
-        </a>
+        </NavLink>
         <p>Una plataforma hecha para cuidar las calles que nos conectan.</p>
         <span>© 2026 VíaCTG · Cartagena, Colombia</span>
       </footer>
