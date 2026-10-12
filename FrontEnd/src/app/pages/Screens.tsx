@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react"
-import { NavLink, useNavigate, useParams, useSearchParams } from "react-router"
-import { cargarReporte, cargarReportes, fotoReporte, type Reporte } from "../../api"
+import { NavLink, useLocation, useNavigate, useParams, useSearchParams } from "react-router"
+import { cargarReporte, cargarReportes, fotoReporte, textoEstado, type Reporte } from "../../api/reporteVista"
 import * as authApi from "../../api/auth"
 import * as comentariosApi from "../../api/comentarios"
 import * as confirmacionesApi from "../../api/confirmaciones"
@@ -90,12 +90,11 @@ function useReportes() {
 }
 
 function ReportCard({ reporte }: { reporte: Reporte }) {
-  const conFotoReal = Boolean(reporte.fotos?.length)
+  const foto = fotoReporte(reporte)
   return (
     <article className="report-card">
-      <div className={`card-image-wrap ${conFotoReal ? "" : "fallback-image"}`}>
-        <img src={fotoReporte(reporte)} alt={conFotoReal ? `Evidencia del reporte ${reporte.categoria}` : ""} />
-        {!conFotoReal && <span className="no-evidence"><Icon name="camera" size={14} /> Sin fotografía ciudadana</span>}
+      <div className="card-image-wrap">
+        {foto ? <img src={foto} alt={`Evidencia del reporte ${reporte.categoria}`} /> : <div className="no-photo"><Icon name="camera" size={26} /><span>Sin fotografía</span></div>}
         <span className={`category-chip ${reporte.color}`}>{reporte.categoria}</span>
       </div>
       <div className="card-content">
@@ -125,7 +124,7 @@ export function Reportes() {
       <section className="listing-section">
         <div className="listing-toolbar">
           <div className="search-field"><Icon name="search" size={18} /><input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por barrio, calle o categoría" /></div>
-          <div className="select-field"><Icon name="filter" size={17} /><select value={estado} onChange={(e) => setEstado(e.target.value)}><option value="TODOS">Todos los estados</option><option value="PENDIENTE">Pendientes</option><option value="EN_REVISION">En revisión</option><option value="EN_PROCESO">En proceso</option><option value="RESUELTO">Resueltos</option></select></div>
+          <div className="select-field"><Icon name="filter" size={17} /><select value={estado} onChange={(e) => setEstado(e.target.value)}><option value="TODOS">Todos los estados</option><option value="PENDIENTE">Pendientes</option><option value="EN_REVISION">En revisión</option><option value="EN_PROCESO">En proceso</option><option value="RESUELTO">Resueltos</option><option value="RECHAZADO">Rechazados</option></select></div>
           <NavLink className="primary-button compact" to="/reportes/nuevo"><Icon name="plus" /> Nuevo reporte</NavLink>
         </div>
         <div className="connection-note"><span className={conectado ? "live-dot" : "demo-dot"} />{conectado ? `${visibles.length} reportes obtenidos del servicio ciudadano` : "Esperando conexión con el servicio ciudadano"}</div>
@@ -141,6 +140,8 @@ export function Reportes() {
 export function DetalleReporte() {
   const { id = "" } = useParams()
   const { session } = useAuth()
+  const navigate = useNavigate()
+  const aviso = (useLocation().state as { aviso?: string } | null)?.aviso
   const [reporte, setReporte] = useState<Reporte | null>(null)
   const [comentarios, setComentarios] = useState<ComentarioResponse[]>([])
   const [confirmaciones, setConfirmaciones] = useState<ConfirmacionResponse[]>([])
@@ -166,7 +167,7 @@ export function DetalleReporte() {
 
   async function confirmar() {
     if (!session) {
-      window.location.href = "/login"
+      navigate("/login")
       return
     }
     try {
@@ -185,7 +186,7 @@ export function DetalleReporte() {
 
   async function responder(arreglado: boolean) {
     if (!session) {
-      window.location.href = "/login"
+      navigate("/login")
       return
     }
     try {
@@ -230,24 +231,26 @@ export function DetalleReporte() {
 
   if (cargando) return <PortalShell title="Cargando reporte"><div className="loading-panel">Consultando la información…</div></PortalShell>
   if (!reporte) return <PortalShell title="Reporte no encontrado"><div className="alert-panel error-panel">{error}</div></PortalShell>
-  const tieneFoto = Boolean(reporte.fotos?.length)
+  const foto = fotoReporte(reporte)
+  const historial = [...reporte.historialEstados].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+  const cerrado = reporte.estadoRaw === "RESUELTO" || reporte.estadoRaw === "RECHAZADO"
 
   return (
     <PortalShell eyebrow={`Reporte · ${reporte.id}`} title={reporte.categoria}>
       <section className="detail-layout">
+        {aviso && <div className="alert-panel error-panel detail-notice" role="alert">{aviso}</div>}
         <div className="detail-primary">
-          <div className={`detail-photo ${tieneFoto ? "" : "fallback-image"}`}>
-            <img src={fotoReporte(reporte)} alt={tieneFoto ? `Evidencia de ${reporte.categoria}` : ""} />
-            {!tieneFoto && <div className="evidence-disclaimer"><Icon name="camera" /><strong>Este reporte no tiene fotografías</strong><span>La imagen ambiental no se considera evidencia.</span></div>}
+          <div className="detail-photo">
+            {foto ? <img src={foto} alt={`Evidencia de ${reporte.categoria}`} /> : <div className="no-photo"><Icon name="camera" size={34} /><span>Sin fotografía</span></div>}
           </div>
           <div className="detail-copy">
             <div className="detail-title-row"><div><span className="section-kicker">Descripción ciudadana</span><h2>{reporte.descripcion}</h2>{session?.usuarioId === reporte.usuarioId && reporte.estadoRaw === "PENDIENTE" && <NavLink className="edit-report-link" to={`/reportes/${reporte.id}/editar`}>Editar este reporte</NavLink>}</div><span className={`large-status ${reporte.estadoClase}`}>{reporte.estado}</span></div>
             <div className="detail-address"><Icon name="location" /><div><small>Ubicación reportada</small><strong>{reporte.lugar}</strong></div></div>
             <div className="real-map-wrap">{reporte.latitud != null && reporte.longitud != null && <MapaReportes reportes={[{
-              id: reporte.id, usuarioId: "", calleId: null, categoriaId: reporte.categoria, direccionOsm: reporte.direccionOsm ?? null,
-              descripcion: reporte.descripcion ?? "", fotos: reporte.fotos ?? [], latitud: reporte.latitud, longitud: reporte.longitud,
-              estado: reporte.estadoRaw ?? "PENDIENTE", prioridad: reporte.prioridad ?? "MEDIA", fechaCreacion: reporte.fechaCreacion ?? "",
-              fechaActualizacion: reporte.fechaCreacion ?? "", historialEstados: [],
+              id: reporte.id, usuarioId: "", calleId: null, categoriaId: reporte.categoria, direccionOsm: reporte.direccionOsm,
+              descripcion: reporte.descripcion, fotos: reporte.fotos, latitud: reporte.latitud, longitud: reporte.longitud,
+              estado: reporte.estadoRaw, prioridad: reporte.prioridad, fechaCreacion: reporte.fechaCreacion,
+              fechaActualizacion: reporte.fechaCreacion, historialEstados: reporte.historialEstados,
             }]} />}</div>
             <section className="comments-panel">
               <div className="content-heading"><div><h3>Conversación ciudadana</h3><p>{comentarios.length} comentario(s)</p></div></div>
@@ -259,13 +262,26 @@ export function DetalleReporte() {
         <aside className="detail-sidebar">
           {error && <div className="alert-panel error-panel">{error}</div>}
           <div className="community-card"><span className="section-kicker">La comunidad dice</span><h3>¿Este problema sigue igual?</h3><div className="vote-count"><strong>{confirmaciones.length}</strong><span>personas lo confirman</span></div><button className="primary-button full" onClick={confirmar}><Icon name="check" /> {session && confirmaciones.some((item) => item.usuarioId === session.usuarioId) ? "Retirar confirmación" : "Confirmar reporte"}</button></div>
-          {seguimiento && <div className="community-card"><span className="section-kicker">¿Ya lo arreglaron?</span><h3>{seguimiento.arreglado} dicen que sí · {seguimiento.sigue} que sigue igual</h3><div className="followup-actions"><button className={seguimiento.miRespuesta === true ? "selected" : ""} onClick={() => responder(true)}>Ya está arreglado</button><button className={seguimiento.miRespuesta === false ? "selected" : ""} onClick={() => responder(false)}>Sigue igual</button></div></div>}
-          <div className="timeline-card"><span className="section-kicker">Seguimiento</span><div className="timeline-item done"><i /><div><strong>Reporte recibido</strong><small>{reporte.fechaCreacion ? new Date(reporte.fechaCreacion).toLocaleString("es-CO") : reporte.fecha}</small></div></div><div className="timeline-item active"><i /><div><strong>{reporte.estado}</strong><small>Último estado registrado por la plataforma.</small></div></div><div className="timeline-item"><i /><div><strong>Solución</strong><small>{reporte.estadoRaw === "RESUELTO" ? "Problema resuelto" : "Pendiente de actualización"}</small></div></div></div>
+          {seguimiento && !cerrado && <div className="community-card"><span className="section-kicker">¿Ya lo arreglaron?</span><h3>{seguimiento.arreglado} dicen que sí · {seguimiento.sigue} que sigue igual</h3><div className="followup-actions"><button className={seguimiento.miRespuesta === true ? "selected" : ""} onClick={() => responder(true)}>Ya está arreglado</button><button className={seguimiento.miRespuesta === false ? "selected" : ""} onClick={() => responder(false)}>Sigue igual</button></div></div>}
+          <div className="timeline-card">
+            <span className="section-kicker">Seguimiento</span>
+            <div className={historial.length ? "timeline-item done" : "timeline-item active"}><i /><div><strong>Reporte recibido</strong><small>{reporte.fechaCreacion ? new Date(reporte.fechaCreacion).toLocaleString("es-CO") : reporte.fecha}</small></div></div>
+            {historial.map((cambio, index) => (
+              <div className={index === historial.length - 1 ? "timeline-item active" : "timeline-item done"} key={cambio.id ?? `${cambio.fecha}-${index}`}>
+                <i />
+                <div><strong>{textoEstado(cambio.estadoNuevo)}</strong>{cambio.comentarioAdmin && <span>{cambio.comentarioAdmin}</span>}<small>{new Date(cambio.fecha).toLocaleString("es-CO")}</small></div>
+              </div>
+            ))}
+            {historial.length === 0 && <p className="timeline-empty">Aún no hay cambios de estado.</p>}
+          </div>
         </aside>
       </section>
     </PortalShell>
   )
 }
+
+const MAX_FOTOS = 3
+const MAX_BYTES_FOTO = 5 * 1024 * 1024
 
 export function CrearReporte() {
   const navigate = useNavigate()
@@ -278,6 +294,7 @@ export function CrearReporte() {
   const [duplicados, setDuplicados] = useState<PosibleDuplicadoResponse[]>([])
   const [error, setError] = useState("")
   const [enviando, setEnviando] = useState(false)
+  const [avisoFotos, setAvisoFotos] = useState("")
   const previews = useRef<string[]>([])
 
   useEffect(() => () => previews.current.forEach(URL.revokeObjectURL), [])
@@ -289,13 +306,27 @@ export function CrearReporte() {
 
   function cargarFotos(event: ChangeEvent<HTMLInputElement>) {
     const archivos = Array.from(event.target.files ?? [])
-    if (archivos.some((archivo) => !["image/jpeg", "image/png", "image/webp"].includes(archivo.type))) {
-      setError("Solo se permiten fotografías JPEG, PNG o WEBP.")
-      return
-    }
-    const nuevas = archivos.slice(0, 3 - fotos.length).map((archivo) => ({ archivo, preview: URL.createObjectURL(archivo) }))
+    // Permite volver a elegir el mismo archivo después de quitarlo.
+    event.target.value = ""
+    const avisos: string[] = []
+    const imagenes = archivos.filter((archivo) => ["image/jpeg", "image/png", "image/webp"].includes(archivo.type))
+    if (imagenes.length < archivos.length) avisos.push("Solo se permiten fotografías JPEG, PNG o WEBP.")
+    const pesadas = imagenes.filter((archivo) => archivo.size > MAX_BYTES_FOTO)
+    if (pesadas.length) avisos.push(`${pesadas.map((archivo) => archivo.name).join(", ")} ${pesadas.length === 1 ? "pesa" : "pesan"} más de 5 MB y no se ${pesadas.length === 1 ? "agregó" : "agregaron"}. Elige una foto más liviana.`)
+    const validas = imagenes.filter((archivo) => archivo.size <= MAX_BYTES_FOTO)
+    const cupo = MAX_FOTOS - fotos.length
+    if (validas.length > cupo) avisos.push(`Solo puedes adjuntar ${MAX_FOTOS} fotografías en total: ${validas.length - cupo === 1 ? "se descartó 1" : `se descartaron ${validas.length - cupo}`}.`)
+    const nuevas = validas.slice(0, cupo).map((archivo) => ({ archivo, preview: URL.createObjectURL(archivo) }))
     previews.current.push(...nuevas.map((foto) => foto.preview))
     setFotos((actuales) => [...actuales, ...nuevas])
+    setAvisoFotos(avisos.join(" "))
+  }
+
+  function quitarFoto(preview: string) {
+    URL.revokeObjectURL(preview)
+    previews.current = previews.current.filter((url) => url !== preview)
+    setFotos((actuales) => actuales.filter((foto) => foto.preview !== preview))
+    setAvisoFotos("")
   }
 
   async function enviar(event: FormEvent) {
@@ -317,8 +348,16 @@ export function CrearReporte() {
     setEnviando(true)
     try {
       const creado = await reportesApi.crear({ categoriaId: categoria.trim(), descripcion: descripcion.trim(), latitud: coordenadas[0], longitud: coordenadas[1] })
-      if (fotos.length) await reportesApi.subirFotos(creado.id, fotos.map((foto) => foto.archivo))
-      navigate(`/reportes/${creado.id}`)
+      // El reporte ya existe: si las fotos fallan se avisa en el detalle, sin volver al formulario (reenviar lo duplicaría).
+      let aviso: string | undefined
+      if (fotos.length) {
+        try {
+          await reportesApi.subirFotos(creado.id, fotos.map((foto) => foto.archivo))
+        } catch (exception) {
+          aviso = `El reporte se creó, pero no se pudieron subir las fotos: ${exception instanceof Error ? exception.message : "error desconocido"}`
+        }
+      }
+      navigate(`/reportes/${creado.id}`, { state: aviso ? { aviso } : undefined })
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el reporte.")
     } finally {
@@ -341,7 +380,7 @@ export function CrearReporte() {
         <div className="form-progress">{["Ubicación", "Evidencia", "Revisar"].map((item, index) => <div className={paso >= index + 1 ? "active" : ""} key={item}><span>{paso > index + 1 ? <Icon name="check" size={14} /> : index + 1}</span><strong>{item}</strong></div>)}</div>
         <form className="report-form" onSubmit={enviar}>
           {paso === 1 && <><div className="form-heading"><span>01</span><div><h2>¿Dónde está el problema?</h2><p>Haz clic en el mapa o usa la ubicación de tu dispositivo.</p></div></div><div className="picker-map real-picker"><MapaSeleccionPunto onSeleccionar={(lat, lng) => setCoordenadas([lat, lng])} puntoInicial={coordenadas} /></div>{coordenadas && <div className="coords-summary"><Icon name="location" /><div><strong>{direccion ?? "Buscando la dirección…"}</strong><small>{coordenadas[0].toFixed(5)}, {coordenadas[1].toFixed(5)}</small></div></div>}{duplicados.length > 0 && <div className="duplicates-box"><strong>¿Ya lo reportaron?</strong><p>Encontramos {duplicados.length} reporte(s) activo(s) a menos de 100 metros.</p>{duplicados.slice(0, 3).map((item) => <div className="duplicate-action" key={item.reporte.id}><NavLink to={`/reportes/${item.reporte.id}`}>{item.reporte.categoriaId} · {Math.round(item.distanciaMetros)} m · {item.confirmaciones} confirmaciones</NavLink><button type="button" onClick={() => confirmarDuplicado(item.reporte.id)}>Es el mismo: confirmar</button></div>)}</div>}</>}
-          {paso === 2 && <><div className="form-heading"><span>02</span><div><h2>Cuéntanos qué está pasando</h2><p>Una descripción clara y fotos ayudan a gestionar mejor el caso.</p></div></div><div className="form-fields"><label>Categoría<input value={categoria} onChange={(event) => setCategoria(event.target.value)} maxLength={100} placeholder="Ejemplo: Hueco, alumbrado, inundación" required /></label><label>Descripción<textarea rows={5} minLength={10} maxLength={2000} value={descripcion} onChange={(event) => setDescripcion(event.target.value)} placeholder="Describe el problema y alguna referencia para encontrarlo..." required /></label><label className="upload-zone"><Icon name="camera" size={30} /><strong>Agrega hasta 3 fotografías</strong><small>JPEG, PNG o WEBP · máximo 5 MB cada una</small><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={cargarFotos} disabled={fotos.length === 3} /></label>{fotos.length > 0 && <div className="upload-previews">{fotos.map((foto) => <img src={foto.preview} key={foto.preview} alt={`Vista previa de ${foto.archivo.name}`} />)}</div>}</div></>}
+          {paso === 2 && <><div className="form-heading"><span>02</span><div><h2>Cuéntanos qué está pasando</h2><p>Una descripción clara y fotos ayudan a gestionar mejor el caso.</p></div></div><div className="form-fields"><label>Categoría<input value={categoria} onChange={(event) => setCategoria(event.target.value)} maxLength={100} placeholder="Ejemplo: Hueco, alumbrado, inundación" required /></label><label>Descripción<textarea rows={5} minLength={10} maxLength={2000} value={descripcion} onChange={(event) => setDescripcion(event.target.value)} placeholder="Describe el problema y alguna referencia para encontrarlo..." required /></label><label className="upload-zone"><Icon name="camera" size={30} /><strong>Agrega hasta 3 fotografías</strong><small>JPEG, PNG o WEBP · máximo 5 MB cada una</small><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={cargarFotos} disabled={fotos.length === MAX_FOTOS} /></label>{avisoFotos && <div className="alert-panel error-panel" role="alert">{avisoFotos}</div>}{fotos.length > 0 && <div className="upload-previews">{fotos.map((foto) => <div className="upload-preview" key={foto.preview}><img src={foto.preview} alt={`Vista previa de ${foto.archivo.name}`} /><button type="button" onClick={() => quitarFoto(foto.preview)} aria-label={`Quitar ${foto.archivo.name}`}>×</button></div>)}</div>}</div></>}
           {paso === 3 && <><div className="form-heading"><span>03</span><div><h2>Revisa antes de publicar</h2><p>Tu reporte será visible para toda la comunidad.</p></div></div><div className="review-card"><div className="review-image">{fotos[0] ? <img src={fotos[0].preview} alt="Evidencia seleccionada" /> : <div><Icon name="camera" /><span>Sin fotografías</span></div>}</div><div><span className="category-chip coral">{categoria}</span><h3>{direccion ?? "Ubicación seleccionada en Cartagena"}</h3><p>{descripcion}</p></div></div></>}
           {error && <div className="alert-panel error-panel">{error}</div>}
           <div className="form-actions">{paso > 1 && <button type="button" className="ghost-button" onClick={() => setPaso(paso - 1)}>Volver</button>}<button className="primary-button" type="submit" disabled={enviando}>{enviando ? "Publicando…" : paso === 3 ? "Publicar reporte" : "Continuar"} <Icon name="arrow" /></button></div>
@@ -386,16 +425,29 @@ export function EditarReporte() {
 }
 
 export function Mapa() {
-  const [reportes, setReportes] = useState<ReporteResponse[]>([])
-  const [error, setError] = useState("")
+  const [carga, setCarga] = useState<{ fase: "cargando" } | { fase: "error"; mensaje: string } | { fase: "cargado"; reportes: ReporteResponse[] }>({ fase: "cargando" })
   useEffect(() => {
-    reportesApi.listar().then(setReportes).catch((exception) => setError(exception instanceof Error ? exception.message : "No fue posible cargar el mapa."))
+    reportesApi.listar()
+      .then((reportes) => setCarga({ fase: "cargado", reportes }))
+      .catch((exception) => setCarga({ fase: "error", mensaje: exception instanceof Error ? exception.message : "No fue posible cargar el mapa." }))
   }, [])
+  const reportes = carga.fase === "cargado" ? carga.reportes : []
   return (
     <PortalShell eyebrow="Cartagena en tiempo real" title="Mapa ciudadano">
       <section className="full-map-layout">
-        <aside className="map-sidebar"><div className="map-filter-title"><strong>Reportes visibles</strong><span>{reportes.length}</span></div>{error && <div className="alert-panel error-panel">{error}</div>}{reportes.slice(0, 12).map((reporte) => <NavLink to={`/reportes/${reporte.id}`} className="map-list-item" key={reporte.id}><span className={`map-list-dot ${reporte.estado === "RESUELTO" ? "done" : reporte.estado === "EN_PROCESO" ? "process" : ""}`} /><div><strong>{reporte.categoriaId}</strong><small>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(4)}, ${reporte.longitud.toFixed(4)}`}</small></div><Icon name="arrow" size={16} /></NavLink>)}</aside>
-        <div className="interactive-map real-full-map">{reportes.length > 0 ? <MapaReportes reportes={reportes} /> : <div className="loading-panel">Cargando mapa…</div>}</div>
+        <aside className="map-sidebar">
+          <div className="map-filter-title"><strong>Reportes visibles</strong><span>{reportes.length}</span></div>
+          {carga.fase === "cargando" && <p className="map-sidebar-note">Cargando reportes…</p>}
+          {carga.fase === "error" && <div className="alert-panel error-panel">{carga.mensaje}</div>}
+          {carga.fase === "cargado" && reportes.length === 0 && <p className="map-sidebar-note">Aún no hay reportes en el mapa.</p>}
+          {reportes.map((reporte) => <NavLink to={`/reportes/${reporte.id}`} className="map-list-item" key={reporte.id}><span className={`map-list-dot ${reporte.estado === "RESUELTO" ? "done" : reporte.estado === "EN_PROCESO" ? "process" : ""}`} /><div><strong>{reporte.categoriaId}</strong><small>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(4)}, ${reporte.longitud.toFixed(4)}`}</small></div><Icon name="arrow" size={16} /></NavLink>)}
+        </aside>
+        <div className="interactive-map real-full-map">
+          {carga.fase === "cargando" && <div className="loading-panel">Cargando mapa…</div>}
+          {carga.fase === "error" && <div className="loading-panel">No pudimos cargar el mapa. {carga.mensaje}</div>}
+          {carga.fase === "cargado" && <MapaReportes reportes={reportes} />}
+          {carga.fase === "cargado" && reportes.length === 0 && <div className="map-empty-note"><Icon name="map" size={15} /> Aún no hay reportes en el mapa</div>}
+        </div>
       </section>
     </PortalShell>
   )

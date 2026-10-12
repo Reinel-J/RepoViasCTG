@@ -64,6 +64,9 @@ Los módulos API disponibles están en `src/api/`:
 
 - `auth.ts`: login y registro.
 - `reportes.ts`: listado, detalle, creación, actualización, subida de fotos, búsqueda cercana y posibles duplicados.
+- `reporteVista.ts`: `cargarReportes` / `cargarReporte` sobre `reportes.ts`, que convierten el DTO en el
+  `Reporte` que pintan la portada y las pantallas públicas (texto y clase del estado, fecha relativa,
+  historial) y `fotoReporte`, que devuelve la URL de la primera foto o `null`.
 - `seguimiento.ts`: votos «¿ya lo arreglaron?» de un reporte.
 - `geocoding.ts`: previsualización de la dirección de un punto (OpenStreetMap/Nominatim).
 - `barrios.ts` y `categorias.ts`: catálogos disponibles en la API; el formulario de reporte ya no
@@ -95,35 +98,45 @@ GET /api/reportes/cercanos?lat=10.391&lng=-75.479&radioKm=2&estado=PENDIENTE
 
 ## Pantallas implementadas
 
-Las rutas se declaran en `src/app/routes.tsx`:
+Las rutas se declaran en `src/app/routes.tsx`. La portada está en `src/app/pages/Home.tsx` y el resto de
+pantallas son exports de `src/app/pages/Screens.tsx`, que el router carga bajo demanda por nombre:
 
 | Ruta | Pantalla | Acceso |
 |------|----------|--------|
-| `/` | Inicio con estadísticas y reportes recientes | Público |
+| `/` | Inicio con estadísticas y reportes recientes, siempre calculados con datos reales de la API | Público |
 | `/login`, `/registro` | Inicio de sesión y registro | Público |
 | `/recuperar`, `/restablecer?token=` | Solicitar enlace y crear contraseña nueva | Público |
-| `/reportes` | Lista con filtro por estado, dirección detectada y paginación (10 por página) | Público |
-| `/reportes/:id` | Detalle con fotos, mapa, dirección, comentarios y confirmaciones | Público (comentar y confirmar requieren sesión) |
-| `/mapa` | Mapa general de reportes | Público |
-| `/reportes/nuevo` | Formulario: categoría libre, descripción, hasta 3 fotos y ubicación en el mapa | Sesión iniciada |
+| `/reportes` | Lista con búsqueda y filtro por estado (incluye rechazados) | Público |
+| `/reportes/:id` | Detalle con foto, mapa, dirección, comentarios, confirmaciones y línea de tiempo con cada cambio de estado | Público (comentar y confirmar requieren sesión) |
+| `/mapa` | Mapa general de reportes con la lista completa en la barra lateral | Público |
+| `/reportes/nuevo` | Formulario en 3 pasos: ubicación en el mapa, categoría libre con descripción y hasta 3 fotos, y revisión | Sesión iniciada |
+| `/reportes/:id/editar` | Editar descripción y ubicación de un reporte propio `PENDIENTE` | Sesión iniciada |
 | `/notificaciones` | Notificaciones del usuario, con marcado como leída | Sesión iniciada |
 | `/perfil` | Editar nombre y teléfono, cambiar contraseña y cerrar sesión en todos los dispositivos | Sesión iniciada |
 | `/admin` | Panel de administración por pestañas (ver abajo) | `MODERADOR` o `ADMIN` |
 
 Notas de comportamiento:
 
-- Al crear un reporte, las fotos se suben en una segunda petición (`POST /api/reportes/{id}/fotos`).
+- Al crear un reporte, las fotos se suben en una segunda petición (`POST /api/reportes/{id}/fotos`). El
+  formulario valida antes el tipo, el peso (5 MB) y el máximo de 3, y permite quitar cada foto. Si el reporte
+  se crea pero la subida falla, se abre igual el detalle con el aviso «El reporte se creó, pero no se pudieron
+  subir las fotos», para que reenviar el formulario no lo duplique.
+- Un reporte sin fotos muestra un placeholder «Sin fotografía»; nunca una imagen de stock.
+- La línea de tiempo del detalle empieza en «Reporte recibido» y lista cada entrada de `historialEstados`
+  (estado nuevo, comentario del moderador y fecha), de la más antigua a la más reciente.
+- `/mapa` distingue cargando, error y cargado; con la base vacía muestra el mapa centrado en Cartagena y
+  el mensaje «Aún no hay reportes en el mapa».
 - Al marcar el punto, el formulario consulta `GET /api/reportes/posibles-duplicados` y, si hay reportes
   activos a menos de 100 m, muestra «¿Ya lo reportaron?» (primero los de la misma categoría, comparada sin
   mayúsculas ni tildes) con la opción «Es el mismo: confirmar», que confirma el existente y abre su detalle.
 - El detalle muestra la tarjeta «¿Ya lo arreglaron?» con los votos de la comunidad; con sesión se responde
-  «Ya está arreglado» o «Sigue igual» mientras el reporte esté activo.
+  «Ya está arreglado» o «Sigue igual»; la tarjeta se oculta en reportes `RESUELTO` o `RECHAZADO`.
 - El backend resuelve la dirección de forma asíncrona, así que un reporte recién creado puede
-  llegar con `direccionOsm` en `null`. El detalle lo vuelve a consultar a los 4 segundos.
+  llegar con `direccionOsm` en `null`; mientras tanto se muestran las coordenadas.
 - Al cambiar la contraseña el backend devuelve un token nuevo y `renovarSesion` lo guarda, así que la sesión actual sigue abierta y las demás se cierran.
 - Los comentarios muestran el nombre real del autor (`usuarioNombre`, que entrega el backend).
-- La paginación de la lista se hace en el cliente sobre la respuesta completa de `GET /api/reportes`;
-  mientras el backend no pagine, conviene pasar a paginación del lado del servidor si crece el volumen.
+- La lista filtra en el cliente sobre la respuesta completa de `GET /api/reportes` y no pagina;
+  conviene pasar a paginación del lado del servidor si crece el volumen.
 - Las notificaciones las genera el backend cuando un moderador cambia el estado de un reporte.
   Al guardar el perfil se actualiza también el nombre mostrado en la barra superior.
 - Cada pantalla se carga bajo demanda (`lazy` del router) y Leaflet solo se descarga al abrir un
@@ -148,7 +161,6 @@ Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coinc
 
 ## Pendiente
 
-- Editar un reporte propio mientras está `PENDIENTE`.
 - Paginación del lado del servidor.
 - Estadística «Barrios participando» (muestra `0`: el reporte no tiene relación con un barrio).
 - Contador de notificaciones sin leer en la barra superior.
@@ -168,12 +180,16 @@ Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coinc
 
 ```text
 src/
-├── api/         # Cliente Axios, tipos y módulos REST
-├── app/         # Router, layout, componentes de UI y página de inicio
-├── components/  # Mapas y corrección de iconos Leaflet
-├── context/     # Sesión: AuthContext (proveedor), useAuth (hook) y authContextValue
-├── pages/       # Pantallas de la aplicación
-└── routes/      # Protección por sesión y rol
+├── api/            # Cliente Axios, tipos, módulos REST y reporteVista.ts (normalización para la vista)
+├── app/
+│   ├── routes.tsx  # Rutas (carga diferida por nombre de export)
+│   ├── pages/      # Home.tsx (portada) y Screens.tsx (todas las demás pantallas y su PortalShell)
+│   └── components/ # UI.tsx: iconos y etiquetas que usa el panel de administración
+├── components/     # Mapas y corrección de iconos Leaflet
+├── context/        # Sesión: AuthContext (proveedor), useAuth (hook) y authContextValue
+├── pages/admin/    # Panel de administración (pestañas)
+├── routes/         # Protección por sesión y rol
+└── index.css       # Único archivo de estilos
 ```
 
 `src/App.tsx` solo reexporta `src/app/App.tsx`, que monta el router.

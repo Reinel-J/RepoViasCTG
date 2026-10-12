@@ -38,12 +38,15 @@ Capas bajo `com.viactg`: controller → service → repository, con `dto`/`mappe
 
 ## Arquitectura del frontend
 
-- Router en `src/app/routes.tsx` (react-router, `createBrowserRouter`); cada pantalla se carga con `lazy` (helpers `pagina` / `paginaProtegida`), solo `Home` es estática. Leaflet y su CSS se importan dentro de los componentes de mapa para no entrar en el paquete inicial.
+- Router en `src/app/routes.tsx` (react-router, `createBrowserRouter`); todas las rutas se cargan con `lazy`. Los helpers `pagina` / `paginaProtegida` resuelven por nombre un export de `src/app/pages/Screens.tsx`, que contiene todas las pantallas (lista, detalle, crear/editar reporte, mapa, login, registro, recuperación, perfil, notificaciones y el contenedor del panel) junto con su `PortalShell` (cabecera y pie); `src/app/pages/Home.tsx` es la portada, con su propia cabecera. Agregar una pantalla = exportarla en `Screens.tsx` y registrarla en `routes.tsx`. Leaflet y su CSS se importan dentro de los componentes de mapa (`src/components/`) para no entrar en el paquete inicial.
+- La portada solo muestra datos reales calculados sobre `GET /api/reportes` (nada de cifras, lugares ni pines de ejemplo) y un reporte sin fotos muestra el placeholder CSS `.no-photo`, nunca una imagen de stock.
+- La navegación interna usa `NavLink` / `useNavigate`; no uses `window.location.href` ni `<a href="/...">` (recargan la página).
 - Sesión: `context/AuthContext.tsx` (proveedor), `authContextValue.ts` (contexto) y `useAuth.ts` (hook) están separados por la regla `react-refresh/only-export-components`. Se persiste en `localStorage` (`token` y `authSession`). `routes/ProtectedRoute.tsx` aplica la protección por rol.
-- `src/api/client.ts` es el único cliente Axios: añade el Bearer, convierte los errores del backend en `error.message` (mensaje + `validationErrors`), y ante un 401 con token guardado (salvo `/auth/*`) limpia la sesión y redirige a `/login`. Las pantallas muestran `exception.message` directamente.
-- Los tipos en `src/api/types.ts` reflejan a mano los DTO del backend: al cambiar un DTO hay que actualizarlos.
-- Panel en `src/pages/admin/` (pestañas por `?seccion=`); `estados.ts` duplica las transiciones de `ReporteService.validarTransicion`: mantenlas sincronizadas.
-- La lista de reportes pagina en el cliente (10 por página) sobre `GET /api/reportes`, que no pagina. Estilos en un único `src/index.css`.
+- `src/api/client.ts` es el único cliente HTTP (Axios; no uses `fetch`): añade el Bearer, convierte los errores del backend en `error.message` (mensaje + `validationErrors`), y ante un 401 con token guardado (salvo `/auth/*`) limpia la sesión y redirige a `/login`. Las pantallas muestran `exception.message` directamente.
+- Los tipos en `src/api/types.ts` reflejan a mano los DTO del backend: al cambiar un DTO hay que actualizarlos. `src/api/reporteVista.ts` envuelve `reportes.ts` y convierte `ReporteResponse` en el `Reporte` de vista (textos y clases de estado, fecha relativa, `fotoReporte`) que usan `Home.tsx` y las pantallas públicas de `Screens.tsx`.
+- Panel en `src/pages/admin/` (pestañas por `?seccion=`), montado por `Admin` en `Screens.tsx` y con sus propios componentes en `src/app/components/UI.tsx`; sus clases CSS (`admin-*`, `stats-*`, `button*`) viven en el mismo `index.css`; `estados.ts` duplica las transiciones de `ReporteService.validarTransicion`: mantenlas sincronizadas.
+- La lista de reportes filtra en el cliente (estado y búsqueda, sin paginar) sobre `GET /api/reportes`, que no pagina. Estilos en un único `src/index.css`.
+- Crear reporte: las fotos (máx. 3, 5 MB, JPEG/PNG/WEBP) se validan en el cliente y se suben en una segunda petición; si esa subida falla se navega igual al detalle con el aviso en el `state` de `navigate`, para no duplicar el reporte.
 - Reglas del lint (React Compiler): nada de `setState` síncrono dentro de `useEffect`; mover esos cambios a los manejadores de eventos.
 
 ## Convenciones
