@@ -43,6 +43,11 @@ export async function seguimientos(): Promise<SeguimientoResumenResponse[]> {
   return response.data
 }
 
+export async function enviarRecordatorios(): Promise<number> {
+  const response = await client.post<{ reportesRecordados: number }>('/admin/reportes/seguimiento/recordatorios')
+  return response.data.reportesRecordados
+}
+
 export async function listarUsuarios(): Promise<UsuarioResponse[]> {
   const response = await client.get<UsuarioResponse[]>('/usuarios')
   return response.data

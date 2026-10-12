@@ -1,4 +1,6 @@
 import { useSearchParams } from "react-router"
+import { useState } from "react"
+import * as adminApi from "../../api/admin"
 import { useAuth } from "../../context/useAuth"
 import { BarriosAdmin } from "./BarriosAdmin"
 import { CategoriasAdmin } from "./CategoriasAdmin"
@@ -25,9 +27,20 @@ export function PanelAdmin() {
   const disponibles = SECCIONES.filter((seccion) => esAdmin || !seccion.soloAdmin)
   const pedida = params.get("seccion") as Seccion | null
   const actual = disponibles.find((seccion) => seccion.id === pedida)?.id ?? "resumen"
+  const [recordatorio, setRecordatorio] = useState("")
+
+  async function enviarRecordatorios() {
+    setRecordatorio("Enviando recordatorios…")
+    try {
+      const enviados = await adminApi.enviarRecordatorios()
+      setRecordatorio(`${enviados} recordatorio(s) enviado(s).`)
+    } catch (exception) {
+      setRecordatorio(exception instanceof Error ? exception.message : "No fue posible enviar los recordatorios.")
+    }
+  }
 
   return (
-    <main className="page-shell section internal-page">
+    <div className="page-shell section internal-page">
       <div className="page-heading">
         <div>
           <span className="eyebrow">Gestión interna · {esAdmin ? "Administrador" : "Moderador"}</span>
@@ -47,12 +60,13 @@ export function PanelAdmin() {
           </button>
         ))}
       </nav>
+      {esAdmin && <div className="admin-utility"><button className="button button-ghost button-small" onClick={enviarRecordatorios}>Ejecutar recordatorios</button>{recordatorio && <span>{recordatorio}</span>}</div>}
       {actual === "resumen" && <ResumenAdmin onVerReportes={(estado) => setParams(estado ? { seccion: "reportes", estado } : { seccion: "reportes" })} />}
       {actual === "reportes" && <ReportesAdmin estadoInicial={params.get("estado")} />}
       {actual === "estadisticas" && <EstadisticasAdmin />}
       {actual === "usuarios" && <UsuariosAdmin usuarioActualId={session?.usuarioId} />}
       {actual === "barrios" && <BarriosAdmin />}
       {actual === "categorias" && <CategoriasAdmin />}
-    </main>
+    </div>
   )
 }

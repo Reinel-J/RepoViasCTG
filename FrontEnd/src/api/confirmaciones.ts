@@ -10,3 +10,7 @@ export async function crear(reporteId: string): Promise<ConfirmacionResponse> {
   const response = await client.post<ConfirmacionResponse>(`/reportes/${reporteId}/confirmaciones`)
   return response.data
 }
+
+export async function retirar(reporteId: string): Promise<void> {
+  await client.delete(`/reportes/${reporteId}/confirmaciones/me`)
+}

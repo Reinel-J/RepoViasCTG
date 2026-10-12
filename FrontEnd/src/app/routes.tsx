@@ -1,55 +1,30 @@
-import type { ComponentType } from "react"
 import { createBrowserRouter } from "react-router"
-import type { Rol } from "../api/types"
+import type { ComponentType } from "react"
 import { ProtectedRoute } from "../routes/ProtectedRoute"
-import { Root } from "./components/Root"
-import { Home } from "./pages/Home"
+import type { Rol } from "../api/types"
 
-type Carga = () => Promise<Record<string, unknown>>
-
-// Cada pantalla se descarga bajo demanda para mantener pequeño el paquete inicial.
-const pagina = (carga: Carga, nombre: string) => async () => ({
-  Component: (await carga())[nombre] as ComponentType,
+const pagina = (nombre: string) => async () => ({
+  Component: (await import("./pages/Screens"))[nombre as keyof typeof import("./pages/Screens")] as ComponentType,
 })
 
-const paginaProtegida = (carga: Carga, nombre: string, requiredRole?: Rol) => async () => {
-  const Pantalla = (await carga())[nombre] as ComponentType
-  return {
-    Component: () => (
-      <ProtectedRoute requiredRole={requiredRole}>
-        <Pantalla />
-      </ProtectedRoute>
-    ),
-  }
+const paginaProtegida = (nombre: string, requiredRole?: Rol) => async () => {
+  const Pantalla = (await import("./pages/Screens"))[nombre as keyof typeof import("./pages/Screens")] as ComponentType
+  return { Component: () => <ProtectedRoute requiredRole={requiredRole}><Pantalla /></ProtectedRoute> }
 }
 
 export const router = createBrowserRouter([
-  {
-    path: "/",
-    Component: Root,
-    children: [
-      { index: true, Component: Home },
-      { path: "login", lazy: pagina(() => import("../pages/Login"), "Login") },
-      { path: "registro", lazy: pagina(() => import("../pages/Registro"), "Registro") },
-      { path: "recuperar", lazy: pagina(() => import("../pages/RecuperarPassword"), "RecuperarPassword") },
-      { path: "restablecer", lazy: pagina(() => import("../pages/RestablecerPassword"), "RestablecerPassword") },
-      { path: "reportes", lazy: pagina(() => import("../pages/ListaReportes"), "ListaReportes") },
-      { path: "reportes/nuevo", lazy: paginaProtegida(() => import("../pages/CrearReporte"), "CrearReporte") },
-      { path: "reportes/:id", lazy: pagina(() => import("../pages/DetalleReporte"), "DetalleReporte") },
-      { path: "mapa", lazy: pagina(() => import("../pages/MapaGeneral"), "MapaGeneral") },
-      { path: "admin", lazy: paginaProtegida(() => import("../pages/admin/PanelAdmin"), "PanelAdmin", "ADMIN") },
-      { path: "notificaciones", lazy: paginaProtegida(() => import("../pages/Notificaciones"), "Notificaciones") },
-      { path: "perfil", lazy: paginaProtegida(() => import("../pages/Perfil"), "Perfil") },
-      {
-        path: "*",
-        element: (
-          <section className="page-shell empty-state">
-            <span className="eyebrow">Error 404</span>
-            <h1>Parece que esta calle no existe.</h1>
-            <p>Regresa al inicio para continuar explorando los reportes de Cartagena.</p>
-          </section>
-        ),
-      },
-    ],
-  },
+  { path: "/", lazy: async () => ({ Component: (await import("./pages/Home")).Home }) },
+  { path: "/reportes", lazy: pagina("Reportes") },
+  { path: "/reportes/nuevo", lazy: paginaProtegida("CrearReporte") },
+  { path: "/reportes/:id/editar", lazy: paginaProtegida("EditarReporte") },
+  { path: "/reportes/:id", lazy: pagina("DetalleReporte") },
+  { path: "/mapa", lazy: pagina("Mapa") },
+  { path: "/login", lazy: pagina("Login") },
+  { path: "/registro", lazy: pagina("Registro") },
+  { path: "/recuperar", lazy: pagina("RecuperarPassword") },
+  { path: "/restablecer", lazy: pagina("RestablecerPassword") },
+  { path: "/perfil", lazy: paginaProtegida("Perfil") },
+  { path: "/notificaciones", lazy: paginaProtegida("Notificaciones") },
+  { path: "/admin", lazy: paginaProtegida("Admin", "ADMIN") },
+  { path: "*", lazy: async () => ({ Component: (await import("./pages/Home")).Home }) },
 ])
