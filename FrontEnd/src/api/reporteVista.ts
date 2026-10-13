@@ -62,7 +62,7 @@ function normalizar(reporte: ReporteResponse): Reporte {
     estado: visual.texto,
     estadoRaw: estado,
     estadoClase: visual.clase,
-    color: estado === 'RESUELTO' ? 'green' : estado === 'EN_PROCESO' ? 'yellow' : 'coral',
+    color: estado === 'RESUELTO' ? 'green' : estado === 'EN_PROCESO' ? 'yellow' : estado === 'RECHAZADO' ? 'gray' : 'coral',
     fotos: reporte.fotos ?? [],
     latitud: reporte.latitud,
     longitud: reporte.longitud,
