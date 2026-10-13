@@ -149,20 +149,23 @@ export function DetalleReporte() {
   const [texto, setTexto] = useState("")
   const [error, setError] = useState("")
   const [cargando, setCargando] = useState(true)
+  const [sinCargar, setSinCargar] = useState<string[]>([])
   useEffect(() => {
     if (!id) return
-    Promise.all([
-      cargarReporte(id),
-      comentariosApi.listar(id),
-      confirmacionesApi.listar(id),
-      seguimientoApi.obtener(id),
-    ]).then(([report, comments, confirmations, followup]) => {
-      setReporte(report)
-      setComentarios(comments)
-      setConfirmaciones(confirmations)
-      setSeguimiento(followup)
-    }).catch((exception) => setError(exception instanceof Error ? exception.message : "No fue posible cargar el reporte."))
+    cargarReporte(id).then(setReporte)
+      .catch((exception) => setError(exception instanceof Error ? exception.message : "No fue posible cargar el reporte."))
       .finally(() => setCargando(false))
+    // Lo demás es complementario: si falla, el reporte se muestra igual y se avisa qué faltó.
+    Promise.allSettled([comentariosApi.listar(id), confirmacionesApi.listar(id), seguimientoApi.obtener(id)]).then(([comments, confirmations, followup]) => {
+      if (comments.status === "fulfilled") setComentarios(comments.value)
+      if (confirmations.status === "fulfilled") setConfirmaciones(confirmations.value)
+      if (followup.status === "fulfilled") setSeguimiento(followup.value)
+      setSinCargar([
+        comments.status === "rejected" && "los comentarios",
+        confirmations.status === "rejected" && "las confirmaciones",
+        followup.status === "rejected" && "el seguimiento de la comunidad",
+      ].filter((parte): parte is string => Boolean(parte)))
+    })
   }, [id, session])
 
   async function confirmar() {
@@ -230,7 +233,7 @@ export function DetalleReporte() {
   }
 
   if (cargando) return <PortalShell title="Cargando reporte"><div className="loading-panel">Consultando la información…</div></PortalShell>
-  if (!reporte) return <PortalShell title="Reporte no encontrado"><div className="alert-panel error-panel">{error}</div></PortalShell>
+  if (!reporte) return <PortalShell title="No pudimos mostrar el reporte"><div className="alert-panel error-panel detail-load-error">{error}</div></PortalShell>
   const foto = fotoReporte(reporte)
   const historial = [...reporte.historialEstados].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
   const cerrado = reporte.estadoRaw === "RESUELTO" || reporte.estadoRaw === "RECHAZADO"
@@ -239,6 +242,7 @@ export function DetalleReporte() {
     <PortalShell eyebrow={`Reporte · ${reporte.id}`} title={reporte.categoria}>
       <section className="detail-layout">
         {aviso && <div className="alert-panel error-panel detail-notice" role="alert">{aviso}</div>}
+        {sinCargar.length > 0 && <div className="alert-panel error-panel detail-notice" role="alert">No pudimos cargar {new Intl.ListFormat("es", { type: "conjunction" }).format(sinCargar)}. Recarga la página para intentarlo de nuevo.</div>}
         <div className="detail-primary">
           <div className="detail-photo">
             {foto ? <img src={foto} alt={`Evidencia de ${reporte.categoria}`} /> : <div className="no-photo"><Icon name="camera" size={34} /><span>Sin fotografía</span></div>}
@@ -440,7 +444,7 @@ export function Mapa() {
           {carga.fase === "cargando" && <p className="map-sidebar-note">Cargando reportes…</p>}
           {carga.fase === "error" && <div className="alert-panel error-panel">{carga.mensaje}</div>}
           {carga.fase === "cargado" && reportes.length === 0 && <p className="map-sidebar-note">Aún no hay reportes en el mapa.</p>}
-          {reportes.map((reporte) => <NavLink to={`/reportes/${reporte.id}`} className="map-list-item" key={reporte.id}><span className={`map-list-dot ${reporte.estado === "RESUELTO" ? "done" : reporte.estado === "EN_PROCESO" ? "process" : ""}`} /><div><strong>{reporte.categoriaId}</strong><small>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(4)}, ${reporte.longitud.toFixed(4)}`}</small></div><Icon name="arrow" size={16} /></NavLink>)}
+          {reportes.map((reporte) => <NavLink to={`/reportes/${reporte.id}`} className="map-list-item" key={reporte.id}><span className={`map-list-dot ${reporte.estado === "RESUELTO" ? "done" : reporte.estado === "EN_PROCESO" ? "process" : reporte.estado === "RECHAZADO" ? "rejected" : ""}`} /><div><strong>{reporte.categoriaId}</strong><small>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(4)}, ${reporte.longitud.toFixed(4)}`}</small></div><Icon name="arrow" size={16} /></NavLink>)}
         </aside>
         <div className="interactive-map real-full-map">
           {carga.fase === "cargando" && <div className="loading-panel">Cargando mapa…</div>}

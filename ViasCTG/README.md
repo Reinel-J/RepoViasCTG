@@ -119,6 +119,31 @@ El registro público crea un usuario `CIUDADANO`. El primer `ADMIN` se crea con 
 - El JWT incluye el claim `ver` con `Usuario.versionToken`; el filtro rechaza tokens con una versión distinta. Cambiar o restablecer la contraseña y `cerrar-sesiones` incrementan la versión.
 - La recuperación genera 32 bytes aleatorios, guarda solo su SHA-256 en `tokens_recuperacion` (índice TTL) y envía `FRONTEND_URL/restablecer?token=…`. Sin SMTP configurado (`SPRING_MAIL_HOST`), el enlace se registra en el log.
 
+## Errores
+
+Toda respuesta de error tiene el mismo cuerpo, con el mensaje en español y pensado para mostrarse tal cual:
+
+```json
+{"timestamp": "…", "status": 400, "error": "Bad Request",
+ "message": "La solicitud contiene campos inválidos",
+ "validationErrors": {"descripcion": "La descripción debe tener entre 10 y 2000 caracteres"}}
+```
+
+| Código | Cuándo |
+|--------|--------|
+| 400 | Campos inválidos (detalle por campo en `validationErrors`), JSON ilegible, parámetro faltante o con valor no válido |
+| 401 | Sin token, token vencido o revocado, o credenciales incorrectas en el login |
+| 403 | Sesión válida sin permiso para la operación |
+| 404 | El recurso o la dirección no existe |
+| 405 / 415 | Método o tipo de contenido no admitido |
+| 409 | Regla de negocio (transición no permitida, máximo de fotos, duplicados…) |
+| 413 | Archivo de más de 5 MB |
+| 429 | Demasiados intentos de login, registro o recuperación |
+| 500 | Error no controlado (el detalle solo va al log) |
+
+Cada restricción de los DTO declara su `message`; al agregar una nueva hay que escribirlo, porque el texto por
+defecto de Bean Validation sale en inglés.
+
 ## Rutas principales
 
 | Recurso | Rutas |

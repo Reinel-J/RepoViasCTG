@@ -53,6 +53,11 @@ El cliente Axios está configurado en `src/api/client.ts`. La URL base sale de l
 http://localhost:8080/api
 ```
 
+Los errores del backend llegan como `ErrorResponse {status, message, validationErrors}` y el cliente
+los convierte en `error.message` (mensaje en español más el detalle de cada campo inválido), que las
+pantallas muestran tal cual. Si la respuesta no trae `message`, se usa un texto por código HTTP; nunca
+se muestra el genérico «Request failed with status code …».
+
 Si la API responde `401` con un token guardado (sesión vencida o inválida), el cliente limpia
 la sesión y redirige a `/login`.
 
@@ -124,6 +129,8 @@ Notas de comportamiento:
 - Un reporte sin fotos muestra un placeholder «Sin fotografía»; nunca una imagen de stock.
 - La línea de tiempo del detalle empieza en «Reporte recibido» y lista cada entrada de `historialEstados`
   (estado nuevo, comentario del moderador y fecha), de la más antigua a la más reciente.
+- El detalle solo depende de la petición del reporte: si fallan comentarios, confirmaciones o seguimiento,
+  se muestra igual con un aviso de lo que no se pudo cargar.
 - `/mapa` distingue cargando, error y cargado; con la base vacía muestra el mapa centrado en Cartagena y
   el mensaje «Aún no hay reportes en el mapa».
 - Al marcar el punto, el formulario consulta `GET /api/reportes/posibles-duplicados` y, si hay reportes
@@ -162,10 +169,7 @@ Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coinc
 ## Pendiente
 
 - Paginación del lado del servidor.
-- Estadística «Barrios participando» (muestra `0`: el reporte no tiene relación con un barrio).
 - Contador de notificaciones sin leer en la barra superior.
-- El icono de los marcadores Leaflet se ve roto («Mark»): `leafletIconFix.ts` debe borrar
-  `L.Icon.Default.prototype._getIconUrl` antes de `mergeOptions`.
 - Pruebas automatizadas.
 - El token JWT se guarda en `localStorage`, expuesto a XSS; considerar cookies `HttpOnly`.
 

@@ -31,16 +31,20 @@ public class ReporteController {
     @GetMapping public List<ReporteResponse> listar(@RequestParam(required = false) EstadoReporte estado) { return reporteService.listar(estado).stream().map(reporteMapper::toResponse).toList(); }
     @GetMapping("/cercanos")
     public List<ReporteResponse> listarCercanos(
-            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
-            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lng,
-            @RequestParam(defaultValue = "2") @Positive double radioKm,
+            @RequestParam @DecimalMin(value = "-90.0", message = "La latitud debe estar entre -90 y 90")
+            @DecimalMax(value = "90.0", message = "La latitud debe estar entre -90 y 90") double lat,
+            @RequestParam @DecimalMin(value = "-180.0", message = "La longitud debe estar entre -180 y 180")
+            @DecimalMax(value = "180.0", message = "La longitud debe estar entre -180 y 180") double lng,
+            @RequestParam(defaultValue = "2") @Positive(message = "El radio debe ser mayor que cero") double radioKm,
             @RequestParam(required = false) EstadoReporte estado) {
         return reporteService.listarCercanos(lat, lng, radioKm, estado).stream().map(reporteMapper::toResponse).toList();
     }
     @GetMapping("/posibles-duplicados")
     public List<PosibleDuplicadoResponse> posiblesDuplicados(
-            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
-            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lng) {
+            @RequestParam @DecimalMin(value = "-90.0", message = "La latitud debe estar entre -90 y 90")
+            @DecimalMax(value = "90.0", message = "La latitud debe estar entre -90 y 90") double lat,
+            @RequestParam @DecimalMin(value = "-180.0", message = "La longitud debe estar entre -180 y 180")
+            @DecimalMax(value = "180.0", message = "La longitud debe estar entre -180 y 180") double lng) {
         return duplicadoService.buscar(lat, lng).stream().map(duplicado -> new PosibleDuplicadoResponse(
                 reporteMapper.toResponse(duplicado.reporte()), duplicado.distanciaMetros(), duplicado.confirmaciones())).toList();
     }

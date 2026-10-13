@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -34,9 +36,15 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.NOT_FOUND, exception.getMessage(), Map.of());
     }
 
-    @ExceptionHandler({BusinessRuleException.class, DuplicateResourceException.class, DuplicateKeyException.class})
+    @ExceptionHandler({BusinessRuleException.class, DuplicateResourceException.class})
     public ResponseEntity<ErrorResponse> handleConflict(RuntimeException exception) {
         return response(HttpStatus.CONFLICT, exception.getMessage(), Map.of());
+    }
+
+    // El mensaje del driver expone nombres de colecciones e índices; no se reenvía al cliente.
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateKey(DuplicateKeyException exception) {
+        return response(HttpStatus.CONFLICT, "Ya existe un registro con esos datos", Map.of());
     }
 
     @ExceptionHandler(ForbiddenOperationException.class)
@@ -64,9 +72,14 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), Map.of());
     }
 
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException exception) {
+        return response(HttpStatus.UNAUTHORIZED, "El correo o la contraseña no son correctos, o la cuenta está desactivada", Map.of());
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException exception) {
-        return response(HttpStatus.UNAUTHORIZED, "Credenciales inválidas o sesión no autorizada", Map.of());
+        return response(HttpStatus.UNAUTHORIZED, "Tu sesión no es válida o ya venció. Inicia sesión de nuevo", Map.of());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -74,10 +87,31 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.FORBIDDEN, "No tienes permiso para realizar esta acción", Map.of());
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
-            MissingServletRequestParameterException.class, MissingServletRequestPartException.class})
-    public ResponseEntity<ErrorResponse> handleBadRequest(Exception exception) {
-        return response(HttpStatus.BAD_REQUEST, "La solicitud está mal formada o le faltan datos", Map.of());
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException exception) {
+        return response(HttpStatus.BAD_REQUEST,
+                "El cuerpo de la solicitud falta o no es un JSON válido (revisa también los valores de las listas cerradas, como estado, prioridad o rol)",
+                Map.of());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        return response(HttpStatus.BAD_REQUEST, "El parámetro '" + exception.getName() + "' tiene un valor no válido", Map.of());
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException exception) {
+        return response(HttpStatus.BAD_REQUEST, "Falta el parámetro obligatorio '" + exception.getParameterName() + "'", Map.of());
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException exception) {
+        return response(HttpStatus.BAD_REQUEST, "Falta el archivo '" + exception.getRequestPartName() + "' en la solicitud", Map.of());
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
+        return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "El tipo de contenido de la solicitud no es compatible con esta operación", Map.of());
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -87,18 +121,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException exception) {
-        return response(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido", Map.of());
+        return response(HttpStatus.METHOD_NOT_ALLOWED, "Esta dirección no admite el método " + exception.getMethod(), Map.of());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException exception) {
-        return response(HttpStatus.NOT_FOUND, "Recurso no encontrado", Map.of());
+        return response(HttpStatus.NOT_FOUND, "La dirección solicitada no existe", Map.of());
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception exception) {
         log.error("Error no controlado", exception);
-        return response(HttpStatus.INTERNAL_SERVER_ERROR, "Ocurrió un error interno", Map.of());
+        return response(HttpStatus.INTERNAL_SERVER_ERROR, "Ocurrió un error interno. Inténtalo de nuevo en unos minutos", Map.of());
     }
 
     private ResponseEntity<ErrorResponse> response(HttpStatus status, String message, Map<String, String> validationErrors) {
