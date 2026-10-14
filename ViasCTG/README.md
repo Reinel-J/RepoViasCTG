@@ -1,6 +1,6 @@
 # ViaCTG
 
-ViaCTG es una API REST para registrar y hacer seguimiento a daños viales de Cartagena. Usa Java 21, Spring Boot 3.3.4, Spring Data MongoDB, Spring Security y JWT.
+ViaCTG es una API REST para registrar y hacer seguimiento a daños viales de Cartagena. Usa Java 21, Spring Boot 3.3.13, Spring Data MongoDB, Spring Security y JWT.
 
 ## Requisitos y configuración
 
@@ -14,9 +14,11 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
-Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`, o lo promueven si ya existe sin cambiar su contraseña), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) y `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`).
+Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque el registro no verifica el correo y otra persona pudo crear antes esa cuenta; un administrador existente conserva su contraseña), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión si el catálogo está vacío) y `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`).
 
-No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`.
+No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`, y los de consulta `reportes(estado, fechaCreacion)`, `reportes.fechaCreacion`, `comentarios(reporteId, fecha)` y `notificaciones(usuarioId, fecha)`.
+
+`GET /actuator/health` (público, sin detalles) indica si la API y MongoDB responden; lo usa el healthcheck de Docker.
 
 ## Arquitectura
 
@@ -34,6 +36,7 @@ Al crear o actualizar un reporte, las coordenadas son obligatorias y se validan 
 
 - Latitud: entre `-90` y `90`.
 - Longitud: entre `-180` y `180`.
+- Además deben caer dentro del área de servicio (`AreaServicio`, por defecto un rectángulo que cubre Cartagena, sus corregimientos cercanos, Barú y las Islas del Rosario); fuera de ella la API responde `409`.
 
 Ejemplo de cuerpo para crear o actualizar un reporte:
 
@@ -46,15 +49,19 @@ Ejemplo de cuerpo para crear o actualizar un reporte:
 }
 ```
 
-`categoriaId` es texto libre. La prioridad no la envía el ciudadano: todo reporte inicia en `MEDIA` y solo `ADMIN` o `MODERADOR` la modifican al cambiar el estado (`prioridad` opcional en `PATCH /api/admin/reportes/{id}/estado`). La edición (`PUT`) solo aplica a reportes `PENDIENTE` y solo recibe descripción y coordenadas.
+`categoriaId` es texto libre (máximo 100 caracteres), pero si coincide con una categoría del catálogo sin distinguir mayúsculas, tildes ni espacios repetidos se guarda con el nombre oficial («inundacion » → «Inundación»), así filtros y estadísticas no se fragmentan. El catálogo no admite nombres duplicados. La prioridad no la envía el ciudadano: todo reporte inicia en `MEDIA` y solo `ADMIN` o `MODERADOR` la modifican al cambiar el estado (`prioridad` opcional en `PATCH /api/admin/reportes/{id}/estado`). La edición (`PUT`) solo aplica a reportes `PENDIENTE` y solo recibe descripción y coordenadas.
 
 ### Dirección (OpenStreetMap)
 
-El backend resuelve `direccionOsm` con Nominatim (geocodificación inversa). Se hace de forma asíncrona: la respuesta de `POST /api/reportes` trae `direccionOsm: null` y el valor se completa segundos después. Si cambian las coordenadas en un `PUT`, se recalcula. `GET /api/geocoding/inverso?lat=..&lng=..` es público y sirve para previsualizar la dirección.
+El backend resuelve `direccionOsm` («vía, barrio») y `barrioOsm` con Nominatim (geocodificación inversa). Se hace de forma asíncrona: la respuesta de `POST /api/reportes` trae ambos en `null` y se completan segundos después, solo si el reporte sigue en las mismas coordenadas. Si cambian las coordenadas en un `PUT`, se recalculan.
+
+`GET /api/geocoding/inverso?lat=..&lng=..` es público y sirve para previsualizar la ubicación: devuelve `{direccionOsm, barrioOsm, dentroDelArea}`. Respeta la política de Nominatim: como máximo una petición por segundo para todo el servidor (con un turno reservado sin bloquear hilos: si la cola supera unos 2 s devuelve la dirección en `null` en lugar de esperar), caché de 5 000 puntos (celdas de ~11 m) y 30 consultas por minuto por IP.
 
 ### Comentarios y notificaciones
 
-`ComentarioResponse` incluye `usuarioNombre` (nombre del autor, `null` si el usuario ya no existe). Cada vez que un `ADMIN` o `MODERADOR` cambia el estado de un reporte, se crea una notificación para su autor (por ejemplo: «Tu reporte "…" cambió a en revisión»), visible en `GET /api/notificaciones`.
+`ComentarioResponse` incluye `usuarioNombre` (nombre del autor, `null` si el usuario ya no existe). Cada vez que un `ADMIN` o `MODERADOR` cambia el estado de un reporte, se crea una notificación para su autor (por ejemplo: «Tu reporte "…" cambió a en revisión»), visible en `GET /api/notificaciones`. Cuando el reporte se resuelve o se rechaza, también se avisa a quienes lo confirmaron. `PATCH /api/notificaciones/leidas` marca todas como leídas.
+
+Solo el autor de un comentario puede editarlo; el autor o un moderador pueden eliminarlo. El autor de un reporte no puede confirmarlo y los reportes resueltos o rechazados no admiten confirmaciones.
 
 ### Fotos
 
@@ -104,7 +111,7 @@ activos en celdas de ~110 m (coordenadas redondeadas a 3 decimales).
 | Acción | Acceso |
 | --- | --- |
 | Registro y login | Público |
-| Consultar reportes, posibles duplicados y votos de seguimiento, barrios y categorías; geocodificación inversa; `/uploads/**` | Público |
+| Consultar reportes, su resumen, posibles duplicados y votos de seguimiento, barrios y categorías; geocodificación inversa; `/uploads/**`; `/actuator/health` | Público |
 | Crear/editar reportes, comentar, confirmar, votar «¿ya lo arreglaron?», consultar comentarios/confirmaciones y datos propios | Usuario autenticado |
 | Cambiar estado e historial de reportes; votos de seguimiento de todos los reportes; estadísticas | `ADMIN` o `MODERADOR` |
 | Ejecutar los recordatorios de seguimiento en el momento | `ADMIN` |
@@ -114,7 +121,9 @@ El registro público crea un usuario `CIUDADANO`. El primer `ADMIN` se crea con 
 
 ## Protección de cuentas
 
-- `security/LimitadorIntentos` cuenta intentos por clave en una ventana deslizante en memoria (sirve para una sola instancia). `AuthService` lo aplica al login (20 por IP y 5 fallos por correo / 15 min), registro (5 por IP / hora), recuperación (5 por IP y 3 por correo / hora) y cambio de contraseña (5 fallos / 15 min). Excederlo responde `429`.
+- `security/LimitadorIntentos` cuenta intentos por clave en una ventana deslizante en memoria (sirve para una sola instancia). Verificar y registrar es una sola operación atómica, así que enviar intentos en paralelo no permite superar el máximo; el login cuenta cada intento antes de comparar la contraseña y lo borra si es correcta. Se aplica al login (20 por IP y 5 fallos por correo / 15 min), registro (5 por IP / hora), recuperación (5 por IP y 3 por correo / hora), cambio de contraseña (5 fallos / 15 min), creación de reportes (10 por usuario / hora), comentarios (20 por usuario / 10 min) y geocodificación pública (30 por IP / minuto). Excederlo responde `429`.
+- Usuarios y reportes se modifican con actualizaciones parciales atómicas (`$set`/`$inc`/`$push` con `findAndModify`), nunca reescribiendo el documento completo: un cambio de perfil no deshace una desactivación hecha a la vez, ni editar un reporte o subir fotos revierte un cambio de estado o su historial.
+- BCrypt solo usa 72 bytes: contraseñas más largas (las letras con tilde cuentan doble) se rechazan con `409` y un mensaje claro.
 - Detrás de un proxy, `server.forward-headers-strategy=native` toma la IP real de `X-Forwarded-For` solo si viene de un proxy interno.
 - El JWT incluye el claim `ver` con `Usuario.versionToken`; el filtro rechaza tokens con una versión distinta. Cambiar o restablecer la contraseña y `cerrar-sesiones` incrementan la versión.
 - La recuperación genera 32 bytes aleatorios, guarda solo su SHA-256 en `tokens_recuperacion` (índice TTL) y envía `FRONTEND_URL/restablecer?token=…`. Sin SMTP configurado (`SPRING_MAIL_HOST`), el enlace se registra en el log.
@@ -138,7 +147,7 @@ Toda respuesta de error tiene el mismo cuerpo, con el mensaje en español y pens
 | 405 / 415 | Método o tipo de contenido no admitido |
 | 409 | Regla de negocio (transición no permitida, máximo de fotos, duplicados…) |
 | 413 | Archivo de más de 5 MB |
-| 429 | Demasiados intentos de login, registro o recuperación |
+| 429 | Demasiados intentos (login, registro, recuperación, reportes, comentarios o geocodificación) |
 | 500 | Error no controlado (el detalle solo va al log) |
 
 Cada restricción de los DTO declara su `message`; al agregar una nueva hay que escribirlo, porque el texto por
@@ -150,7 +159,7 @@ defecto de Bean Validation sale en inglés.
 | --- | --- |
 | Autenticación | `POST /api/auth/registro`, `POST /api/auth/login`, `POST /api/auth/recuperar` (`{"email"}`, siempre `202`), `POST /api/auth/restablecer` (`{"token","passwordNueva"}`) |
 | Perfil y usuarios | `GET/PUT /api/usuarios/me`, `PUT /api/usuarios/me/password` (`{"passwordActual","passwordNueva"}`, devuelve un token nuevo), `POST /api/usuarios/me/cerrar-sesiones`; `GET /api/usuarios`, `PATCH /api/usuarios/{id}/rol` (`{"rol":"MODERADOR"}`), `PATCH /api/usuarios/{id}/activo?activo=false` (`ADMIN`) |
-| Reportes | `GET/POST /api/reportes`, `GET /api/reportes/cercanos`, `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
+| Reportes | `GET/POST /api/reportes` (del más reciente al más antiguo; `?estado=` y `?limite=` opcionales), `GET /api/reportes/resumen` (cifras de la portada), `GET /api/reportes/cercanos` (radio máximo 50 km), `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
 | Seguimiento | `GET/POST /api/reportes/{reporteId}/seguimiento` |
 | Geocodificación | `GET /api/geocoding/inverso` |
 | Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial`, `GET /api/admin/reportes/seguimiento`, `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) |
@@ -159,7 +168,8 @@ defecto de Bean Validation sale en inglés.
 | Categorías | `GET/POST /api/categorias`, `GET/PUT /api/categorias/{id}`, `PATCH /api/categorias/{id}/estado` |
 | Confirmaciones | `GET/POST /api/reportes/{reporteId}/confirmaciones`, `DELETE /api/reportes/{reporteId}/confirmaciones/me` |
 | Comentarios | `GET/POST /api/reportes/{reporteId}/comentarios`, `PUT/DELETE /api/comentarios/{id}` |
-| Notificaciones | `GET /api/notificaciones`, `PATCH /api/notificaciones/{id}/leida` |
+| Notificaciones | `GET /api/notificaciones`, `PATCH /api/notificaciones/{id}/leida`, `PATCH /api/notificaciones/leidas` |
+| Salud | `GET /actuator/health` |
 
 La documentación interactiva está en `http://localhost:8080/swagger-ui/index.html`.
 

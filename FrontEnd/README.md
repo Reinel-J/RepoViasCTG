@@ -147,7 +147,9 @@ Notas de comportamiento:
 - Las notificaciones las genera el backend cuando un moderador cambia el estado de un reporte.
   Al guardar el perfil se actualiza también el nombre mostrado en la barra superior.
 - Cada pantalla se carga bajo demanda (`lazy` del router) y Leaflet solo se descarga al abrir un
-  mapa, así que el paquete inicial pesa ~377 kB (antes ~555 kB).
+  mapa (`components/MapasDiferidos.tsx`), así que la carga inicial de la portada pesa ~370 kB sin
+  comprimir y ~120 kB con gzip. Antes Leaflet y su CSS se precargaban en todas las páginas por la regla
+  de `manualChunks`.
 
 ## Panel de administración
 
@@ -166,12 +168,24 @@ así que se puede enlazar directamente.
 Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coincidir con
 `ReporteService.validarTransicion` del backend. Las acciones destructivas piden confirmación.
 
+## Rendimiento
+
+- Los mapas (Leaflet y su CSS) se cargan con `import()` dinámico desde `src/components/MapasDiferidos.tsx`:
+  la portada, el listado y el login no los descargan. No importes `MapaReportes`, `MapaSeleccionPunto` ni
+  `MapaDensidad` directamente desde una pantalla; usa los de `MapasDiferidos`.
+- La portada usa `GET /reportes/resumen` y `GET /reportes?limite=3` en lugar de descargar todos los reportes.
+- `src/utils/imagenes.ts` reduce las fotos a 1600 px y las vuelve a codificar en JPEG antes de subirlas, lo
+  que además elimina sus metadatos EXIF (ubicación GPS, modelo del teléfono).
+- nginx comprime con gzip y cachea un año los assets con hash.
+
 ## Pendiente
 
-- Paginación del lado del servidor.
+- Paginación del lado del servidor (el listado y el mapa aún descargan todos los reportes).
 - Contador de notificaciones sin leer en la barra superior.
-- Pruebas automatizadas.
-- El token JWT se guarda en `localStorage`, expuesto a XSS; considerar cookies `HttpOnly`.
+- Pruebas de componentes y de extremo a extremo (hoy hay pruebas unitarias con Vitest).
+- El token JWT se guarda en `localStorage`, expuesto a XSS; agregar una Content-Security-Policy en nginx y
+  considerar cookies `HttpOnly`.
+- En móvil, la tarjeta para confirmar un reporte queda al final, debajo de los comentarios.
 
 ## Roles
 
@@ -202,5 +216,6 @@ src/
 
 ```bash
 npm run lint
+npm test        # Vitest
 npm run build
 ```
