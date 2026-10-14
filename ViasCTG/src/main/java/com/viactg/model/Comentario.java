@@ -6,11 +6,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
 @Document(collection = "comentarios")
+@CompoundIndex(name = "reporte_fecha", def = "{'reporteId': 1, 'fecha': 1}")
 @Getter
 @Setter
 @Builder

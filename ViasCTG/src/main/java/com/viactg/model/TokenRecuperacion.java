@@ -19,6 +19,7 @@ import java.time.Instant;
 public class TokenRecuperacion {
     @Id
     private String id;
+    @Indexed
     private String usuarioId;
     @Indexed(unique = true)
     private String tokenHash;

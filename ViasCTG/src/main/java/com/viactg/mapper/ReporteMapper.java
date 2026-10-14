@@ -12,10 +12,11 @@ import java.util.List;
 public class ReporteMapper {
     public ReporteResponse toResponse(Reporte reporte) {
         return new ReporteResponse(reporte.getId(), reporte.getUsuarioId(), reporte.getCalleId(),
-                reporte.getCategoriaId(), reporte.getDireccionOsm(), reporte.getDescripcion(),
+                reporte.getCategoriaId(), reporte.getDireccionOsm(), reporte.getBarrioOsm(), reporte.getDescripcion(),
                 reporte.getFotos() == null ? List.of() : List.copyOf(reporte.getFotos()), reporte.getLatitud(),
                 reporte.getLongitud(), reporte.getEstado(), reporte.getPrioridad(), reporte.getFechaCreacion(),
-                reporte.getFechaActualizacion(), reporte.getHistorialEstados().stream().map(this::toHistorialResponse).toList());
+                reporte.getFechaActualizacion(), reporte.getHistorialEstados() == null ? List.of()
+                        : reporte.getHistorialEstados().stream().map(this::toHistorialResponse).toList());
     }
 
     public HistorialEstadoResponse toHistorialResponse(HistorialEstado historial) {

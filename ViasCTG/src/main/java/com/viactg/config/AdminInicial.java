@@ -1,5 +1,6 @@
 package com.viactg.config;
 
+import com.viactg.exception.BusinessRuleException;
 import com.viactg.service.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +31,12 @@ public class AdminInicial implements ApplicationRunner {
             log.warn("ADMIN_PASSWORD debe tener al menos 8 caracteres; no se creó el administrador inicial");
             return;
         }
-        usuarioService.asegurarAdministrador(email, password, "Administrador");
-        log.info("Administrador inicial asegurado: {}", email);
+        try {
+            usuarioService.asegurarAdministrador(email, password, "Administrador");
+            log.info("Administrador inicial asegurado: {}", email);
+        } catch (BusinessRuleException invalida) {
+            // Por ejemplo, una contraseña de más de 72 bytes: se avisa sin impedir que arranque la API.
+            log.warn("No se creó el administrador inicial: {}", invalida.getMessage());
+        }
     }
 }

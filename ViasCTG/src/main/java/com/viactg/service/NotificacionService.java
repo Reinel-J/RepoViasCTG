@@ -4,6 +4,10 @@ import com.viactg.exception.ForbiddenOperationException;
 import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.model.Notificacion;
 import com.viactg.repository.NotificacionRepository;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -12,8 +16,12 @@ import java.util.List;
 @Service
 public class NotificacionService {
     private final NotificacionRepository notificacionRepository;
+    private final MongoTemplate mongoTemplate;
 
-    public NotificacionService(NotificacionRepository notificacionRepository) { this.notificacionRepository = notificacionRepository; }
+    public NotificacionService(NotificacionRepository notificacionRepository, MongoTemplate mongoTemplate) {
+        this.notificacionRepository = notificacionRepository;
+        this.mongoTemplate = mongoTemplate;
+    }
 
     public Notificacion crear(String usuarioId, String reporteId, String mensaje) {
         return notificacionRepository.save(Notificacion.builder().usuarioId(usuarioId).reporteId(reporteId)
@@ -28,5 +36,11 @@ public class NotificacionService {
         if (!notificacion.getUsuarioId().equals(usuarioId)) throw new ForbiddenOperationException("No puedes modificar esta notificación");
         notificacion.setLeida(true);
         return notificacionRepository.save(notificacion);
+    }
+
+    /** Marca como leídas todas las notificaciones pendientes del usuario; devuelve cuántas cambiaron. */
+    public long marcarTodasLeidas(String usuarioId) {
+        return mongoTemplate.updateMulti(Query.query(Criteria.where("usuarioId").is(usuarioId).and("leida").is(false)),
+                new Update().set("leida", true), Notificacion.class).getModifiedCount();
     }
 }
