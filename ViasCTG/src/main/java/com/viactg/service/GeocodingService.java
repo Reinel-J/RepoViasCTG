@@ -38,6 +38,7 @@ public class GeocodingService {
     static final long ESPERA_MAXIMA_SEGUNDO_PLANO_MS = 60_000;
     static final int MAXIMO_EN_CACHE = 5_000;
     private static final int LONGITUD_MAXIMA = 200;
+    static final String USER_AGENT_POR_DEFECTO = "ViaCTG/1.0 (+https://github.com/Reinel-J/RepoViasCTG)";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -65,7 +66,8 @@ public class GeocodingService {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.baseUrl = baseUrl == null ? "" : baseUrl.trim().replaceAll("/+$", "");
-        this.userAgent = userAgent;
+        // Una variable de entorno definida pero vacía no debe dejar las peticiones sin identificación.
+        this.userAgent = userAgent == null || userAgent.isBlank() ? USER_AGENT_POR_DEFECTO : userAgent.trim();
         this.relojMs = relojMs;
     }
 
