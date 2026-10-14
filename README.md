@@ -82,10 +82,10 @@ documento de visión) dejó estos cambios; el detalle está en `ViasCTG/PROGRESS
   borra su dirección.
 - **Reglas del documento de visión**: coordenadas validadas contra el área de Cartagena, categorías
   normalizadas al catálogo (con las 7 categorías iniciales), sin auto-confirmaciones, filtros por categoría
-  y barrio, y aviso a quienes confirmaron cuando el caso se cierra.
+  y barrio en el listado y el mapa, y aviso a quienes confirmaron cuando el caso se cierra.
 - **Rendimiento y usabilidad**: la portada usa un resumen en lugar de descargar todos los reportes, Leaflet
   se carga solo donde hay mapas, las fotos se reducen (y pierden su ubicación GPS) antes de subirse, todas
-  las fotos se ven en el detalle y la tipografía mínima pasó de 7 px a 11 px.
+  las fotos se ven en el detalle y el texto pasó de empezar en 7 px a empezar en 11 px.
 - **Calidad**: pruebas nuevas en backend y frontend (Vitest) y CI en GitHub Actions.
 
 ### Datos reales en el inicio
@@ -259,7 +259,7 @@ docker compose run --rm --user root backend chown -R viactg:viactg /app/uploads
 - **Categoría**: es texto libre, pero se normaliza al catálogo administrable (que sigue activándose y
   desactivándose sin borrarse) para que filtros y estadísticas sean consistentes.
 - **Barrio**: el reporte ya no apunta al catálogo de barrios y calles; el barrio sale de OpenStreetMap
-  (`barrioOsm`) y con él se filtra el listado.
+  (`barrioOsm`) y con él se filtran el listado y el mapa.
 
 ## Integración continua
 

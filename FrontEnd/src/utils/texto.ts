@@ -15,6 +15,12 @@ export function coincideBusqueda(busqueda: string, ...campos: (string | null | u
   return campos.some((campo) => normalizarBusqueda(campo).includes(termino))
 }
 
+// Filtro de un <select>: vacío deja pasar todo; si no, compara sin mayúsculas ni tildes, igual que
+// valoresUnicos, para que la opción "Manga" también muestre los reportes guardados como "manga".
+export function coincideFiltro(filtro: string, valor: string | null | undefined): boolean {
+  return !filtro || normalizarBusqueda(filtro) === normalizarBusqueda(valor)
+}
+
 // Valores distintos y no vacíos, ordenados alfabéticamente en español.
 export function valoresUnicos(valores: (string | null | undefined)[]): string[] {
   const vistos = new Map<string, string>()
