@@ -69,23 +69,43 @@ Pendientes principales: ver la sección «Pendiente recomendado» de `ViasCTG/PR
 
 ## Cambios recientes
 
+### Auditoría y mejoras (octubre 2026)
+
+Una auditoría completa (seguridad, integridad de datos, rendimiento, accesibilidad y alineación con el
+documento de visión) dejó estos cambios; el detalle está en `ViasCTG/PROGRESS.md` y en los mensajes de commit:
+
+- **Seguridad**: la geocodificación pública ya no puede dejar la API sin hilos; el administrador inicial no
+  puede ser secuestrado registrando antes su correo; límites de intentos atómicos y anti-spam; MongoDB solo
+  en `127.0.0.1` en Docker; contenedor del backend sin root; encabezados de seguridad y gzip en nginx.
+- **Integridad**: usuarios y reportes se modifican con actualizaciones parciales atómicas (ya no se pierden
+  cambios de estado, desactivaciones ni direcciones por escrituras simultáneas) y editar un reporte ya no
+  borra su dirección.
+- **Reglas del documento de visión**: coordenadas validadas contra el área de Cartagena, categorías
+  normalizadas al catálogo (con las 7 categorías iniciales), sin auto-confirmaciones, filtros por categoría
+  y barrio, y aviso a quienes confirmaron cuando el caso se cierra.
+- **Rendimiento y usabilidad**: la portada usa un resumen en lugar de descargar todos los reportes, Leaflet
+  se carga solo donde hay mapas, las fotos se reducen (y pierden su ubicación GPS) antes de subirse, todas
+  las fotos se ven en el detalle y la tipografía mínima pasó de 7 px a 11 px.
+- **Calidad**: pruebas nuevas en backend y frontend (Vitest) y CI en GitHub Actions.
+
 ### Datos reales en el inicio
 
-La sección **Reportes de la comunidad** ya no muestra tarjetas de demostración. Consume
-`GET /api/reportes` y, mientras la consulta no tenga resultados o no pueda completarse,
-presenta un estado vacío que invita a crear el primer reporte. Las estadísticas también se
-calculan con esa respuesta:
+La sección **Reportes de la comunidad** muestra los 3 reportes más recientes del filtro elegido
+(`GET /api/reportes?limite=3`) y, si no hay resultados, un estado vacío que invita a crear el primero. Las
+cifras salen de `GET /api/reportes/resumen`, que cuenta en la base de datos en lugar de descargar todos los
+reportes:
 
 - Reportes ciudadanos: cantidad de reportes recibidos.
 - Problemas resueltos: reportes con estado `RESUELTO`.
-- Barrios participando: `0` por ahora, hasta contar con una relación directa entre un reporte
-  y su barrio.
+- En proceso: reportes con estado `EN_PROCESO`.
 - Reciben respuesta: porcentaje de reportes cuyo estado ya no es `PENDIENTE`.
 
 ### Creación de reportes y dirección geográfica
 
 El formulario de creación ya no solicita una calle del catálogo. Al seleccionar un punto en
-el mapa, el cliente consulta una previsualización de dirección y muestra la vía detectada.
+el mapa, el cliente consulta una previsualización de dirección y muestra la vía y el barrio detectados; si el
+punto está fuera de Cartagena (área de servicio configurable) lo avisa antes de continuar, y el backend lo
+rechaza igualmente.
 Al guardar, el backend vuelve a resolver la dirección por sus propios medios y almacena el
 resultado en el nuevo campo opcional `direccionOsm` del reporte; nunca toma la dirección del
 cliente como fuente de verdad.
@@ -94,8 +114,9 @@ El servicio usa la geocodificación inversa pública de OpenStreetMap/Nominatim:
 
 - `GET /api/geocoding/inverso?lat={latitud}&lng={longitud}` es público y devuelve
   `{ "direccionOsm": "..." }`, o `null` si no se puede resolver.
-- Las consultas se identifican con un `User-Agent` propio, tienen un tiempo máximo de espera
-  de cinco segundos y se limitan a una petición por segundo.
+- Las consultas se identifican con un `User-Agent` propio (configurable con `NOMINATIM_USER_AGENT`), tienen
+  un tiempo máximo de espera de cinco segundos, se limitan a una petición por segundo sin bloquear hilos del
+  servidor, se guardan en caché y cada IP puede hacer 30 por minuto.
 - La dirección del reporte se resuelve de forma asíncrona: `POST /api/reportes` responde de
   inmediato con `direccionOsm` en `null` y la dirección se guarda segundos después, de modo que
   aparece al volver a consultar el reporte. Si Nominatim falla o tarda demasiado, queda vacía.
@@ -104,9 +125,10 @@ El servicio usa la geocodificación inversa pública de OpenStreetMap/Nominatim:
   inyecte `ObjectMapper` de forma explícita, mientras el constructor alternativo queda para
   pruebas.
 
-La categoría también pasó a ser texto libre. El formulario ofrece la guía “Ejemplo: Hueco,
-alumbrado” y el backend conserva ese texto en `categoriaId` sin exigir que exista una categoría
-en MongoDB.
+La categoría también pasó a ser texto libre. El formulario sugiere las categorías activas del catálogo
+(botones y autocompletado) y el backend conserva el texto en `categoriaId` sin exigir que exista en MongoDB;
+si coincide con una del catálogo sin distinguir mayúsculas ni tildes, guarda el nombre oficial. Si el
+catálogo está vacío al arrancar, se crean las 7 categorías del documento de visión (`SEED_CATEGORIAS`).
 
 ### Prioridad y moderación
 
@@ -127,7 +149,15 @@ rechazar un reporte.
 - `POST /api/reportes` ya no recibe `calleId` ni `prioridad`; recibe categoría como texto,
   descripción y coordenadas.
 - `PUT /api/reportes/{id}` tampoco modifica la prioridad.
-- Las respuestas de reportes incluyen `direccionOsm`, que puede ser `null`.
+- Las respuestas de reportes incluyen `direccionOsm` y `barrioOsm`, que pueden ser `null`.
+- `GET /api/reportes` devuelve del más reciente al más antiguo y acepta `limite` (1–100);
+  `GET /api/reportes/resumen` da las cifras públicas de la portada.
+- `GET /api/geocoding/inverso` devuelve `{direccionOsm, barrioOsm, dentroDelArea}`.
+- `PATCH /api/notificaciones/leidas` marca todas las notificaciones como leídas.
+- `PUT /api/usuarios/me` con `telefono: ""` borra el teléfono.
+- Nuevos `409`: coordenadas fuera del área de servicio, confirmar el propio reporte o uno cerrado,
+  categoría duplicada en el catálogo y contraseñas de más de 72 bytes. Nuevos `429`: exceso de reportes,
+  comentarios o consultas de geocodificación.
 
 ### Fotos adjuntas
 
@@ -136,7 +166,8 @@ formulario muestra miniaturas antes de enviar y crea el reporte antes de transfe
 mediante `POST /api/reportes/{id}/fotos` como `multipart/form-data` bajo la clave `archivos`.
 Cada archivo puede pesar hasta 5 MB.
 
-El backend valida la firma binaria y la extensión de cada imagen, verifica que quien la sube sea
+Antes de subirlas, el navegador las reduce (lado mayor de 1600 px, JPEG) y así descarta sus metadatos EXIF,
+como la ubicación GPS del teléfono. El backend valida la firma binaria y la extensión de cada imagen, verifica que quien la sube sea
 el propietario del reporte y genera un nombre UUID para almacenarla fuera de los datos MongoDB.
 Las rutas públicas generadas se exponen en el arreglo `fotos` de cada respuesta y se sirven desde
 `/uploads/**`. El volumen `uploads_data` conserva esos archivos en Docker aunque se reconstruya
@@ -155,14 +186,20 @@ el contenedor del backend.
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Crea o promueve el primer administrador al arrancar | vacías (no hace nada) |
 | `SEGUIMIENTO_DIAS` | Días sin cambios antes de preguntar «¿ya lo arreglaron?» al autor y a quienes confirmaron | `30` |
 | `SEGUIMIENTO_CRON` | Hora de la tarea diaria de recordatorios (zona `America/Bogota`) | `0 0 9 * * *` |
+| `NOMINATIM_URL` / `NOMINATIM_USER_AGENT` | Servidor de geocodificación e identificación ante OpenStreetMap (pon un contacto real) | `https://nominatim.openstreetmap.org` / `ViaCTG/1.0 (+https://github.com/Reinel-J/RepoViasCTG)` |
+| `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN`, `ZONA_LNG_MAX` | Área de servicio donde se aceptan reportes | `true`, Cartagena, 10.15–10.65, −75.80 a −75.30 |
+| `SEED_CATEGORIAS` | Crear las categorías iniciales si el catálogo está vacío | `true` |
+| `SWAGGER_ENABLED` | Exponer Swagger UI y `/v3/api-docs` | `true` |
 
 En producción define `CORS_ALLOWED_ORIGINS` con el dominio real del frontend.
 
 ### Seguridad de cuentas
 
-- **Límite de intentos** (en memoria, por instancia): login 20 intentos por IP y 5 fallos por correo cada
-  15 minutos; registro 5 por IP y hora; recuperación 5 por IP y 3 por correo cada hora. Al superarlo la
-  API responde `429`. Un correo inexistente responde igual (y tarda lo mismo) que una contraseña incorrecta.
+- **Límite de intentos** (en memoria, por instancia y atómico, así que no se esquiva con peticiones en
+  paralelo): login 20 intentos por IP y 5 fallos por correo cada 15 minutos; registro 5 por IP y hora;
+  recuperación 5 por IP y 3 por correo cada hora; 10 reportes por usuario y hora; 20 comentarios por usuario
+  cada 10 minutos. Al superarlo la API responde `429`. Un correo inexistente responde igual (y tarda lo mismo)
+  que una contraseña incorrecta.
 - **Recuperar contraseña**: `/recuperar` envía un enlace de un solo uso válido 30 minutos. Solo se guarda
   el hash del token (colección `tokens_recuperacion`, con borrado automático al vencer).
 - **Cambiar contraseña** desde el perfil, pidiendo la actual.
@@ -176,7 +213,9 @@ prioridad), **Reportes** (todos los estados, búsqueda, cambio de estado con pri
 historial y lo que la comunidad dice sobre si ya se arregló) y **Estadísticas** (tiempos de respuesta y
 resolución, creados y resueltos por mes, categorías y mapa de densidad de daños activos). Un `ADMIN` además gestiona **Usuarios** (rol y activación), **Barrios** (con sus calles) y
 **Categorías** (crear, editar, activar/desactivar). El primer administrador se crea con `ADMIN_EMAIL` y
-`ADMIN_PASSWORD`; después se promueve a otros desde el propio panel.
+`ADMIN_PASSWORD`; después se promueve a otros desde el propio panel. Si `ADMIN_EMAIL` ya existía como cuenta
+no administradora, al promoverla se le asigna `ADMIN_PASSWORD` y se cierran sus sesiones (el registro no verifica
+el correo, así que alguien pudo crearla antes).
 
 ## Docker
 
@@ -201,6 +240,31 @@ docker compose up --build
 | MongoDB | localhost:27017 |
 
 Para detener: `docker compose down` (agrega `-v` para borrar los datos de Mongo).
+
+MongoDB solo escucha en `127.0.0.1:27017` (corre sin autenticación; Docker publica puertos saltándose firewalls
+como UFW). El backend espera a que Mongo responda y expone `GET /actuator/health` para su propio healthcheck.
+
+**Si actualizas desde una versión anterior:** el backend ya no corre como `root`, así que un volumen
+`uploads_data` creado antes pertenece a `root`. Ajusta sus permisos una vez:
+
+```bash
+docker compose run --rm --user root backend chown -R viactg:viactg /app/uploads
+```
+
+## Decisiones frente al documento de visión
+
+- **Persistencia**: el documento propone PostgreSQL + JPA + Flyway (PostGIS a futuro); el proyecto migró a
+  MongoDB con índices `2dsphere` para las consultas geográficas. Si la evaluación exige el stack del documento,
+  conviene actualizar el documento o justificar el cambio en él.
+- **Categoría**: es texto libre, pero se normaliza al catálogo administrable (que sigue activándose y
+  desactivándose sin borrarse) para que filtros y estadísticas sean consistentes.
+- **Barrio**: el reporte ya no apunta al catálogo de barrios y calles; el barrio sale de OpenStreetMap
+  (`barrioOsm`) y con él se filtra el listado.
+
+## Integración continua
+
+`.github/workflows/ci.yml` compila y prueba el backend (`mvnw verify`) y el frontend (lint, Vitest y build) en
+cada push y pull request.
 
 ## Autor
 
