@@ -33,6 +33,12 @@
 .real-full-map .leaflet-map { min-height: 650px; height: 100%; }
 .leaflet-container { font-family: var(--sans); }
 .leaflet-popup-content-wrapper { border-radius: 3px 14px 3px 14px; }
+.mapa-popup { width: 240px; color: var(--ink); }
+.mapa-popup-img { position: relative; width: 240px; height: 135px; margin-bottom: 9px; overflow: hidden; border-radius: 3px 12px 3px 12px; background: var(--sand); }
+.mapa-popup-img img { display: block; width: 240px; height: 135px; object-fit: cover; }
+.mapa-popup-etiqueta { position: absolute; top: 7px; left: 7px; padding: 3px 7px; border-radius: 99px; background: rgba(7, 59, 63, .82); color: var(--white); font-size: 8px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+.leaflet-container a.mapa-popup-enlace { display: inline-block; margin-top: 7px; color: var(--coral-dark); font-weight: 700; }
+.leaflet-container a.mapa-popup-enlace:hover { color: var(--teal); }
 .location-button { position: absolute; z-index: 500; top: 12px; right: 12px; padding: 9px 12px; border: 0; border-radius: 99px; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 700; }
 .coords-summary { margin-top: 13px; padding: 13px; display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); background: var(--sand); border-radius: 3px 12px 3px 12px; }
 .coords-summary svg { color: var(--coral); }

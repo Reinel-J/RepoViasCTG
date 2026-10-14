@@ -79,9 +79,32 @@ export async function cargarReporte(id: string): Promise<Reporte> {
   return normalizar(await reportesApi.obtener(id))
 }
 
+// Las fotos llegan como ruta relativa (/uploads/...): se completan con la URL del backend.
+export function urlFoto(ruta: string): string {
+  return ruta.startsWith('http') ? ruta : `${BACKEND_URL}${ruta}`
+}
+
 // URL de la primera foto real del reporte, o null si no tiene ninguna.
 export function fotoReporte(reporte: Reporte): string | null {
   const foto = reporte.fotos[0]
-  if (!foto) return null
-  return foto.startsWith('http') ? foto : `${BACKEND_URL}${foto}`
+  return foto ? urlFoto(foto) : null
+}
+
+// La categoría es texto libre: se busca por palabras clave, en este orden, sobre el texto sin tildes ni eñes.
+const ilustraciones: [string[], string][] = [
+  [['alcantarilla', 'manjol'], 'alcantarilla'],
+  [['hueco', 'bache'], 'hueco'],
+  [['inunda', 'encharc'], 'inundacion'],
+  [['alumbrado', 'poste', 'luz', 'lampara'], 'alumbrado'],
+  [['sin pavimentar', 'destapad', 'tierra'], 'via_sin_pavimentar'],
+  [['anden', 'acera'], 'anden'],
+  [['senal', 'semaforo', 'pare'], 'senalizacion'],
+  [['escombro', 'basura'], 'escombros'],
+]
+
+// Ilustración genérica de la categoría, para reportes sin fotos. No es evidencia: debe rotularse como ilustrativa.
+export function imagenCategoria(texto: string): string {
+  const categoria = texto.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const nombre = ilustraciones.find(([claves]) => claves.some((clave) => categoria.includes(clave)))?.[1] ?? 'otro'
+  return `/img/categorias/${nombre}.svg`
 }
