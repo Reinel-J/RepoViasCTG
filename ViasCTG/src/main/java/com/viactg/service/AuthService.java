@@ -63,17 +63,16 @@ public class AuthService {
     }
 
     public Usuario login(String email, String password, String ip) {
-        String emailNormalizado = normalizar(email);
-        String claveIp = "login-ip:" + ip;
+        String emailNormalizado = UsuarioService.normalizarEmail(email);
         String claveEmail = "login-email:" + emailNormalizado;
-        limitador.verificar(claveIp, MAX_LOGIN_POR_IP, VENTANA_LOGIN);
-        limitador.verificar(claveEmail, MAX_FALLOS_POR_EMAIL, VENTANA_LOGIN);
-        limitador.registrar(claveIp);
+        limitador.consumir("login-ip:" + ip, MAX_LOGIN_POR_IP, VENTANA_LOGIN);
+        // El intento se cuenta antes de comparar la contraseña (y se borra si es correcta): contar solo después de
+        // fallar dejaría probar muchas contraseñas a la vez con peticiones en paralelo.
+        limitador.consumir(claveEmail, MAX_FALLOS_POR_EMAIL, VENTANA_LOGIN);
 
         Optional<Usuario> usuario = usuarioRepository.findByEmail(emailNormalizado);
         boolean coincide = passwordEncoder.matches(password, usuario.map(Usuario::getPasswordHash).orElse(hashFicticio));
         if (usuario.isEmpty() || !coincide || !usuario.get().isActivo()) {
-            limitador.registrar(claveEmail);
             throw new BadCredentialsException(CREDENCIALES_INVALIDAS);
         }
         limitador.limpiar(claveEmail);
@@ -88,7 +87,7 @@ public class AuthService {
     /** Siempre termina igual exista o no el correo, para no revelar qué cuentas hay. */
     public void solicitarRecuperacion(String email, String ip) {
         limitador.consumir("recuperar-ip:" + ip, MAX_RECUPERACIONES_POR_IP, VENTANA_HORA);
-        String emailNormalizado = normalizar(email);
+        String emailNormalizado = UsuarioService.normalizarEmail(email);
         String claveEmail = "recuperar-email:" + emailNormalizado;
         try {
             limitador.consumir(claveEmail, MAX_RECUPERACIONES_POR_EMAIL, VENTANA_HORA);
@@ -110,39 +109,34 @@ public class AuthService {
     }
 
     public void restablecer(String token, String passwordNueva) {
+        // Antes de gastar el enlace (es de un solo uso): una contraseña inválida no debe obligar a pedir otro.
+        UsuarioService.validarLongitudPassword(passwordNueva);
         TokenRecuperacion registro = tokenRepository.findByTokenHash(sha256(token))
                 .filter(encontrado -> encontrado.getExpira().isAfter(Instant.now()))
                 .orElseThrow(() -> new BusinessRuleException("El enlace no es válido o ya venció. Solicita uno nuevo."));
         Usuario usuario = usuarioService.buscarPorId(registro.getUsuarioId());
         tokenRepository.deleteByUsuarioId(usuario.getId());
-        actualizarPassword(usuario, passwordNueva);
+        usuarioService.actualizarPassword(usuario.getId(), passwordNueva);
         limitador.limpiar("login-email:" + usuario.getEmail());
     }
 
     /** Cambia la contraseña y cierra las demás sesiones; devuelve el usuario para emitir un token nuevo. */
     public Usuario cambiarPassword(String usuarioId, String passwordActual, String passwordNueva) {
+        UsuarioService.validarLongitudPassword(passwordNueva);
         String clave = "cambio-password:" + usuarioId;
-        limitador.verificar(clave, MAX_FALLOS_CAMBIO_PASSWORD, VENTANA_LOGIN);
+        // Igual que en el login: se cuenta antes de comparar y se borra si la contraseña actual es correcta.
+        limitador.consumir(clave, MAX_FALLOS_CAMBIO_PASSWORD, VENTANA_LOGIN);
         Usuario usuario = usuarioService.buscarPorId(usuarioId);
         if (!passwordEncoder.matches(passwordActual, usuario.getPasswordHash())) {
-            limitador.registrar(clave);
             throw new BusinessRuleException("La contraseña actual no es correcta");
         }
         limitador.limpiar(clave);
-        return actualizarPassword(usuario, passwordNueva);
+        return usuarioService.actualizarPassword(usuarioId, passwordNueva);
     }
 
     /** Invalida todos los JWT emitidos hasta ahora para este usuario. */
     public void cerrarTodasLasSesiones(String usuarioId) {
-        Usuario usuario = usuarioService.buscarPorId(usuarioId);
-        usuario.setVersionToken(usuario.getVersionToken() + 1);
-        usuarioRepository.save(usuario);
-    }
-
-    private Usuario actualizarPassword(Usuario usuario, String passwordNueva) {
-        usuario.setPasswordHash(passwordEncoder.encode(passwordNueva));
-        usuario.setVersionToken(usuario.getVersionToken() + 1);
-        return usuarioRepository.save(usuario);
+        usuarioService.incrementarVersionToken(usuarioId);
     }
 
     private String generarToken() {
@@ -157,9 +151,5 @@ public class AuthService {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException(exception);
         }
-    }
-
-    private String normalizar(String email) {
-        return email.trim().toLowerCase();
     }
 }

@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record ReporteCrearRequest(
-        @NotBlank(message = "La categoría es obligatoria") String categoriaId,
+        @NotBlank(message = "La categoría es obligatoria") @Size(max = 100, message = "La categoría admite máximo 100 caracteres") String categoriaId,
         @NotBlank(message = "La descripción es obligatoria") @Size(min = 10, max = 2000, message = "La descripción debe tener entre 10 y 2000 caracteres") String descripcion,
         @NotNull(message = "La latitud es obligatoria")
         @DecimalMin(value = "-90.0", message = "La latitud debe ser mayor o igual a -90")

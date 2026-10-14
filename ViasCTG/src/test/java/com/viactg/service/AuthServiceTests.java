@@ -98,13 +98,19 @@ class AuthServiceTests {
         when(tokenRepository.findByTokenHash(AuthService.sha256("tok"))).thenReturn(Optional.of(
                 TokenRecuperacion.builder().usuarioId("u-1").tokenHash(AuthService.sha256("tok")).expira(Instant.now().plusSeconds(60)).build()));
         when(usuarioService.buscarPorId("u-1")).thenReturn(ana);
-        when(usuarioRepository.save(ana)).thenReturn(ana);
 
         service.restablecer("tok", "Nueva12345");
 
-        assertThat(encoder.matches("Nueva12345", ana.getPasswordHash())).isTrue();
-        assertThat(ana.getVersionToken()).isEqualTo(1);
+        // UsuarioService.actualizarPassword guarda el hash nuevo y sube la versión del token en una sola operación.
+        verify(usuarioService).actualizarPassword("u-1", "Nueva12345");
         verify(tokenRepository).deleteByUsuarioId("u-1");
+    }
+
+    @Test
+    void restablecerConUnaContrasenaDemasiadoLargaNoGastaElEnlace() {
+        assertThatThrownBy(() -> service.restablecer("tok", "ñ".repeat(40))).isInstanceOf(BusinessRuleException.class);
+        verify(tokenRepository, never()).deleteByUsuarioId(anyString());
+        verify(usuarioService, never()).actualizarPassword(anyString(), anyString());
     }
 
     @Test
@@ -118,13 +124,19 @@ class AuthServiceTests {
     void cambiarPasswordExigeLaActualYSubeLaVersion() {
         Usuario ana = usuario("Vieja12345");
         when(usuarioService.buscarPorId("u-1")).thenReturn(ana);
-        when(usuarioRepository.save(ana)).thenReturn(ana);
 
         assertThatThrownBy(() -> service.cambiarPassword("u-1", "incorrecta", "Nueva12345")).isInstanceOf(BusinessRuleException.class);
-        assertThat(ana.getVersionToken()).isZero();
+        verify(usuarioService, never()).actualizarPassword(anyString(), anyString());
 
         service.cambiarPassword("u-1", "Vieja12345", "Nueva12345");
-        assertThat(encoder.matches("Nueva12345", ana.getPasswordHash())).isTrue();
-        assertThat(ana.getVersionToken()).isEqualTo(1);
+        verify(usuarioService).actualizarPassword("u-1", "Nueva12345");
+    }
+
+    @Test
+    void cerrarSesionesSubeLaVersionDelTokenSinReescribirLaCuenta() {
+        service.cerrarTodasLasSesiones("u-1");
+
+        verify(usuarioService).incrementarVersionToken("u-1");
+        verify(usuarioRepository, never()).save(any());
     }
 }
