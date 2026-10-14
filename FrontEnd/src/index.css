@@ -654,3 +654,28 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
   .admin-card.admin-inline-form h2 { grid-column: auto; }
   .duplicate-action { align-items: flex-start; flex-direction: column; }
 }
+
+/* --- Mejoras de la auditoría: filtros, galería, sugerencias y leyenda del mapa --- */
+.listing-filters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px; }
+.listing-filters .select-field { flex: 1 1 220px; }
+.detail-photo > a { display: block; width: 100%; height: 100%; }
+.detail-photo > a > img { width: 100%; height: 100%; object-fit: cover; }
+.photo-thumbs { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 8px; }
+.photo-thumbs button { width: 58px; height: 46px; padding: 0; overflow: hidden; border: 2px solid rgba(255,255,255,.75); border-radius: 3px 10px 3px 10px; background: var(--sand); cursor: pointer; box-shadow: 0 4px 14px rgba(7,59,63,.25); }
+.photo-thumbs button.is-active { border-color: var(--coral); }
+.photo-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.community-note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--ink-soft); }
+.category-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
+.category-suggestions button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--cream); color: var(--ink); font: 600 11px var(--sans); cursor: pointer; }
+.category-suggestions button.is-selected { color: var(--white); background: var(--teal); border-color: var(--teal); }
+.map-filter { margin-bottom: 14px; }
+.map-legend { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 10px; color: var(--ink-soft); }
+.map-legend li { display: flex; align-items: center; gap: 6px; }
+.map-legend i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--white); box-shadow: 0 0 0 1px var(--line); }
+.leaflet-popup-content a { color: var(--teal); font-weight: 700; }
+@media (max-width: 720px) {
+  .photo-thumbs button { width: 48px; height: 38px; }
+  /* En una sola columna, el botón de nuevo reporte va después de todos los filtros. */
+  .listing-filters { order: 1; }
+  .listing-toolbar > .primary-button { order: 2; }
+}

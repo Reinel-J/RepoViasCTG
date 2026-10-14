@@ -3,10 +3,9 @@ import { useEffect } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import type { EstadisticasResponse } from '../api/types'
 import { colorDensidad } from './densidad'
+import { ATRIBUCION_OSM, CARTAGENA, TESELAS_OSM } from './mapaBase'
 
 type Celda = EstadisticasResponse['densidad'][number]
-
-const CARTAGENA: [number, number] = [10.391, -75.479]
 
 function AjustarVista({ celdas }: { celdas: Celda[] }) {
   const map = useMap()
@@ -24,10 +23,7 @@ export function MapaDensidad({ celdas }: { celdas: Celda[] }) {
 
   return (
     <MapContainer className="leaflet-map density-map" center={CARTAGENA} zoom={12} scrollWheelZoom>
-      <TileLayer
-        attribution="&copy; OpenStreetMap contributors"
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer attribution={ATRIBUCION_OSM} url={TESELAS_OSM} />
       <AjustarVista celdas={celdas} />
       {celdas.map((celda) => {
         const color = colorDensidad(celda.total, maximo)

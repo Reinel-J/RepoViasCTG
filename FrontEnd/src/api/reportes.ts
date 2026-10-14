@@ -5,12 +5,19 @@ import type {
   ReporteActualizarRequest,
   ReporteCrearRequest,
   ReporteResponse,
+  ResumenReportesResponse,
 } from './types'
 
-export async function listar(estado?: EstadoReporte): Promise<ReporteResponse[]> {
+// Del más reciente al más antiguo; con `limite` devuelve solo los N más recientes.
+export async function listar(estado?: EstadoReporte, limite?: number): Promise<ReporteResponse[]> {
   const response = await client.get<ReporteResponse[]>('/reportes', {
-    params: estado ? { estado } : undefined,
+    params: { ...(estado ? { estado } : {}), ...(limite ? { limite } : {}) },
   })
+  return response.data
+}
+
+export async function resumen(): Promise<ResumenReportesResponse> {
+  const response = await client.get<ResumenReportesResponse>('/reportes/resumen')
   return response.data
 }
 

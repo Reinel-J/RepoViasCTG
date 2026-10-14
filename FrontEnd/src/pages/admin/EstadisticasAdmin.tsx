@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import * as adminApi from "../../api/admin"
 import type { EstadisticasResponse } from "../../api/types"
 import { RAMPA_DENSIDAD } from "../../components/densidad"
-import { MapaDensidad } from "../../components/MapaDensidad"
+import { MapaDensidad } from "../../components/MapasDiferidos"
 import { mensajeError } from "./estados"
 
 type Mes = EstadisticasResponse["meses"][number]
