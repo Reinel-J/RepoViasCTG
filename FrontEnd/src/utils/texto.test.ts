@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { coincideBusqueda, normalizarBusqueda, valoresUnicos } from "./texto"
+import { coincideBusqueda, coincideFiltro, normalizarBusqueda, valoresUnicos } from "./texto"
 
 describe("normalizarBusqueda", () => {
   it("ignora tildes, mayúsculas y espacios repetidos", () => {
@@ -18,6 +18,20 @@ describe("coincideBusqueda", () => {
 
   it("una búsqueda vacía coincide con todo", () => {
     expect(coincideBusqueda("   ", "Hueco")).toBe(true)
+  })
+})
+
+describe("coincideFiltro", () => {
+  it("sin filtro deja pasar todo, incluso valores vacíos", () => {
+    expect(coincideFiltro("", "Hueco")).toBe(true)
+    expect(coincideFiltro("", null)).toBe(true)
+  })
+
+  it("compara el valor completo sin distinguir tildes ni mayúsculas", () => {
+    expect(coincideFiltro("Manga", "manga")).toBe(true)
+    expect(coincideFiltro("Inundación", "inundacion")).toBe(true)
+    expect(coincideFiltro("Manga", "Pie de la Popa, Manga")).toBe(false)
+    expect(coincideFiltro("Manga", null)).toBe(false)
   })
 })
 

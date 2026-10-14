@@ -17,7 +17,7 @@ import { MapaReportes, MapaSeleccionPunto } from "../../components/MapasDiferido
 import { PanelAdmin } from "../../pages/admin/PanelAdmin"
 import { prepararFoto } from "../../utils/imagenes"
 import { rutaSegura } from "../../utils/navegacion"
-import { coincideBusqueda, valoresUnicos } from "../../utils/texto"
+import { coincideBusqueda, coincideFiltro, valoresUnicos } from "../../utils/texto"
 
 type IconName = "arrow" | "bell" | "camera" | "check" | "clock" | "filter" | "location" | "map" | "menu" | "plus" | "search" | "user"
 
@@ -134,8 +134,8 @@ export function Reportes() {
   // La búsqueda no distingue mayúsculas ni tildes ("inundacion" encuentra "Inundación").
   const visibles = useMemo(() => datos.filter((reporte) =>
     (estado === "TODOS" || reporte.estadoRaw === estado) &&
-    (!categoria || reporte.categoria === categoria) &&
-    (!barrio || reporte.barrio === barrio) &&
+    coincideFiltro(categoria, reporte.categoria) &&
+    coincideFiltro(barrio, reporte.barrio) &&
     coincideBusqueda(busqueda, reporte.categoria, reporte.lugar, reporte.barrio, reporte.descripcion)
   ), [datos, estado, categoria, barrio, busqueda])
 
@@ -572,19 +572,28 @@ export function Mapa() {
   const [carga, setCarga] = useState<{ fase: "cargando" } | { fase: "error"; mensaje: string } | { fase: "cargado"; reportes: ReporteResponse[] }>({ fase: "cargando" })
   // Por defecto, solo los daños abiertos: es lo que le sirve a quien planea su recorrido.
   const [filtro, setFiltro] = useState<FiltroMapa>("ACTIVOS")
+  const [categoria, setCategoria] = useState("")
+  const [barrio, setBarrio] = useState("")
   useEffect(() => {
     reportesApi.listar()
       .then((reportes) => setCarga({ fase: "cargado", reportes }))
       .catch((exception) => setCarga({ fase: "error", mensaje: mensajeDe(exception, "No fue posible cargar el mapa.") }))
   }, [])
   const todos = useMemo(() => carga.fase === "cargado" ? carga.reportes : [], [carga])
+  // El documento de visión pide listado y mapa filtrables por barrio y categoría.
+  const categorias = useMemo(() => valoresUnicos(todos.map((reporte) => reporte.categoriaId)), [todos])
+  const barrios = useMemo(() => valoresUnicos(todos.map((reporte) => reporte.barrioOsm)), [todos])
   const reportes = useMemo(() => todos.filter((reporte) =>
-    filtro === "TODOS" || (filtro === "ACTIVOS" ? ESTADOS_ACTIVOS.includes(reporte.estado) : reporte.estado === filtro)), [todos, filtro])
+    (filtro === "TODOS" || (filtro === "ACTIVOS" ? ESTADOS_ACTIVOS.includes(reporte.estado) : reporte.estado === filtro)) &&
+    coincideFiltro(categoria, reporte.categoriaId) &&
+    coincideFiltro(barrio, reporte.barrioOsm)), [todos, filtro, categoria, barrio])
   return (
     <PortalShell eyebrow="Cartagena en tiempo real" title="Mapa ciudadano">
       <section className="full-map-layout">
         <aside className="map-sidebar">
           <div className="select-field map-filter"><Icon name="filter" size={17} /><select aria-label="Qué reportes mostrar" value={filtro} onChange={(event) => setFiltro(event.target.value as FiltroMapa)}><option value="ACTIVOS">Daños activos</option><option value="TODOS">Todos los reportes</option>{LEYENDA_MAPA.map((estado) => <option key={estado} value={estado}>{textoEstado(estado)}</option>)}</select></div>
+          {categorias.length > 1 && <div className="select-field map-filter"><select aria-label="Filtrar el mapa por categoría" value={categoria} onChange={(event) => setCategoria(event.target.value)}><option value="">Todas las categorías</option>{categorias.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}</select></div>}
+          {barrios.length > 0 && <div className="select-field map-filter"><select aria-label="Filtrar el mapa por barrio" value={barrio} onChange={(event) => setBarrio(event.target.value)}><option value="">Todos los barrios</option>{barrios.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}</select></div>}
           <ul className="map-legend" aria-label="Colores del mapa">{LEYENDA_MAPA.map((estado) => <li key={estado}><i style={{ background: COLOR_ESTADO[estado] }} />{textoEstado(estado)}</li>)}</ul>
           <div className="map-filter-title"><strong>Reportes visibles</strong><span>{reportes.length}</span></div>
           {carga.fase === "cargando" && <p className="map-sidebar-note">Cargando reportes…</p>}

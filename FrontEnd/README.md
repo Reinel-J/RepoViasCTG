@@ -111,9 +111,9 @@ pantallas son exports de `src/app/pages/Screens.tsx`, que el router carga bajo d
 | `/` | Inicio con estadísticas y reportes recientes, siempre calculados con datos reales de la API | Público |
 | `/login`, `/registro` | Inicio de sesión y registro | Público |
 | `/recuperar`, `/restablecer?token=` | Solicitar enlace y crear contraseña nueva | Público |
-| `/reportes` | Lista con búsqueda y filtro por estado (incluye rechazados) | Público |
+| `/reportes` | Lista con búsqueda sin tildes y filtros por estado (incluye rechazados), categoría y barrio | Público |
 | `/reportes/:id` | Detalle con foto, mapa, dirección, comentarios, confirmaciones y línea de tiempo con cada cambio de estado | Público (comentar y confirmar requieren sesión) |
-| `/mapa` | Mapa general de reportes con la lista completa en la barra lateral | Público |
+| `/mapa` | Mapa general con filtros por estado (por defecto, daños activos), categoría y barrio, y la lista de lo visible en la barra lateral | Público |
 | `/reportes/nuevo` | Formulario en 3 pasos: ubicación en el mapa, categoría libre con descripción y hasta 3 fotos, y revisión | Sesión iniciada |
 | `/reportes/:id/editar` | Editar descripción y ubicación de un reporte propio `PENDIENTE` | Sesión iniciada |
 | `/notificaciones` | Notificaciones del usuario, con marcado como leída | Sesión iniciada |
@@ -131,8 +131,8 @@ Notas de comportamiento:
   (estado nuevo, comentario del moderador y fecha), de la más antigua a la más reciente.
 - El detalle solo depende de la petición del reporte: si fallan comentarios, confirmaciones o seguimiento,
   se muestra igual con un aviso de lo que no se pudo cargar.
-- `/mapa` distingue cargando, error y cargado; con la base vacía muestra el mapa centrado en Cartagena y
-  el mensaje «Aún no hay reportes en el mapa».
+- `/mapa` distingue cargando, error y cargado; si ningún reporte coincide con los filtros (o la base está
+  vacía) muestra el mapa centrado en Cartagena y el aviso «No hay reportes con este filtro».
 - Al marcar el punto, el formulario consulta `GET /api/reportes/posibles-duplicados` y, si hay reportes
   activos a menos de 100 m, muestra «¿Ya lo reportaron?» (primero los de la misma categoría, comparada sin
   mayúsculas ni tildes) con la opción «Es el mismo: confirmar», que confirma el existente y abre su detalle.
