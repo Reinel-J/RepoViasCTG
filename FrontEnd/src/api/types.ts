@@ -75,6 +75,8 @@ export interface ReporteResponse {
   calleId: string | null
   categoriaId: string
   direccionOsm: string | null
+  // Barrio según OpenStreetMap; null en reportes antiguos o si no se pudo resolver.
+  barrioOsm: string | null
   descripcion: string
   fotos: string[]
   latitud: number
@@ -84,6 +86,21 @@ export interface ReporteResponse {
   fechaCreacion: string
   fechaActualizacion: string
   historialEstados: HistorialEstadoResponse[]
+}
+
+// Cifras públicas de la portada (GET /reportes/resumen).
+export interface ResumenReportesResponse {
+  total: number
+  porEstado: Record<EstadoReporte, number>
+  creadosUltimas24Horas: number
+  barrios: number
+}
+
+export interface GeocodingInversoResponse {
+  direccionOsm: string | null
+  barrioOsm: string | null
+  // false si el punto está fuera del área de servicio (Cartagena): el backend rechazaría el reporte.
+  dentroDelArea: boolean
 }
 
 export interface PosibleDuplicadoResponse {

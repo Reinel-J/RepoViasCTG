@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { NavLink, useNavigate } from "react-router"
 import { cargarReportes, fotoReporte, type Reporte } from "../../api/reporteVista"
+import * as reportesApi from "../../api/reportes"
+import type { EstadoReporte, ResumenReportesResponse } from "../../api/types"
 import { useAuth } from "../../context/useAuth"
 
 type IconName = "arrow" | "bell" | "camera" | "check" | "chevron" | "clock" | "location" | "map" | "menu" | "plus" | "search"
@@ -27,28 +29,36 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   )
 }
 
+const ESTADOS_FILTRO: Record<string, EstadoReporte | undefined> = { Todos: undefined, Pendientes: "PENDIENTE", "En proceso": "EN_PROCESO", Resueltos: "RESUELTO" }
+
 export function Home() {
   const { session, logout } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [filtro, setFiltro] = useState("Todos")
-  const [totalReportes, setTotalReportes] = useState<Reporte[]>([])
-  const [recientes, setRecientes] = useState<number | null>(null)
+  // La portada ya no descarga todos los reportes: las cifras salen de un resumen con conteos en la base de
+  // datos y las tarjetas son solo los 3 reportes más recientes del filtro elegido.
+  const [resumen, setResumen] = useState<ResumenReportesResponse | null>(null)
+  const [reportes, setReportes] = useState<Reporte[]>([])
+  const [cargado, setCargado] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    cargarReportes()
-      .then((datos) => {
-        setTotalReportes(datos)
-        const haceUnDia = Date.now() - 86_400_000
-        setRecientes(datos.filter((reporte) => reporte.fechaCreacion && new Date(reporte.fechaCreacion).getTime() >= haceUnDia).length)
-      })
-      .catch((exception) => setError(exception instanceof Error ? exception.message : "No fue posible cargar los reportes."))
+    reportesApi.resumen().then(setResumen).catch(() => setResumen(null))
   }, [])
-  const estados: Record<string, Reporte["estadoRaw"]> = { Pendientes: "PENDIENTE", "En proceso": "EN_PROCESO", Resueltos: "RESUELTO" }
-  const reportes = (filtro === "Todos" ? totalReportes : totalReportes.filter((reporte) => reporte.estadoRaw === estados[filtro])).slice(0, 3)
-  const resueltos = totalReportes.filter((reporte) => reporte.estadoRaw === "RESUELTO").length
-  const atendidos = totalReportes.filter((reporte) => reporte.estadoRaw !== "PENDIENTE").length
+  useEffect(() => {
+    let vigente = true
+    cargarReportes(ESTADOS_FILTRO[filtro], 3)
+      .then((datos) => { if (vigente) { setReportes(datos); setError("") } })
+      .catch((exception) => { if (vigente) setError(exception instanceof Error ? exception.message : "No fue posible cargar los reportes.") })
+      .finally(() => { if (vigente) setCargado(true) })
+    return () => { vigente = false }
+  }, [filtro])
+  const total = resumen?.total ?? 0
+  const resueltos = resumen?.porEstado.RESUELTO ?? 0
+  const enProceso = resumen?.porEstado.EN_PROCESO ?? 0
+  const atendidos = total - (resumen?.porEstado.PENDIENTE ?? 0)
+  const recientes = resumen ? resumen.creadosUltimas24Horas : null
 
   return (
     <div className="app-shell">
@@ -80,7 +90,7 @@ export function Home() {
         <div className="header-actions">
           {session && <button className="icon-button" onClick={() => navigate("/notificaciones")} aria-label="Notificaciones"><Icon name="bell" /></button>}
           <button className="login-button" onClick={() => { if (session) logout(); else navigate("/login") }}>{session ? "Cerrar sesión" : "Iniciar sesión"}</button>
-          <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="Abrir menú"><Icon name="menu" /></button>
+          <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} aria-expanded={menuOpen}><Icon name="menu" /></button>
         </div>
       </header>
 
@@ -116,10 +126,10 @@ export function Home() {
             <span className="mini-label">Juntos avanzamos</span>
             <p>La participación ciudadana sí transforma.</p>
           </div>
-          <div className="stat"><strong>{totalReportes.length}</strong><span>Reportes ciudadanos</span></div>
+          <div className="stat"><strong>{total}</strong><span>Reportes ciudadanos</span></div>
           <div className="stat"><strong>{resueltos}</strong><span>Problemas resueltos</span></div>
-          <div className="stat"><strong>{totalReportes.filter((reporte) => reporte.estadoRaw === "EN_PROCESO").length}</strong><span>En proceso</span></div>
-          <div className="stat"><strong>{totalReportes.length ? Math.round(atendidos / totalReportes.length * 100) : 0}<sup>%</sup></strong><span>Reciben respuesta</span></div>
+          <div className="stat"><strong>{enProceso}</strong><span>En proceso</span></div>
+          <div className="stat"><strong>{total ? Math.round(atendidos / total * 100) : 0}<sup>%</sup></strong><span>Reciben respuesta</span></div>
         </section>
 
         <section className="reports-section" id="reportes">
@@ -144,7 +154,7 @@ export function Home() {
               return (
               <article className="report-card" key={reporte.id}>
                 <div className="card-image-wrap">
-                  {foto ? <img src={foto} alt={`Evidencia de ${reporte.categoria}`} /> : <div className="no-photo"><Icon name="camera" size={26} /><span>Sin fotografía</span></div>}
+                  {foto ? <img src={foto} alt={`Evidencia de ${reporte.categoria}`} loading="lazy" /> : <div className="no-photo"><Icon name="camera" size={26} /><span>Sin fotografía</span></div>}
                   <span className={`category-chip ${reporte.color}`}>{reporte.categoria}</span>
                   <span className="card-number">0{index + 1}</span>
                 </div>
@@ -161,7 +171,7 @@ export function Home() {
             })}
           </div>
           {error && <div className="empty-panel"><h2>No pudimos cargar los reportes</h2><p>{error}</p></div>}
-          {!error && reportes.length === 0 && <div className="empty-panel"><h2>Aún no hay reportes</h2><p>Sé la primera persona en reportar un problema de tu sector.</p></div>}
+          {cargado && !error && reportes.length === 0 && <div className="empty-panel"><h2>Aún no hay reportes</h2><p>Sé la primera persona en reportar un problema de tu sector.</p></div>}
 
           <button className="outline-button" onClick={() => navigate("/reportes")}>Ver todos los reportes <Icon name="arrow" /></button>
         </section>

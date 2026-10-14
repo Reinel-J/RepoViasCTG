@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, useLocation } from 'react-router'
 import { useAuth } from '../context/useAuth'
 import type { Rol } from '../api/types'
 
@@ -22,9 +22,11 @@ function tieneRolPermitido(rol: Rol, requiredRole: Rol) {
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { session } = useAuth()
+  const location = useLocation()
 
   if (!session) {
-    return <Navigate to="/login" replace />
+    // Tras iniciar sesión se vuelve a la página que se quería abrir.
+    return <Navigate to="/login" replace state={{ desde: `${location.pathname}${location.search}` }} />
   }
 
   if (requiredRole && !tieneRolPermitido(session.rol, requiredRole)) {

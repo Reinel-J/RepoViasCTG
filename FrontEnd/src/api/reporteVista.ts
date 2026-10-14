@@ -10,6 +10,7 @@ export interface Reporte {
   descripcion: string
   lugar: string
   direccionOsm: string | null
+  barrio: string | null
   fecha: string
   fechaCreacion: string
   estado: string
@@ -57,6 +58,7 @@ function normalizar(reporte: ReporteResponse): Reporte {
     descripcion: reporte.descripcion ?? '',
     lugar: reporte.direccionOsm ?? `${Number(reporte.latitud).toFixed(5)}, ${Number(reporte.longitud).toFixed(5)}`,
     direccionOsm: reporte.direccionOsm,
+    barrio: reporte.barrioOsm ?? null,
     fecha: tiempoRelativo(reporte.fechaCreacion),
     fechaCreacion: reporte.fechaCreacion,
     estado: visual.texto,
@@ -71,8 +73,9 @@ function normalizar(reporte: ReporteResponse): Reporte {
   }
 }
 
-export async function cargarReportes(): Promise<Reporte[]> {
-  return (await reportesApi.listar()).map(normalizar)
+// Del más reciente al más antiguo (así los ordena el backend).
+export async function cargarReportes(estado?: EstadoReporte, limite?: number): Promise<Reporte[]> {
+  return (await reportesApi.listar(estado, limite)).map(normalizar)
 }
 
 export async function cargarReporte(id: string): Promise<Reporte> {
@@ -107,4 +110,9 @@ export function imagenCategoria(texto: string): string {
   const categoria = texto.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const nombre = ilustraciones.find(([claves]) => claves.some((clave) => categoria.includes(clave)))?.[1] ?? 'otro'
   return `/img/categorias/${nombre}.svg`
+}
+
+// URLs de todas las fotos del reporte (hasta 3).
+export function fotosReporte(reporte: Reporte): string[] {
+  return reporte.fotos.map(urlFoto)
 }
