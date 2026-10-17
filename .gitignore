@@ -1,3 +1,6 @@
 .env
 .~lock.*#
 .idea/
+# Auditoría de Daniel (informe y parches), solo para uso local
+viasctg-auditoria.mbox
+ViaCTG — Audit & Improvement Report.md
