@@ -86,10 +86,15 @@ Los módulos API disponibles están en `src/api/`:
 
 `MapaSeleccionPunto` permite escoger las coordenadas pulsando el mapa o usando la
 ubicación del navegador. `MapaReportes` dibuja los reportes recibidos por la API
-como marcadores con estado y prioridad.
+como círculos coloreados por estado (`COLOR_ESTADO` en `mapaBase.ts`) y encuadra
+los reportes visibles al cargar o al cambiar un filtro. La ventanita de cada reporte
+se abre al pasar el mouse (o con un toque en el celular) y muestra la primera foto o,
+si no tiene, la ilustración de su categoría (`imagenCategoria`, SVG en
+`public/img/categorias/`) rotulada como «Imagen ilustrativa», junto con la categoría,
+el estado, la descripción, la dirección OSM y el enlace al detalle.
 
 Los mapas usan tiles de OpenStreetMap y conservan la atribución visible
-`© OpenStreetMap contributors`. Esta opción es apropiada para la demo; para un
+`© OpenStreetMap` con enlace a su página de derechos. Esta opción es apropiada para la demo; para un
 despliegue con tráfico relevante se debe contratar un proveedor de tiles o alojar
 los propios.
 
