@@ -20,18 +20,22 @@ function resumirDescripcion(descripcion: string) {
   return descripcion.length > 120 ? `${descripcion.slice(0, 120)}…` : descripcion
 }
 
-// Encuadra todos los reportes visibles al cargar o al cambiar el filtro.
+// Encuadra todos los reportes visibles al cargar o al cambiar el filtro. Depende de las coordenadas como texto y
+// no del arreglo: el detalle pasa un arreglo nuevo en cada render y, si no, el mapa volvería a su encuadre
+// (perdiendo el zoom del usuario) con cada tecla escrita en un comentario.
 function AjustarVista({ reportes }: { reportes: ReporteResponse[] }) {
   const map = useMap()
+  const puntos = reportes.map((reporte) => `${reporte.latitud},${reporte.longitud}`).join(';')
 
   useEffect(() => {
-    if (reportes.length === 0) return
-    if (reportes.length === 1) {
-      map.setView([reportes[0].latitud, reportes[0].longitud], 16, { animate: false })
+    if (!puntos) return
+    const coordenadas = puntos.split(';').map((punto) => punto.split(',').map(Number) as [number, number])
+    if (coordenadas.length === 1) {
+      map.setView(coordenadas[0], 16, { animate: false })
       return
     }
-    map.fitBounds(reportes.map((reporte) => [reporte.latitud, reporte.longitud] as [number, number]), { padding: [30, 30], maxZoom: 16 })
-  }, [map, reportes])
+    map.fitBounds(coordenadas, { padding: [30, 30], maxZoom: 16 })
+  }, [map, puntos])
 
   return null
 }

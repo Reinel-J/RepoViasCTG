@@ -6,6 +6,10 @@ import { ATRIBUCION_OSM, CARTAGENA, TESELAS_OSM } from './mapaBase'
 
 type Punto = [number, number]
 
+// Por encima de este margen la posición no sirve para ubicar un daño: suele ser la estimación por la conexión a
+// internet de un computador sin GPS, que en Colombia a menudo cae en Bogotá aunque la persona esté en Cartagena.
+const MARGEN_MAXIMO_M = 2000
+
 interface MapaSeleccionPuntoProps {
   onSeleccionar: (lat: number, lng: number) => void
   puntoInicial?: Punto
@@ -58,8 +62,14 @@ export function MapaSeleccionPunto({ onSeleccionar, puntoInicial }: MapaSeleccio
     setBuscando(true)
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const nuevoPunto: Punto = [position.coords.latitude, position.coords.longitude]
         setBuscando(false)
+        const margen = position.coords.accuracy
+        if (margen > MARGEN_MAXIMO_M) {
+          // No se mueve el mapa: llevarlo a cientos de kilómetros obligaría a volver arrastrándolo.
+          setMensajeError(`Tu dispositivo solo pudo estimar tu ubicación con un margen de unos ${Math.round(margen / 1000)} km (pasa en computadores sin GPS). Marca el punto tocando el mapa.`)
+          return
+        }
+        const nuevoPunto: Punto = [position.coords.latitude, position.coords.longitude]
         seleccionarPunto(nuevoPunto)
         setDestino(nuevoPunto)
         onSeleccionar(...nuevoPunto)

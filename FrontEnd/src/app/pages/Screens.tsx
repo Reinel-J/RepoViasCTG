@@ -17,25 +17,29 @@ import { avisarCambioNotificaciones } from "../../components/notificacionesEvent
 import { COLOR_ESTADO } from "../../components/mapaBase"
 import { MapaReportes, MapaSeleccionPunto } from "../../components/MapasDiferidos"
 import { PanelAdmin } from "../../pages/admin/PanelAdmin"
+import { enlaceWhatsApp, textoCompartir } from "../../utils/compartir"
 import { prepararFoto } from "../../utils/imagenes"
 import { rutaSegura } from "../../utils/navegacion"
 import { coincideBusqueda, coincideFiltro, valoresUnicos } from "../../utils/texto"
 
-type IconName = "arrow" | "bell" | "camera" | "check" | "clock" | "filter" | "location" | "map" | "menu" | "plus" | "search" | "user"
+type IconName = "arrow" | "bell" | "camera" | "chat" | "check" | "clock" | "filter" | "link" | "location" | "map" | "menu" | "plus" | "search" | "share" | "user"
 
 function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
     arrow: <><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></>,
     bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
     camera: <><path d="M14.5 5 13 3h-2L9.5 5H5a2 2 0 0 0-2 2v11h18V7a2 2 0 0 0-2-2Z" /><circle cx="12" cy="12" r="3.5" /></>,
+    chat: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />,
     check: <path d="m5 12 4 4L19 6" />,
     clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
     filter: <path d="M4 6h16M7 12h10M10 18h4" />,
+    link: <><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></>,
     location: <><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
     map: <><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z" /><path d="M9 3v15M15 6v15" /></>,
     menu: <><path d="M4 7h16M4 12h16M4 17h16" /></>,
     plus: <><path d="M12 5v14M5 12h14" /></>,
     search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
+    share: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4" /></>,
     user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-5 4-7 8-7s7 2 8 7" /></>,
   }
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
@@ -73,6 +77,14 @@ function PortalShell({ children, title, eyebrow, action = true }: { children: Re
           <NavLink to="/mapa">Mapa ciudadano</NavLink>
           {session && <NavLink to="/mis-reportes">Mis reportes</NavLink>}
           {(session?.rol === "ADMIN" || session?.rol === "MODERADOR") && <NavLink to="/admin">Panel de gestión</NavLink>}
+          {/* Solo en el menú desplegable (≤ 980 px), donde la campana y el botón de sesión están ocultos. */}
+          <div className="nav-cuenta">
+            {session ? <>
+              <NavLink to="/notificaciones">Notificaciones</NavLink>
+              <NavLink to="/perfil">Mi perfil</NavLink>
+              <button type="button" onClick={logout}>Cerrar sesión · {session.nombre}</button>
+            </> : <NavLink to="/login">Iniciar sesión</NavLink>}
+          </div>
         </nav>
         <div className="header-actions">
           {session && <CampanaNotificaciones><Icon name="bell" /></CampanaNotificaciones>}
@@ -334,6 +346,7 @@ function DetalleReporteVista({ id }: { id: string }) {
             {esAutor ? <p className="community-note">Es tu reporte: otras personas pueden confirmarlo para darle más fuerza.</p>
               : !cerrado && <button className="primary-button full" onClick={confirmar}><Icon name="check" /> {yaConfirme ? "Retirar confirmación" : "Confirmar reporte"}</button>}
           </div>
+          <CompartirReporte reporte={reporte} cerrado={cerrado} />
           {seguimiento && !cerrado && <div className="community-card"><span className="section-kicker">¿Ya lo arreglaron?</span><h3>{seguimiento.arreglado} dicen que sí · {seguimiento.sigue} que sigue igual</h3><div className="followup-actions"><button className={seguimiento.miRespuesta === true ? "selected" : ""} aria-pressed={seguimiento.miRespuesta === true} onClick={() => responder(true)}>Ya está arreglado</button><button className={seguimiento.miRespuesta === false ? "selected" : ""} aria-pressed={seguimiento.miRespuesta === false} onClick={() => responder(false)}>Sigue igual</button></div></div>}
           <div className="timeline-card">
             <span className="section-kicker">Seguimiento</span>
@@ -349,6 +362,47 @@ function DetalleReporteVista({ id }: { id: string }) {
         </aside>
       </section>
     </PortalShell>
+  )
+}
+
+// WhatsApp va siempre (es por donde más circula en Cartagena); el menú nativo para elegir otra app solo aparece
+// donde el navegador lo ofrece, sobre todo en celulares.
+function CompartirReporte({ reporte, cerrado }: { reporte: Reporte; cerrado: boolean }) {
+  const [aviso, setAviso] = useState("")
+  const url = `${window.location.origin}/reportes/${reporte.id}`
+  const texto = textoCompartir({ categoria: reporte.categoria, direccionOsm: reporte.direccionOsm, estado: reporte.estado, cerrado })
+  const menuNativo = typeof navigator.share === "function"
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setAviso("Enlace copiado. Pégalo donde quieras compartirlo.")
+    } catch {
+      // El portapapeles solo está disponible en HTTPS o localhost.
+      setAviso(`No pudimos copiarlo automáticamente. Este es el enlace: ${url}`)
+    }
+  }
+
+  async function abrirMenu() {
+    try {
+      await navigator.share({ title: `${reporte.categoria} · VíaCTG`, text: texto, url })
+    } catch (exception) {
+      // Cerrar el menú sin elegir una app también llega como error (AbortError): no es un fallo.
+      if (!(exception instanceof DOMException && exception.name === "AbortError")) setAviso("No pudimos abrir el menú para compartir. Usa WhatsApp o copia el enlace.")
+    }
+  }
+
+  return (
+    <div className="community-card share-card">
+      <span className="section-kicker">Compartir</span>
+      <h3>{cerrado ? "Cuéntale a tus vecinos" : "Mientras más lo vean, más fuerza tiene"}</h3>
+      <div className="share-actions">
+        <a className="whatsapp" href={enlaceWhatsApp(texto, url)} target="_blank" rel="noopener noreferrer"><Icon name="chat" size={18} /> Enviar por WhatsApp</a>
+        <button type="button" onClick={copiar}><Icon name="link" size={16} /> Copiar enlace</button>
+        {menuNativo && <button type="button" onClick={abrirMenu}><Icon name="share" size={16} /> Más opciones</button>}
+      </div>
+      {aviso && <p className="share-note" role="status">{aviso}</p>}
+    </div>
   )
 }
 
