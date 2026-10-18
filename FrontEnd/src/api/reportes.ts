@@ -16,6 +16,12 @@ export async function listar(estado?: EstadoReporte, limite?: number): Promise<R
   return response.data
 }
 
+// Reportes del usuario autenticado, del más reciente al más antiguo.
+export async function listarMios(estado?: EstadoReporte): Promise<ReporteResponse[]> {
+  const response = await client.get<ReporteResponse[]>('/reportes/mios', { params: estado ? { estado } : {} })
+  return response.data
+}
+
 export async function resumen(): Promise<ResumenReportesResponse> {
   const response = await client.get<ResumenReportesResponse>('/reportes/resumen')
   return response.data

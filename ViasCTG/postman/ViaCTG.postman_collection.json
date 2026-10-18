@@ -692,6 +692,32 @@
       "name": "Reportes (autenticado)",
       "item": [
         {
+          "name": "Mis reportes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/mios?estado=PENDIENTE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "mios"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "PENDIENTE",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Reportes del usuario autenticado, del más reciente al más antiguo. Sin sesión responde 401. Quita `disabled` a `estado` para filtrar."
+          }
+        },
+        {
           "name": "Crear reporte",
           "request": {
             "method": "POST",
@@ -1051,6 +1077,25 @@
               }
             }
           ]
+        },
+        {
+          "name": "Contar sin leer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notificaciones/sin-leer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notificaciones",
+                "sin-leer"
+              ]
+            },
+            "description": "Solo el número de notificaciones sin leer del usuario: {\"total\": n}. Lo consulta la campana del frontend."
+          }
         },
         {
           "name": "Marcar como leída",

@@ -53,6 +53,9 @@ El cliente Axios está configurado en `src/api/client.ts`. La URL base sale de l
 http://localhost:8080/api
 ```
 
+`VITE_NOTIFICACIONES_INTERVALO_MS` (opcional, por defecto `60000`) fija cada cuánto la campana consulta
+el número de notificaciones sin leer. Como `VITE_API_URL`, se fija al construir.
+
 Los errores del backend llegan como `ErrorResponse {status, message, validationErrors}` y el cliente
 los convierte en `error.message` (mensaje en español más el detalle de cada campo inválido), que las
 pantallas muestran tal cual. Si la respuesta no trae `message`, se usa un texto por código HTTP; nunca
@@ -79,7 +82,7 @@ Los módulos API disponibles están en `src/api/`:
 - `comentarios.ts` y `confirmaciones.ts`: interacciones por reporte.
 - `admin.ts`: reportes pendientes, transición de estado, historial, votos de seguimiento, estadísticas y gestión de usuarios.
 - `barrios.ts` y `categorias.ts` también incluyen las operaciones de administración.
-- `notificaciones.ts`: listado y marcado como leída.
+- `notificaciones.ts`: listado, conteo de no leídas (`contarSinLeer`, para la campana) y marcado como leída.
 - `usuarios.ts`: perfil propio y actualización de nombre y teléfono.
 
 ## Mapa y geolocalización
@@ -121,6 +124,7 @@ pantallas son exports de `src/app/pages/Screens.tsx`, que el router carga bajo d
 | `/mapa` | Mapa general con filtros por estado (por defecto, daños activos), categoría y barrio, y la lista de lo visible en la barra lateral | Público |
 | `/reportes/nuevo` | Formulario en 3 pasos: ubicación en el mapa, categoría libre con descripción y hasta 3 fotos, y revisión | Sesión iniciada |
 | `/reportes/:id/editar` | Editar descripción y ubicación de un reporte propio `PENDIENTE` | Sesión iniciada |
+| `/mis-reportes` | Reportes creados por el usuario (`GET /reportes/mios`), con pestañas por estado y enlace para editar los `PENDIENTE` | Sesión iniciada |
 | `/notificaciones` | Notificaciones del usuario, con marcado como leída | Sesión iniciada |
 | `/perfil` | Editar nombre y teléfono, cambiar contraseña y cerrar sesión en todos los dispositivos | Sesión iniciada |
 | `/admin` | Panel de administración por pestañas (ver abajo) | `MODERADOR` o `ADMIN` |
@@ -150,6 +154,13 @@ Notas de comportamiento:
 - La lista filtra en el cliente sobre la respuesta completa de `GET /api/reportes` y no pagina;
   conviene pasar a paginación del lado del servidor si crece el volumen.
 - Las notificaciones las genera el backend cuando un moderador cambia el estado de un reporte.
+- La campana de la cabecera (`components/CampanaNotificaciones.tsx`, en la portada y en `PortalShell`) muestra
+  las no leídas (tope «9+») con `GET /notificaciones/sin-leer`: consulta al montarse, al cambiar de página, al
+  volver a la pestaña, al marcar notificaciones como leídas (evento de `components/notificacionesEventos.ts`) y
+  cada `VITE_NOTIFICACIONES_INTERVALO_MS` solo con la pestaña visible; si el backend falla, la espera se duplica
+  hasta 5 minutos. En pantallas de 980 px o menos la campana se oculta, como el resto de botones de icono.
+- Con sesión iniciada, la cabecera muestra «Mis reportes» (en la portada, junto a «Cómo funciona»), y el menú
+  lateral de la cuenta reúne Mi perfil, Mis reportes y Notificaciones.
   Al guardar el perfil se actualiza también el nombre mostrado en la barra superior.
 - Cada pantalla se carga bajo demanda (`lazy` del router) y Leaflet solo se descarga al abrir un
   mapa (`components/MapasDiferidos.tsx`), así que la carga inicial de la portada pesa ~370 kB sin
@@ -186,7 +197,6 @@ Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coinc
 ## Pendiente
 
 - Paginación del lado del servidor (el listado y el mapa aún descargan todos los reportes).
-- Contador de notificaciones sin leer en la barra superior.
 - Pruebas de componentes y de extremo a extremo (hoy hay pruebas unitarias con Vitest).
 - El token JWT se guarda en `localStorage`, expuesto a XSS; agregar una Content-Security-Policy en nginx y
   considerar cookies `HttpOnly`.

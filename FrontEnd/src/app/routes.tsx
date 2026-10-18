@@ -24,6 +24,7 @@ export const router = createBrowserRouter([
   { path: "/recuperar", lazy: pagina("RecuperarPassword") },
   { path: "/restablecer", lazy: pagina("RestablecerPassword") },
   { path: "/perfil", lazy: paginaProtegida("Perfil") },
+  { path: "/mis-reportes", lazy: paginaProtegida("MisReportes") },
   { path: "/notificaciones", lazy: paginaProtegida("Notificaciones") },
   { path: "/admin", lazy: paginaProtegida("Admin", "ADMIN") },
   { path: "*", lazy: async () => ({ Component: (await import("./pages/Home")).Home }) },

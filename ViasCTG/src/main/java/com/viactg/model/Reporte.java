@@ -23,6 +23,8 @@ import java.util.List;
 @Document(collection = "reportes")
 // Listados públicos y del panel: por estado y del más reciente al más antiguo.
 @CompoundIndex(name = "estado_fecha", def = "{'estado': 1, 'fechaCreacion': -1}")
+// "Mis reportes": los de un autor, del más reciente al más antiguo.
+@CompoundIndex(name = "usuario_fecha", def = "{'usuarioId': 1, 'fechaCreacion': -1}")
 @Getter
 @Setter
 @Builder

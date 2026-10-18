@@ -30,6 +30,11 @@ public class NotificacionService {
 
     public List<Notificacion> listarParaUsuario(String usuarioId) { return notificacionRepository.findByUsuarioIdOrderByFechaDesc(usuarioId); }
 
+    /** Cantidad de notificaciones sin leer del usuario, contada en la base de datos (la consulta la campana). */
+    public long contarSinLeer(String usuarioId) {
+        return mongoTemplate.count(Query.query(Criteria.where("usuarioId").is(usuarioId).and("leida").is(false)), Notificacion.class);
+    }
+
     public Notificacion marcarLeida(String notificacionId, String usuarioId) {
         Notificacion notificacion = notificacionRepository.findById(notificacionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Notificación no encontrada: " + notificacionId));

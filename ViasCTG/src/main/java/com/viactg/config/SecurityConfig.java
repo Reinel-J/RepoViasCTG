@@ -44,6 +44,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
+                        // Antes de la regla pública de GET /api/reportes/**: el primer patrón que coincide decide.
+                        .requestMatchers(HttpMethod.GET, "/api/reportes/mios").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/reportes/**", "/api/barrios/**", "/api/categorias/**", "/api/geocoding/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class).build();

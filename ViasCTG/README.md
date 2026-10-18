@@ -16,7 +16,7 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 
 Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque el registro no verifica el correo y otra persona pudo crear antes esa cuenta; un administrador existente conserva su contraseña), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión si el catálogo está vacío) y `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`).
 
-No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`, y los de consulta `reportes(estado, fechaCreacion)`, `reportes.fechaCreacion`, `comentarios(reporteId, fecha)` y `notificaciones(usuarioId, fecha)`.
+No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`, y los de consulta `reportes(estado, fechaCreacion)`, `reportes.fechaCreacion`, `reportes(usuarioId, fechaCreacion)`, `comentarios(reporteId, fecha)`, `notificaciones(usuarioId, fecha)` y `notificaciones(usuarioId, leida)`.
 
 `GET /actuator/health` (público, sin detalles) indica si la API y MongoDB responden; lo usa el healthcheck de Docker.
 
@@ -59,7 +59,7 @@ El backend resuelve `direccionOsm` («vía, barrio») y `barrioOsm` con Nominati
 
 ### Comentarios y notificaciones
 
-`ComentarioResponse` incluye `usuarioNombre` (nombre del autor, `null` si el usuario ya no existe). Cada vez que un `ADMIN` o `MODERADOR` cambia el estado de un reporte, se crea una notificación para su autor (por ejemplo: «Tu reporte "…" cambió a en revisión»), visible en `GET /api/notificaciones`. Cuando el reporte se resuelve o se rechaza, también se avisa a quienes lo confirmaron. `PATCH /api/notificaciones/leidas` marca todas como leídas.
+`ComentarioResponse` incluye `usuarioNombre` (nombre del autor, `null` si el usuario ya no existe). Cada vez que un `ADMIN` o `MODERADOR` cambia el estado de un reporte, se crea una notificación para su autor (por ejemplo: «Tu reporte "…" cambió a en revisión»), visible en `GET /api/notificaciones`. Cuando el reporte se resuelve o se rechaza, también se avisa a quienes lo confirmaron. `PATCH /api/notificaciones/leidas` marca todas como leídas y `GET /api/notificaciones/sin-leer` devuelve solo el conteo (`{"total": 3}`), pensado para que el frontend lo consulte cada minuto sin descargar la lista.
 
 Solo el autor de un comentario puede editarlo; el autor o un moderador pueden eliminarlo. El autor de un reporte no puede confirmarlo y los reportes resueltos o rechazados no admiten confirmaciones.
 
@@ -159,7 +159,7 @@ defecto de Bean Validation sale en inglés.
 | --- | --- |
 | Autenticación | `POST /api/auth/registro`, `POST /api/auth/login`, `POST /api/auth/recuperar` (`{"email"}`, siempre `202`), `POST /api/auth/restablecer` (`{"token","passwordNueva"}`) |
 | Perfil y usuarios | `GET/PUT /api/usuarios/me`, `PUT /api/usuarios/me/password` (`{"passwordActual","passwordNueva"}`, devuelve un token nuevo), `POST /api/usuarios/me/cerrar-sesiones`; `GET /api/usuarios`, `PATCH /api/usuarios/{id}/rol` (`{"rol":"MODERADOR"}`), `PATCH /api/usuarios/{id}/activo?activo=false` (`ADMIN`) |
-| Reportes | `GET/POST /api/reportes` (del más reciente al más antiguo; `?estado=` y `?limite=` opcionales), `GET /api/reportes/resumen` (cifras de la portada), `GET /api/reportes/cercanos` (radio máximo 50 km), `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
+| Reportes | `GET/POST /api/reportes` (del más reciente al más antiguo; `?estado=` y `?limite=` opcionales), `GET /api/reportes/mios` (los del usuario autenticado, del más reciente al más antiguo; `?estado=` opcional; exige sesión aunque los demás GET de reportes sean públicos), `GET /api/reportes/resumen` (cifras de la portada), `GET /api/reportes/cercanos` (radio máximo 50 km), `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
 | Seguimiento | `GET/POST /api/reportes/{reporteId}/seguimiento` |
 | Geocodificación | `GET /api/geocoding/inverso` |
 | Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial`, `GET /api/admin/reportes/seguimiento`, `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) |
@@ -168,7 +168,7 @@ defecto de Bean Validation sale en inglés.
 | Categorías | `GET/POST /api/categorias`, `GET/PUT /api/categorias/{id}`, `PATCH /api/categorias/{id}/estado` |
 | Confirmaciones | `GET/POST /api/reportes/{reporteId}/confirmaciones`, `DELETE /api/reportes/{reporteId}/confirmaciones/me` |
 | Comentarios | `GET/POST /api/reportes/{reporteId}/comentarios`, `PUT/DELETE /api/comentarios/{id}` |
-| Notificaciones | `GET /api/notificaciones`, `PATCH /api/notificaciones/{id}/leida`, `PATCH /api/notificaciones/leidas` |
+| Notificaciones | `GET /api/notificaciones`, `GET /api/notificaciones/sin-leer`, `PATCH /api/notificaciones/{id}/leida`, `PATCH /api/notificaciones/leidas` |
 | Salud | `GET /actuator/health` |
 
 La documentación interactiva está en `http://localhost:8080/swagger-ui/index.html`.

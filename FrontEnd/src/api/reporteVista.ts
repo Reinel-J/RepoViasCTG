@@ -78,6 +78,10 @@ export async function cargarReportes(estado?: EstadoReporte, limite?: number): P
   return (await reportesApi.listar(estado, limite)).map(normalizar)
 }
 
+export async function cargarMisReportes(): Promise<Reporte[]> {
+  return (await reportesApi.listarMios()).map(normalizar)
+}
+
 export async function cargarReporte(id: string): Promise<Reporte> {
   return normalizar(await reportesApi.obtener(id))
 }

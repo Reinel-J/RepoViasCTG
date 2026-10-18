@@ -35,6 +35,9 @@
     quienes confirmaron cuando el caso se cierra.
   - `GET /api/reportes` ordenado y con `limite`, `GET /api/reportes/resumen`, índices de consulta, Actuator,
     Docker sin root, Mongo solo en localhost y CI en GitHub Actions.
+- «Mis reportes» (`GET /api/reportes/mios`, índice `reportes(usuarioId, fechaCreacion)`) y contador de
+  notificaciones sin leer (`GET /api/notificaciones/sin-leer`, índice `notificaciones(usuarioId, leida)`) para la
+  campana del frontend.
 
 ## Pendiente recomendado
 
