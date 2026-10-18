@@ -69,6 +69,14 @@
 .followup-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 15px; }
 .followup-actions button { padding: 9px; border: 1px solid var(--line); border-radius: 3px 10px 3px 10px; background: var(--cream); color: var(--ink); font-size: 12px; font-weight: 700; }
 .followup-actions button.selected { color: var(--white); background: var(--ink); }
+.share-card h3 { margin-bottom: 16px; }
+.share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.share-actions a, .share-actions button { min-height: 42px; padding: 9px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line); border-radius: 3px 10px 3px 10px; background: var(--cream); color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; }
+/* Verde oscuro de WhatsApp: el verde claro de la marca no da contraste suficiente con texto blanco. */
+.share-actions .whatsapp { grid-column: 1 / -1; border-color: transparent; background: #075e54; color: var(--white); }
+/* Sin el botón «Más opciones» (navegadores sin menú nativo), «Copiar enlace» ocupa todo el ancho. */
+.share-actions button:only-of-type { grid-column: 1 / -1; }
+.share-note { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-soft); overflow-wrap: anywhere; }
 .read-button { align-self: center; border: 0; color: var(--teal); background: transparent; font-size: 12px; font-weight: 700; }
 .profile-stack { display: grid; gap: 18px; }
 .danger-link { margin-top: 10px; border: 0; color: var(--coral); background: transparent; font-size: 13px; font-weight: 700; }
@@ -330,6 +338,8 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .portal-header { border-bottom: 1px solid var(--line); }
 .portal-header .nav-action { display: inline-flex; align-items: center; gap: 6px; }
 .main-nav a[aria-current="page"] { color: var(--coral); }
+/* Cuenta dentro del menú: solo se muestra en el desplegable de pantallas angostas. */
+.nav-cuenta { display: none; }
 .page-hero { min-height: 230px; padding: 58px 7vw 52px; position: relative; overflow: hidden; color: var(--white); background: var(--deep); }
 .page-hero::after { content: ""; position: absolute; right: 8%; bottom: -65px; width: 240px; height: 180px; opacity: .12; background: repeating-radial-gradient(circle at 0 100%, transparent 0 22px, var(--yellow) 23px 25px, transparent 26px 44px); background-size: 90px 90px; transform: rotate(-7deg); }
 .page-hero > span { display: block; margin-bottom: 12px; color: var(--yellow); text-transform: uppercase; letter-spacing: 2.5px; font-size: 13px; font-weight: 700; }
@@ -572,6 +582,8 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
   .main-nav.open { display: flex; }
   .main-nav a { padding: 13px 0; }
   .main-nav a.active::after { display: none; }
+  .nav-cuenta { display: flex; flex-direction: column; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .nav-cuenta button { padding: 13px 0; border: 0; background: transparent; color: var(--coral-dark); font: inherit; font-weight: 700; text-align: left; }
   .menu-button { display: grid; }
   .login-button, .icon-button { display: none; }
   .hero-status-card { right: 4vw; }

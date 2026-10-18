@@ -87,6 +87,14 @@ export function Home() {
           <a href="#como-funciona">Cómo funciona</a>
           {session && <NavLink to="/mis-reportes">Mis reportes</NavLink>}
           {(session?.rol === "ADMIN" || session?.rol === "MODERADOR") && <NavLink to="/admin">Panel de gestión</NavLink>}
+          {/* Solo en el menú desplegable (≤ 980 px), donde la campana y el botón de sesión están ocultos. */}
+          <div className="nav-cuenta">
+            {session ? <>
+              <NavLink to="/notificaciones">Notificaciones</NavLink>
+              <NavLink to="/perfil">Mi perfil</NavLink>
+              <button type="button" onClick={logout}>Cerrar sesión · {session.nombre}</button>
+            </> : <NavLink to="/login">Iniciar sesión</NavLink>}
+          </div>
         </nav>
 
         <div className="header-actions">

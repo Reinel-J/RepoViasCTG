@@ -49,12 +49,38 @@
 - Verificar el correo al registrarse (hoy cualquiera puede registrar un correo ajeno).
 - Quitar también en el servidor los metadatos EXIF de las fotos (hoy lo hace el navegador antes de subirlas).
 - Content-Security-Policy en nginx y, a mediano plazo, sesión en cookie `HttpOnly` en lugar de `localStorage`.
-- No exponer los id internos de quienes confirman en `GET /confirmaciones` (bastan el conteo y `confirmadoPorMi`).
+- No exponer los id internos de usuarios en respuestas públicas: `GET /confirmaciones` (bastan el conteo y
+  `confirmadoPorMi`), `ReporteResponse.usuarioId` y sobre todo `ComentarioResponse`, que junta `usuarioId` con
+  `usuarioNombre` y permite, sin sesión, listar todos los reportes (con coordenadas) de una persona con nombre.
 - Regla de fotos: permitir a moderadores y restringir por estado del reporte.
 - Mover el límite de intentos a un almacén compartido si se despliegan varias réplicas del backend.
-- Configuración por perfiles (`local`, `test`, `prod`) y despliegue automatizado.
+- Configuración por perfiles (`local`, `test`, `prod`) y despliegue automatizado. Hoy los valores por defecto de
+  `application.properties` son de desarrollo y en producción una variable olvidada no falla: `MONGODB_URI` cae en
+  localhost, `FRONTEND_URL` deja enlaces de recuperación a `localhost:5173`, el CORS solo admite localhost y Swagger
+  queda público. `prod` exigiría esas variables sin valor por defecto (falla al arrancar si faltan), apagaría
+  Swagger y bajaría el nivel de log; `test` fijaría un `JWT_SECRET` de prueba y apagaría Nominatim; `local`
+  conservaría los valores actuales.
 - Opción de resolver automáticamente un reporte `EN_PROCESO` cuando suficientes votos digan «ya está arreglado».
 - Decidir si el modelo vuelve a relacionar reportes con el catálogo de barrios/calles (hoy usa el barrio de OSM).
+
+### Hallazgos de las pruebas de caja negra (18 de octubre de 2026)
+
+- **Bloqueo de cuentas ajenas**: 5 contraseñas malas para un correo, desde IPs distintas, bloquean esa cuenta 15
+  minutos también para su dueña (su contraseña correcta recibe 429); repitiéndolo, un moderador queda fuera
+  indefinidamente. `AuthService.login` cuenta los fallos solo por correo (`login-email:`): contarlos por
+  correo + IP y dejar un umbral global por correo mucho más alto.
+- **`X-Forwarded-For` aceptado desde cualquier red privada**: con `server.forward-headers-strategy=native`, Tomcat
+  confía en la cabecera si la conexión viene de 10.x, 172.16–31.x, 192.168.x o 127.x. Como Compose publica el
+  8080 en todas las interfaces, cualquiera en la red local puede saltarse todos los límites por IP (login,
+  registro, recuperación, geocodificación). Al desplegar: que solo el proxy alcance el backend y fijar
+  `server.tomcat.remoteip.internal-proxies` a su IP.
+- **Barrios sin unicidad**: dos `POST /api/barrios` con el mismo nombre crean dos barrios (no hay índice único ni
+  comparación sin tildes/mayúsculas como en categorías), y `BarrioService.actualizar` y el alta de calles usan
+  `save()` sobre el documento existente.
+- Menores: una contraseña de más de 72 bytes da 409 en lugar de 400; una URL mal formada en `/uploads/` devuelve
+  la página HTML de error de Tomcat en vez de `ErrorResponse`; `EditarReporte` (frontend) no comprueba al cargar
+  si el reporte sigue `PENDIENTE` ni si quien edita es el autor (el backend sí lo impide, pero el aviso llega al
+  guardar).
 
 ## Decisiones vigentes
 
