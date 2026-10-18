@@ -107,6 +107,31 @@ class ReporteServiceTests {
     }
 
     @Test
+    void listarDeUsuarioFiltraPorAutorYEstadoDelMasRecienteAlMasAntiguo() {
+        Reporte propio = pendiente("r-1", "u-1");
+        when(mongoTemplate.find(any(Query.class), eq(Reporte.class))).thenReturn(List.of(propio));
+
+        List<Reporte> resultado = crearServicio().listarDeUsuario("u-1", EstadoReporte.PENDIENTE);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(Reporte.class));
+        Query consulta = queryCaptor.getValue();
+        assertThat(resultado).containsExactly(propio);
+        assertThat(consulta.getQueryObject().get("usuarioId")).isEqualTo("u-1");
+        assertThat(consulta.getQueryObject().get("estado")).isEqualTo(EstadoReporte.PENDIENTE);
+        assertThat(consulta.getSortObject()).isEqualTo(new Document("fechaCreacion", -1));
+    }
+
+    @Test
+    void listarDeUsuarioSinEstadoNoFiltraPorEstado() {
+        crearServicio().listarDeUsuario("u-1", null);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(Reporte.class));
+        assertThat(queryCaptor.getValue().getQueryObject()).containsOnlyKeys("usuarioId");
+    }
+
+    @Test
     void crearNormalizaLaCategoriaYGuardaElReportePendienteConPrioridadMedia() {
         when(usuarioRepository.existsById("u-1")).thenReturn(true);
         when(categoriaService.normalizarNombre(" inundacion ")).thenReturn("Inundación");

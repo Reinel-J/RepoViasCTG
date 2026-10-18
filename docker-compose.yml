@@ -56,6 +56,7 @@ services:
       context: ./FrontEnd
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api}
+        VITE_NOTIFICACIONES_INTERVALO_MS: ${VITE_NOTIFICACIONES_INTERVALO_MS:-60000}
     restart: unless-stopped
     ports:
       - "5173:80"

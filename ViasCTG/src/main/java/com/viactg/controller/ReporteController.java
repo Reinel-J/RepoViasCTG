@@ -42,6 +42,13 @@ public class ReporteController {
         return reporteService.listar(estado, limite).stream().map(reporteMapper::toResponse).toList();
     }
 
+    // Solo los reportes del usuario autenticado (SecurityConfig exige sesión para esta ruta).
+    @GetMapping("/mios")
+    public List<ReporteResponse> listarMios(@AuthenticationPrincipal UsuarioPrincipal principal,
+                                            @RequestParam(required = false) EstadoReporte estado) {
+        return reporteService.listarDeUsuario(principal.getId(), estado).stream().map(reporteMapper::toResponse).toList();
+    }
+
     @GetMapping("/resumen")
     public ResumenReportesResponse resumen() {
         ReporteService.Resumen resumen = reporteService.calcularResumen(Instant.now());

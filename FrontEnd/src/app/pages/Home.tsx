@@ -4,6 +4,7 @@ import { cargarReportes, fotoReporte, type Reporte } from "../../api/reporteVist
 import * as reportesApi from "../../api/reportes"
 import type { EstadoReporte, ResumenReportesResponse } from "../../api/types"
 import { useAuth } from "../../context/useAuth"
+import { CampanaNotificaciones } from "../../components/CampanaNotificaciones"
 
 type IconName = "arrow" | "bell" | "camera" | "check" | "chevron" | "clock" | "location" | "map" | "menu" | "plus" | "search"
 
@@ -84,11 +85,12 @@ export function Home() {
           <NavLink to="/reportes">Reportes</NavLink>
           <NavLink to="/mapa">Mapa ciudadano</NavLink>
           <a href="#como-funciona">Cómo funciona</a>
+          {session && <NavLink to="/mis-reportes">Mis reportes</NavLink>}
           {(session?.rol === "ADMIN" || session?.rol === "MODERADOR") && <NavLink to="/admin">Panel de gestión</NavLink>}
         </nav>
 
         <div className="header-actions">
-          {session && <button className="icon-button" onClick={() => navigate("/notificaciones")} aria-label="Notificaciones"><Icon name="bell" /></button>}
+          {session && <CampanaNotificaciones><Icon name="bell" /></CampanaNotificaciones>}
           <button className="login-button" onClick={() => { if (session) logout(); else navigate("/login") }}>{session ? "Cerrar sesión" : "Iniciar sesión"}</button>
           <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} aria-expanded={menuOpen}><Icon name="menu" /></button>
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react"
 import { NavLink, useLocation, useNavigate, useParams, useSearchParams, type NavigateFunction } from "react-router"
-import { cargarReporte, cargarReportes, fotoReporte, fotosReporte, textoEstado, type Reporte } from "../../api/reporteVista"
+import { cargarMisReportes, cargarReporte, cargarReportes, fotoReporte, fotosReporte, textoEstado, type Reporte } from "../../api/reporteVista"
 import * as authApi from "../../api/auth"
 import * as categoriasApi from "../../api/categorias"
 import * as comentariosApi from "../../api/comentarios"
@@ -12,6 +12,8 @@ import * as seguimientoApi from "../../api/seguimiento"
 import * as usuariosApi from "../../api/usuarios"
 import type { ComentarioResponse, ConfirmacionResponse, EstadoReporte, NotificacionResponse, PosibleDuplicadoResponse, ReporteResponse, SeguimientoResumenResponse, UsuarioResponse } from "../../api/types"
 import { useAuth } from "../../context/useAuth"
+import { CampanaNotificaciones } from "../../components/CampanaNotificaciones"
+import { avisarCambioNotificaciones } from "../../components/notificacionesEventos"
 import { COLOR_ESTADO } from "../../components/mapaBase"
 import { MapaReportes, MapaSeleccionPunto } from "../../components/MapasDiferidos"
 import { PanelAdmin } from "../../pages/admin/PanelAdmin"
@@ -69,10 +71,11 @@ function PortalShell({ children, title, eyebrow, action = true }: { children: Re
           <NavLink to="/">Inicio</NavLink>
           <NavLink to="/reportes">Reportes</NavLink>
           <NavLink to="/mapa">Mapa ciudadano</NavLink>
+          {session && <NavLink to="/mis-reportes">Mis reportes</NavLink>}
           {(session?.rol === "ADMIN" || session?.rol === "MODERADOR") && <NavLink to="/admin">Panel de gestión</NavLink>}
         </nav>
         <div className="header-actions">
-          {session && <NavLink className="icon-button" to="/notificaciones" aria-label="Notificaciones"><Icon name="bell" /></NavLink>}
+          {session && <CampanaNotificaciones><Icon name="bell" /></CampanaNotificaciones>}
           {action && <NavLink className="login-button nav-action" to="/reportes/nuevo"><Icon name="plus" size={16} /> Reportar</NavLink>}
           {session ? <button className="session-button" onClick={logout}>{session.nombre} · Salir</button> : <NavLink className="session-button" to="/login">Iniciar sesión</NavLink>}
           <button className="menu-button" onClick={() => setMenu(!menu)} aria-label={menu ? "Cerrar menú" : "Abrir menú"} aria-expanded={menu} aria-controls="menu-principal"><Icon name="menu" /></button>
@@ -102,7 +105,7 @@ function useReportes() {
   return { datos, conectado, cargando, error }
 }
 
-function ReportCard({ reporte }: { reporte: Reporte }) {
+function ReportCard({ reporte, editable = false }: { reporte: Reporte; editable?: boolean }) {
   const foto = fotoReporte(reporte)
   return (
     <article className="report-card">
@@ -118,6 +121,7 @@ function ReportCard({ reporte }: { reporte: Reporte }) {
           <span className={`status ${reporte.estadoClase}`}><i />{reporte.estado}</span>
         </div>
         <NavLink to={`/reportes/${reporte.id}`}>Ver reporte <Icon name="arrow" size={17} /></NavLink>
+        {editable && reporte.estadoRaw === "PENDIENTE" && <NavLink className="edit-report-link" to={`/reportes/${reporte.id}/editar`}>Editar este reporte</NavLink>}
       </div>
     </article>
   )
@@ -712,6 +716,36 @@ export function RestablecerPassword() {
   return <div className="auth-page"><div className="auth-image"><div><span>Seguridad</span><h1>Crea una nueva contraseña.</h1></div></div><div className="auth-panel"><Logo /><form className="auth-form" onSubmit={enviar}><span className="section-kicker">Nueva contraseña</span><h2>Restablecer acceso</h2>{listo ? <><div className="success-message" role="status">Tu contraseña se actualizó correctamente.</div><NavLink className="primary-button full" to="/login">Iniciar sesión</NavLink></> : !token ? <div className="alert-panel error-panel">El enlace está incompleto.</div> : <><label>Contraseña nueva<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={password} onChange={(event) => setPassword(event.target.value)} required /></label><label>Confirmar contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required /></label>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}<button className="primary-button full" disabled={enviando}>{enviando ? "Guardando…" : "Guardar contraseña"}</button></>}</form></div></div>
 }
 
+// Menú lateral del espacio personal; NavLink marca la página actual con la clase "active".
+function CuentaNav() {
+  return <aside className="account-nav"><NavLink to="/perfil"><Icon name="user" /> Mi perfil</NavLink><NavLink to="/mis-reportes"><Icon name="location" /> Mis reportes</NavLink><NavLink to="/notificaciones"><Icon name="bell" /> Notificaciones</NavLink></aside>
+}
+
+const FILTROS_MIS_REPORTES: [string, EstadoReporte | null][] = [["Todos", null], ["Pendientes", "PENDIENTE"], ["En revisión", "EN_REVISION"], ["En proceso", "EN_PROCESO"], ["Resueltos", "RESUELTO"], ["Rechazados", "RECHAZADO"]]
+
+export function MisReportes() {
+  const [datos, setDatos] = useState<Reporte[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState("")
+  const [estado, setEstado] = useState<EstadoReporte | null>(null)
+  useEffect(() => {
+    cargarMisReportes().then(setDatos)
+      .catch((exception) => setError(mensajeDe(exception, "No fue posible cargar tus reportes.")))
+      .finally(() => setCargando(false))
+  }, [])
+  // Se descargan una vez y se filtran aquí: así cada pestaña muestra su conteo sin otra petición.
+  const conteo = (filtro: EstadoReporte | null) => filtro ? datos.filter((reporte) => reporte.estadoRaw === filtro).length : datos.length
+  const visibles = estado ? datos.filter((reporte) => reporte.estadoRaw === estado) : datos
+  return <PortalShell eyebrow="Tu espacio ciudadano" title="Mis reportes"><section className="account-layout"><CuentaNav /><div className="my-reports">
+    <div className="content-heading"><div><h2>Lo que has reportado</h2><p>{datos.length} {datos.length === 1 ? "reporte" : "reportes"} en total</p></div><NavLink className="primary-button compact" to="/reportes/nuevo"><Icon name="plus" /> Nuevo reporte</NavLink></div>
+    {datos.length > 0 && <div className="filters" aria-label="Filtrar mis reportes por estado">{FILTROS_MIS_REPORTES.filter(([, filtro]) => !filtro || conteo(filtro) > 0).map(([texto, filtro]) => <button key={texto} className={estado === filtro ? "selected" : ""} aria-pressed={estado === filtro} onClick={() => setEstado(filtro)}>{texto} ({conteo(filtro)})</button>)}</div>}
+    {cargando && <div className="loading-panel">Cargando tus reportes…</div>}
+    {error && <div className="alert-panel error-panel" role="alert">{error}</div>}
+    <div className="report-grid my-reports-grid">{visibles.map((reporte) => <ReportCard reporte={reporte} editable key={reporte.id} />)}</div>
+    {!cargando && !error && !datos.length && <div className="empty-panel"><Icon name="map" size={30} /><h2>Aún no has reportado nada</h2><p>Cuando veas un hueco, una alcantarilla abierta o un poste sin luz, repórtalo y síguelo desde aquí.</p><NavLink className="primary-button compact empty-action" to="/reportes/nuevo"><Icon name="plus" /> Reportar un daño</NavLink></div>}
+  </div></section></PortalShell>
+}
+
 export function Notificaciones() {
   const [items, setItems] = useState<NotificacionResponse[]>([])
   const [error, setError] = useState("")
@@ -722,6 +756,7 @@ export function Notificaciones() {
     try {
       const actualizada = await notificacionesApi.marcarLeida(id)
       setItems((actuales) => actuales.map((item) => item.id === id ? actualizada : item))
+      avisarCambioNotificaciones()
     } catch (exception) {
       setError(mensajeDe(exception, "No fue posible actualizar la notificación."))
     }
@@ -730,12 +765,13 @@ export function Notificaciones() {
     try {
       await notificacionesApi.marcarTodasLeidas()
       setItems((actuales) => actuales.map((item) => ({ ...item, leida: true })))
+      avisarCambioNotificaciones()
     } catch (exception) {
       setError(mensajeDe(exception, "No fue posible actualizar las notificaciones."))
     }
   }
   const sinLeer = items.filter((item) => !item.leida).length
-  return <PortalShell eyebrow="Mantente al día" title="Notificaciones"><section className="account-layout"><aside className="account-nav"><NavLink to="/perfil"><Icon name="user" /> Mi perfil</NavLink><NavLink className="active" to="/notificaciones"><Icon name="bell" /> Notificaciones</NavLink></aside><div className="notification-list"><div className="content-heading"><div><h2>Novedades de tus reportes</h2><p>{sinLeer} sin leer</p></div>{sinLeer > 1 && <button className="read-button" onClick={leerTodas}>Marcar todas como leídas</button>}</div>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{items.map((item) => <article className={!item.leida ? "notification unread" : "notification"} key={item.id}><span className="notification-icon"><Icon name="bell" /></span><div><strong>{item.mensaje}</strong>{item.reporteId && <NavLink to={`/reportes/${item.reporteId}`}>Ver reporte</NavLink>}<small>{new Date(item.fecha).toLocaleString("es-CO")}</small></div>{!item.leida && <button className="read-button" onClick={() => leer(item.id)}>Marcar leída</button>}</article>)}{!items.length && !error && <div className="empty-panel"><h2>Estás al día</h2><p>Te avisaremos cuando cambien tus reportes.</p></div>}</div></section></PortalShell>
+  return <PortalShell eyebrow="Mantente al día" title="Notificaciones"><section className="account-layout"><CuentaNav /><div className="notification-list"><div className="content-heading"><div><h2>Novedades de tus reportes</h2><p>{sinLeer} sin leer</p></div>{sinLeer > 1 && <button className="read-button" onClick={leerTodas}>Marcar todas como leídas</button>}</div>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{items.map((item) => <article className={!item.leida ? "notification unread" : "notification"} key={item.id}><span className="notification-icon"><Icon name="bell" /></span><div><strong>{item.mensaje}</strong>{item.reporteId && <NavLink to={`/reportes/${item.reporteId}`}>Ver reporte</NavLink>}<small>{new Date(item.fecha).toLocaleString("es-CO")}</small></div>{!item.leida && <button className="read-button" onClick={() => leer(item.id)}>Marcar leída</button>}</article>)}{!items.length && !error && <div className="empty-panel"><h2>Estás al día</h2><p>Te avisaremos cuando cambien tus reportes.</p></div>}</div></section></PortalShell>
 }
 
 export function Perfil() {
@@ -785,7 +821,7 @@ export function Perfil() {
       navigate("/login")
     } catch (exception) { setError(mensajeDe(exception, "No fue posible cerrar las sesiones.")) }
   }
-  return <PortalShell eyebrow="Tu espacio ciudadano" title="Mi perfil"><section className="account-layout"><aside className="account-nav"><NavLink className="active" to="/perfil"><Icon name="user" /> Mi perfil</NavLink><NavLink to="/notificaciones"><Icon name="bell" /> Notificaciones</NavLink></aside><div className="profile-stack">{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{mensaje && <div className="success-message" role="status">{mensaje}</div>}<div className="profile-card"><div className="profile-intro"><div className="avatar">{nombre.slice(0, 2).toUpperCase()}</div><div><h2>{usuario?.nombre ?? "Cargando…"}</h2><span>{usuario?.rol} · {usuario?.email}</span></div></div><form className="profile-form" onSubmit={guardar}><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input value={usuario?.email ?? ""} disabled /></label><label>Teléfono<input type="tel" autoComplete="tel" value={telefono} onChange={(event) => setTelefono(event.target.value)} placeholder="Opcional" /></label><button className="primary-button">Guardar cambios</button></form></div><div className="profile-card"><div className="content-heading"><div><h2>Seguridad</h2><p>Cambiar la contraseña invalida las demás sesiones.</p></div></div><form className="profile-form" onSubmit={cambiarClave}><label>Contraseña actual<input type="password" autoComplete="current-password" value={actual} onChange={(event) => setActual(event.target.value)} required /></label><label>Nueva contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={nueva} onChange={(event) => setNueva(event.target.value)} required /></label><label>Confirmar contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required /></label><button className="primary-button">Cambiar contraseña</button></form><button className="danger-link" onClick={cerrarTodo}>Cerrar sesiones en todos los dispositivos</button></div></div></section></PortalShell>
+  return <PortalShell eyebrow="Tu espacio ciudadano" title="Mi perfil"><section className="account-layout"><CuentaNav /><div className="profile-stack">{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{mensaje && <div className="success-message" role="status">{mensaje}</div>}<div className="profile-card"><div className="profile-intro"><div className="avatar">{nombre.slice(0, 2).toUpperCase()}</div><div><h2>{usuario?.nombre ?? "Cargando…"}</h2><span>{usuario?.rol} · {usuario?.email}</span></div></div><form className="profile-form" onSubmit={guardar}><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input value={usuario?.email ?? ""} disabled /></label><label>Teléfono<input type="tel" autoComplete="tel" value={telefono} onChange={(event) => setTelefono(event.target.value)} placeholder="Opcional" /></label><button className="primary-button">Guardar cambios</button></form></div><div className="profile-card"><div className="content-heading"><div><h2>Seguridad</h2><p>Cambiar la contraseña invalida las demás sesiones.</p></div></div><form className="profile-form" onSubmit={cambiarClave}><label>Contraseña actual<input type="password" autoComplete="current-password" value={actual} onChange={(event) => setActual(event.target.value)} required /></label><label>Nueva contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={nueva} onChange={(event) => setNueva(event.target.value)} required /></label><label>Confirmar contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required /></label><button className="primary-button">Cambiar contraseña</button></form><button className="danger-link" onClick={cerrarTodo}>Cerrar sesiones en todos los dispositivos</button></div></div></section></PortalShell>
 }
 
 export function Admin() {

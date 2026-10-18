@@ -137,6 +137,13 @@ public class ReporteService {
         return listar(estado, null);
     }
 
+    /** Reportes creados por el usuario, del más reciente al más antiguo; {@code estado} null devuelve todos. */
+    public List<Reporte> listarDeUsuario(String usuarioId, EstadoReporte estado) {
+        Query query = Query.query(Criteria.where("usuarioId").is(usuarioId)).with(MAS_RECIENTES);
+        if (estado != null) query.addCriteria(Criteria.where("estado").is(estado));
+        return mongoTemplate.find(query, Reporte.class);
+    }
+
     /** Cifras de la portada con conteos en la base de datos. */
     public Resumen calcularResumen(Instant ahora) {
         Map<EstadoReporte, Long> porEstado = new EnumMap<>(EstadoReporte.class);

@@ -210,6 +210,9 @@ a { color: inherit; text-decoration: none; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 .icon-button, .search-button, .menu-button { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line); color: var(--ink); background: transparent; }
 .icon-button:hover, .search-button:hover { background: var(--sand); }
+/* Contador de notificaciones sin leer sobre la campana. */
+.campana { position: relative; }
+.campana-contador { position: absolute; top: -5px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px; display: grid; place-items: center; border: 2px solid var(--cream); border-radius: 999px; background: var(--coral); color: var(--white); font-size: 11px; font-weight: 800; line-height: 1; }
 .login-button { height: 40px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--ink); color: var(--white); font-size: 15px; font-weight: 700; }
 .menu-button { display: none; }
 
@@ -312,7 +315,7 @@ a { color: inherit; text-decoration: none; }
 .final-cta > span { font-size: 14px; text-transform: uppercase; letter-spacing: 2.5px; font-weight: 700; }
 .final-cta h2 { margin: 13px 0 27px; font-size: clamp(54px, 6vw, 80px); line-height: .93; position: relative; z-index: 1; }
 .primary-button.dark { background: var(--ink); }
-.cta-pattern { position: absolute; inset: 0; opacity: .11; background: repeating-radial-gradient(circle at 0 100%, transparent 0 31px, var(--ink) 32px 34px, transparent 35px 59px); background-size: 120px 120px; }
+.cta-pattern { position: absolute; inset: 0; pointer-events: none; opacity: .11; background: repeating-radial-gradient(circle at 0 100%, transparent 0 31px, var(--ink) 32px 34px, transparent 35px 59px); background-size: 120px 120px; }
 
 footer { min-height: 150px; padding: 40px 7vw; display: flex; align-items: center; justify-content: space-between; gap: 30px; background: var(--ink); color: rgba(255,255,255,.7); font-size: 14px; }
 .footer-brand .brand-mark { background: var(--cream); }
@@ -495,6 +498,12 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .account-nav { padding: 10px; display: grid; gap: 4px; background: var(--white); border: 1px solid var(--line); border-radius: 3px 16px 3px 3px; }
 .account-nav a { padding: 12px; display: flex; align-items: center; gap: 9px; border-radius: 3px 10px 3px 10px; font-size: 14px; font-weight: 700; }
 .account-nav a.active { color: var(--white); background: var(--ink); }
+/* Mis reportes: dos columnas porque el menú lateral ocupa parte del ancho. */
+.my-reports { display: grid; gap: 20px; }
+.my-reports .content-heading { margin: 0; }
+.my-reports .filters { flex-wrap: wrap; justify-self: start; border-radius: 22px; }
+.my-reports-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.empty-action { margin-top: 20px; }
 .notification-list, .profile-card { padding: 30px; background: var(--white); border: 1px solid var(--line); border-radius: 3px 22px 3px 3px; }
 .content-heading { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
 .content-heading h2, .content-heading h3 { margin: 0 0 5px; font: 400 28px var(--serif); }
@@ -638,6 +647,7 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
   .account-layout { padding: 30px 6vw 65px; grid-template-columns: 1fr; }
   .account-nav { grid-template-columns: 1fr 1fr; }
   .notification-list, .profile-card { padding: 22px 17px; }
+  .my-reports-grid { grid-template-columns: 1fr; }
   .profile-form { grid-template-columns: 1fr; }
   .profile-form label:first-child { grid-column: auto; }
   .admin-layout { grid-template-columns: 1fr; }
