@@ -95,4 +95,6 @@ class CorreoServiceTests {
         service.enviar("dos@correo.com", "Segundo", "Sale bien");
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(sender, timeout(ESPERA_MS).times(2)).send(captor.cap
+        verify(sender, timeout(ESPERA_MS).times(2)).send(captor.capture());
+    }
+}
