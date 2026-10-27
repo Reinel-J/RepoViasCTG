@@ -3,6 +3,7 @@ import './leafletIconFix'
 import { useEffect, useState } from 'react'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import { ATRIBUCION_OSM, CARTAGENA, TESELAS_OSM } from './mapaBase'
+import { ZoomConRueda } from './ZoomConRueda'
 
 type Punto = [number, number]
 
@@ -91,8 +92,9 @@ export function MapaSeleccionPunto({ onSeleccionar, puntoInicial }: MapaSeleccio
         {buscando ? 'Buscando tu ubicación…' : 'Usar mi ubicación'}
       </button>
       {mensajeError && <p className="alert error" role="alert">{mensajeError}</p>}
-      <MapContainer className="leaflet-map leaflet-map-picker" center={puntoInicial ?? CARTAGENA} zoom={puntoInicial ? 16 : 13} scrollWheelZoom>
+      <MapContainer className="leaflet-map leaflet-map-picker" center={puntoInicial ?? CARTAGENA} zoom={puntoInicial ? 16 : 13} scrollWheelZoom={false}>
         <TileLayer attribution={ATRIBUCION_OSM} url={TESELAS_OSM} />
+        <ZoomConRueda />
         <SelectorPunto onSeleccionar={onSeleccionar} seleccionarPunto={seleccionarPunto} />
         {destino && <CentrarMapa destino={destino} />}
         {punto && <Marker position={punto} />}

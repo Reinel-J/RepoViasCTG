@@ -28,6 +28,6 @@ public class SeguimientoController {
 
     static SeguimientoResumenResponse aRespuesta(SeguimientoService.Resumen resumen) {
         return new SeguimientoResumenResponse(resumen.reporteId(), resumen.arreglado(), resumen.sigue(),
-                resumen.ultimaRespuesta(), resumen.miRespuesta());
+                resumen.ultimaRespuesta(), resumen.miRespuesta(), resumen.cierrePrevisto());
     }
 }

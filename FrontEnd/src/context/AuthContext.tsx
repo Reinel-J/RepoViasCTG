@@ -44,10 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     guardarSesion(await authApi.login(email, password))
   }
 
-  async function registro(nombre: string, email: string, password: string) {
-    guardarSesion(await authApi.registro(nombre, email, password))
-  }
-
   function logout() {
     localStorage.removeItem('token')
     localStorage.removeItem(SESSION_STORAGE_KEY)
@@ -63,5 +59,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  return <AuthContext.Provider value={{ session, login, registro, logout, actualizarNombre, renovarSesion: guardarSesion }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ session, login, logout, actualizarNombre, renovarSesion: guardarSesion }}>{children}</AuthContext.Provider>
 }

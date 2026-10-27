@@ -52,6 +52,11 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.FORBIDDEN, exception.getMessage(), Map.of());
     }
 
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException exception) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage(), Map.of());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException exception) {
         Map<String, String> errors = exception.getBindingResult().getFieldErrors().stream()

@@ -1,7 +1,9 @@
 package com.viactg.service;
 
 import com.viactg.dto.UsuarioActualizacionRequest;
+import com.viactg.dto.UsuarioRegistroRequest;
 import com.viactg.exception.BusinessRuleException;
+import com.viactg.exception.InvalidRequestException;
 import com.viactg.model.Rol;
 import com.viactg.model.Usuario;
 import com.viactg.repository.UsuarioRepository;
@@ -100,13 +102,14 @@ class UsuarioServiceTests {
         assertThat(creado.getEmail()).isEqualTo("admin@test.com");
         assertThat(creado.getRol()).isEqualTo(Rol.ADMIN);
         assertThat(creado.isActivo()).isTrue();
+        assertThat(creado.isEmailVerificado()).isTrue();
         assertThat(creado.getPasswordHash()).isEqualTo("hash-admin");
     }
 
     @Test
     void asegurarAdministradorNoCambiaLaContrasenaDeUnAdministradorExistente() {
         Usuario admin = Usuario.builder().id("u-1").email("admin@test.com").passwordHash("hash-original")
-                .rol(Rol.ADMIN).activo(true).build();
+                .rol(Rol.ADMIN).activo(true).emailVerificado(true).build();
         when(usuarioRepository.findByEmail("admin@test.com")).thenReturn(Optional.of(admin));
 
         Usuario resultado = service.asegurarAdministrador("admin@test.com", "OtraClave123", "Administrador");
@@ -129,7 +132,45 @@ class UsuarioServiceTests {
 
         Document cambios = capturarActualizacion().getUpdateObject();
         assertThat(cambios.get("$set", Document.class))
-                .containsEntry("rol", Rol.ADMIN).containsEntry("activo", true).containsEntry("passwordHash", "hash-admin");
+                .containsEntry("rol", Rol.ADMIN).containsEntry("activo", true).containsEntry("passwordHash", "hash-admin")
+                .containsEntry("emailVerificado", true);
+        assertThat(cambios.get("$inc", Document.class).get("versionToken")).isEqualTo(1);
+    }
+
+    @Test
+    void asegurarAdministradorVerificaElCorreoDeUnAdministradorSinVerificarSinTocarSuContrasena() {
+        Usuario admin = Usuario.builder().id("u-1").email("admin@test.com").passwordHash("hash-original")
+                .rol(Rol.ADMIN).activo(true).emailVerificado(false).build();
+        when(usuarioRepository.findByEmail("admin@test.com")).thenReturn(Optional.of(admin));
+        devolverAlActualizar(admin);
+
+        service.asegurarAdministrador("admin@test.com", "OtraClave123", "Administrador");
+
+        Document cambios = capturarActualizacion().getUpdateObject();
+        assertThat(cambios.get("$set", Document.class)).containsEntry("emailVerificado", true).doesNotContainKey("passwordHash");
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void registrarCreaLaCuentaSinVerificar() {
+        when(usuarioRepository.existsByEmail("ana@test.com")).thenReturn(false);
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        Usuario creado = service.registrar(new UsuarioRegistroRequest("Ana", "Ana@Test.com", "Correcta123", null));
+
+        assertThat(creado.isEmailVerificado()).isFalse();
+        assertThat(creado.getRol()).isEqualTo(Rol.CIUDADANO);
+    }
+
+    @Test
+    void restablecerPasswordVerificaElCorreoYCierraLasSesiones() {
+        when(passwordEncoder.encode("Nueva12345")).thenReturn("hash-nuevo");
+        devolverAlActualizar(new Usuario());
+
+        service.restablecerPassword("u-1", "Nueva12345");
+
+        Document cambios = capturarActualizacion().getUpdateObject();
+        assertThat(cambios.get("$set", Document.class)).containsEntry("passwordHash", "hash-nuevo").containsEntry("emailVerificado", true);
         assertThat(cambios.get("$inc", Document.class).get("versionToken")).isEqualTo(1);
     }
 
@@ -138,6 +179,6 @@ class UsuarioServiceTests {
         assertThatCode(() -> UsuarioService.validarLongitudPassword("a".repeat(72))).doesNotThrowAnyException();
         // 40 eñes son 40 caracteres pero 80 bytes en UTF-8.
         assertThatThrownBy(() -> UsuarioService.validarLongitudPassword("ñ".repeat(40)))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("72");
+                .isInstanceOf(InvalidRequestException.class).hasMessageContaining("72");
     }
 }

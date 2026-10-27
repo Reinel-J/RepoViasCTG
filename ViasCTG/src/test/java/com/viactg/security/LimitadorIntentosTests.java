@@ -54,6 +54,21 @@ class LimitadorIntentosTests {
     }
 
     @Test
+    void limpiarConPrefijoBorraSoloLasClavesQueEmpiezanAsi() {
+        LimitadorIntentos limitador = new LimitadorIntentos(new RelojMovil());
+        limitador.registrar("login-email-ip:ana@test.com|1.1.1.1");
+        limitador.registrar("login-email-ip:ana@test.com|2.2.2.2");
+        limitador.registrar("login-email-ip:ana@test.com.co|1.1.1.1");
+
+        limitador.limpiarConPrefijo("login-email-ip:ana@test.com|");
+
+        assertThatCode(() -> limitador.verificar("login-email-ip:ana@test.com|1.1.1.1", 1, Duration.ofMinutes(1))).doesNotThrowAnyException();
+        assertThatCode(() -> limitador.verificar("login-email-ip:ana@test.com|2.2.2.2", 1, Duration.ofMinutes(1))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> limitador.verificar("login-email-ip:ana@test.com.co|1.1.1.1", 1, Duration.ofMinutes(1)))
+                .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
     void lasPeticionesSimultaneasNoSuperanElMaximo() throws Exception {
         LimitadorIntentos limitador = new LimitadorIntentos();
         int hilos = 64;

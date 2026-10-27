@@ -84,6 +84,11 @@ public class LimitadorIntentos {
         intentos.remove(clave);
     }
 
+    /** Borra todas las claves que empiezan por {@code prefijo} (por ejemplo, los fallos de un correo desde cualquier IP). */
+    public void limpiarConPrefijo(String prefijo) {
+        intentos.keySet().removeIf(clave -> clave.startsWith(prefijo));
+    }
+
     int clavesRegistradas() {
         return intentos.size();
     }

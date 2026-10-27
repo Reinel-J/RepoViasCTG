@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react"
 import { NavLink, useLocation, useNavigate, useParams, useSearchParams, type NavigateFunction } from "react-router"
-import { cargarMisReportes, cargarReporte, cargarReportes, fotoReporte, fotosReporte, textoEstado, type Reporte } from "../../api/reporteVista"
+import { cargarMisReportes, cargarReporte, cargarReportes, fotoReporte, fotosReporte, motivoNoEditable, textoEstado, type Reporte } from "../../api/reporteVista"
 import * as authApi from "../../api/auth"
 import * as categoriasApi from "../../api/categorias"
 import * as comentariosApi from "../../api/comentarios"
@@ -56,6 +56,16 @@ function Logo() {
 
 function mensajeDe(exception: unknown, porDefecto: string) {
   return exception instanceof Error ? exception.message : porDefecto
+}
+
+type AvisoFormulario = { tipo: "error" | "exito"; texto: string }
+
+// Resultado de un formulario, para mostrarlo junto a su botón y no lejos de donde la persona está mirando.
+function MensajeFormulario({ aviso }: { aviso: AvisoFormulario | null }) {
+  if (!aviso) return null
+  return aviso.tipo === "error"
+    ? <div className="alert-panel error-panel" role="alert">{aviso.texto}</div>
+    : <div className="success-message" role="status">{aviso.texto}</div>
 }
 
 // Lleva al login recordando a dónde volver después.
@@ -347,7 +357,7 @@ function DetalleReporteVista({ id }: { id: string }) {
               : !cerrado && <button className="primary-button full" onClick={confirmar}><Icon name="check" /> {yaConfirme ? "Retirar confirmación" : "Confirmar reporte"}</button>}
           </div>
           <CompartirReporte reporte={reporte} cerrado={cerrado} />
-          {seguimiento && !cerrado && <div className="community-card"><span className="section-kicker">¿Ya lo arreglaron?</span><h3>{seguimiento.arreglado} dicen que sí · {seguimiento.sigue} que sigue igual</h3><div className="followup-actions"><button className={seguimiento.miRespuesta === true ? "selected" : ""} aria-pressed={seguimiento.miRespuesta === true} onClick={() => responder(true)}>Ya está arreglado</button><button className={seguimiento.miRespuesta === false ? "selected" : ""} aria-pressed={seguimiento.miRespuesta === false} onClick={() => responder(false)}>Sigue igual</button></div></div>}
+          {seguimiento && !cerrado && <div className="community-card"><span className="section-kicker">¿Ya lo arreglaron?</span><h3>{seguimiento.arreglado} dicen que sí · {seguimiento.sigue} que sigue igual</h3>{seguimiento.cierrePrevisto && <p className="followup-note">La comunidad indica que ya está arreglado. Si nadie dice lo contrario, se marcará como resuelto el {new Date(seguimiento.cierrePrevisto).toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}.</p>}<div className="followup-actions"><button className={seguimiento.miRespuesta === true ? "selected" : ""} aria-pressed={seguimiento.miRespuesta === true} onClick={() => responder(true)}>Ya está arreglado</button><button className={seguimiento.miRespuesta === false ? "selected" : ""} aria-pressed={seguimiento.miRespuesta === false} onClick={() => responder(false)}>Sigue igual</button></div></div>}
           <div className="timeline-card">
             <span className="section-kicker">Seguimiento</span>
             <div className={historial.length ? "timeline-item done" : "timeline-item active"}><i /><div><strong>Reporte recibido</strong><small>{reporte.fechaCreacion ? new Date(reporte.fechaCreacion).toLocaleString("es-CO") : reporte.fecha}</small></div></div>
@@ -590,6 +600,7 @@ export function CrearReporte() {
 export function EditarReporte() {
   const { id = "" } = useParams()
   const navigate = useNavigate()
+  const { session } = useAuth()
   const [reporte, setReporte] = useState<ReporteResponse | null>(null)
   const [descripcion, setDescripcion] = useState("")
   const [coordenadas, setCoordenadas] = useState<[number, number]>()
@@ -619,7 +630,9 @@ export function EditarReporte() {
     }
   }
 
-  return <PortalShell eyebrow="Reporte pendiente" title="Editar reporte"><section className="report-form-layout">{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{reporte && <form className="report-form" onSubmit={guardar}><div className="form-heading"><span>01</span><div><h2>Actualiza la información</h2><p>Solo los reportes pendientes pueden editarse.</p></div></div><div className="form-fields"><label>Categoría<input value={reporte.categoriaId} disabled /></label><label>Descripción<textarea minLength={10} maxLength={2000} rows={6} value={descripcion} onChange={(event) => setDescripcion(event.target.value)} required /></label></div><div className="picker-map real-picker"><MapaSeleccionPunto puntoInicial={coordenadas} onSeleccionar={(lat, lng) => setCoordenadas([lat, lng])} /></div><div className="form-actions"><button type="button" className="ghost-button" onClick={() => navigate(-1)}>Cancelar</button><button className="primary-button" disabled={guardando}>{guardando ? "Guardando…" : "Guardar cambios"}</button></div></form>}</section></PortalShell>
+  const bloqueo = reporte ? motivoNoEditable(reporte, session?.usuarioId) : null
+
+  return <PortalShell eyebrow="Reporte pendiente" title="Editar reporte"><section className="report-form-layout">{error && !reporte && <div className="alert-panel error-panel" role="alert">{error}</div>}{bloqueo && <div className="alert-panel error-panel" role="alert">{bloqueo} <NavLink to={`/reportes/${id}`}>Volver al reporte</NavLink></div>}{reporte && !bloqueo && <form className="report-form" onSubmit={guardar}><div className="form-heading"><span>01</span><div><h2>Actualiza la información</h2><p>Solo los reportes pendientes pueden editarse.</p></div></div><div className="form-fields"><label>Categoría<input value={reporte.categoriaId} disabled /></label><label>Descripción<textarea minLength={10} maxLength={2000} rows={6} value={descripcion} onChange={(event) => setDescripcion(event.target.value)} required /></label></div><div className="picker-map real-picker"><MapaSeleccionPunto puntoInicial={coordenadas} onSeleccionar={(lat, lng) => setCoordenadas([lat, lng])} /></div>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}<div className="form-actions"><button type="button" className="ghost-button" onClick={() => navigate(-1)}>Cancelar</button><button className="primary-button" disabled={guardando}>{guardando ? "Guardando…" : "Guardar cambios"}</button></div></form>}</section></PortalShell>
 }
 
 type FiltroMapa = "ACTIVOS" | "TODOS" | EstadoReporte
@@ -677,16 +690,19 @@ export function Login() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [sinConfirmar, setSinConfirmar] = useState(false)
   const [enviando, setEnviando] = useState(false)
   async function enviar(event: FormEvent) {
     event.preventDefault()
     setEnviando(true)
     setError("")
+    setSinConfirmar(false)
     try {
       await login(email, password)
       navigate(rutaSegura(desde), { replace: true })
     } catch (exception) {
       setError(mensajeDe(exception, "No fue posible iniciar sesión."))
+      setSinConfirmar(authApi.esCorreoSinConfirmar(exception))
     } finally {
       setEnviando(false)
     }
@@ -694,34 +710,77 @@ export function Login() {
   return (
     <div className="auth-page">
       <div className="auth-image"><NavLink to="/" className="auth-back">← Volver al inicio</NavLink><div><span>Cartagena se mueve</span><h1>Tu voz también<br />abre caminos.</h1><p>Únete a una comunidad que cuida cada calle, cada barrio y cada trayecto.</p></div></div>
-      <div className="auth-panel"><Logo /><form className="auth-form" onSubmit={enviar}><span className="section-kicker">Bienvenido de vuelta</span><h2>Inicia sesión</h2><p>Consulta tus reportes y sigue sus avances.</p><label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="tu@correo.com" required /></label><label>Contraseña<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required /></label><div className="form-inline"><span /><NavLink to="/recuperar">¿Olvidaste tu contraseña?</NavLink></div>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}<button className="primary-button full" disabled={enviando}>{enviando ? "Entrando…" : "Entrar a VíaCTG"} <Icon name="arrow" /></button><span className="auth-switch">¿Aún no tienes cuenta? <NavLink to="/registro" state={{ desde }}>Crear cuenta</NavLink></span></form></div>
+      <div className="auth-panel"><Logo /><form className="auth-form" onSubmit={enviar}><span className="section-kicker">Bienvenido de vuelta</span><h2>Inicia sesión</h2><p>Consulta tus reportes y sigue sus avances.</p><label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="tu@correo.com" required /></label><label>Contraseña<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required /></label><div className="form-inline"><span /><NavLink to="/recuperar">¿Olvidaste tu contraseña?</NavLink></div>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{sinConfirmar && <ReenviarConfirmacion email={email} />}<button className="primary-button full" disabled={enviando}>{enviando ? "Entrando…" : "Entrar a VíaCTG"} <Icon name="arrow" /></button><span className="auth-switch">¿Aún no tienes cuenta? <NavLink to="/registro" state={{ desde }}>Crear cuenta</NavLink></span></form></div>
     </div>
   )
 }
 
 export function Registro() {
-  const { registro } = useAuth()
-  const navigate = useNavigate()
   const desde = (useLocation().state as { desde?: string } | null)?.desde
   const [nombre, setNombre] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [enviando, setEnviando] = useState(false)
+  // Correo de la cuenta recién creada: la sesión empieza al abrir el enlace de confirmación.
+  const [registrada, setRegistrada] = useState("")
   async function enviar(event: FormEvent) {
     event.preventDefault()
     setEnviando(true)
     setError("")
     try {
-      await registro(nombre, email, password)
-      navigate(rutaSegura(desde), { replace: true })
+      setRegistrada((await authApi.registro(nombre, email, password)).email)
     } catch (exception) {
       setError(mensajeDe(exception, "No fue posible crear la cuenta."))
     } finally {
       setEnviando(false)
     }
   }
-  return <div className="auth-page"><div className="auth-image"><NavLink to="/" className="auth-back">← Volver al inicio</NavLink><div><span>Súmate a la comunidad</span><h1>Una calle mejor empieza contigo.</h1><p>Reporta, confirma y sigue los problemas de tu barrio.</p></div></div><div className="auth-panel"><Logo /><form className="auth-form" onSubmit={enviar}><span className="section-kicker">Nueva cuenta</span><h2>Únete a VíaCTG</h2><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}<button className="primary-button full" disabled={enviando}>{enviando ? "Creando cuenta…" : "Crear mi cuenta"} <Icon name="arrow" /></button><span className="auth-switch">¿Ya tienes cuenta? <NavLink to="/login" state={{ desde }}>Inicia sesión</NavLink></span></form></div></div>
+  return <div className="auth-page"><div className="auth-image"><NavLink to="/" className="auth-back">← Volver al inicio</NavLink><div><span>Súmate a la comunidad</span><h1>Una calle mejor empieza contigo.</h1><p>Reporta, confirma y sigue los problemas de tu barrio.</p></div></div><div className="auth-panel"><Logo />{registrada ? <div className="auth-form"><span className="section-kicker">Último paso</span><h2>Confirma tu correo</h2><p>Te enviamos un enlace a <strong>{registrada}</strong>. Ábrelo para activar tu cuenta: vence en 48 horas. Si no lo ves, revisa la carpeta de correo no deseado.</p><ReenviarConfirmacion email={registrada} /><span className="auth-switch">¿Ya lo confirmaste? <NavLink to="/login" state={{ desde }}>Inicia sesión</NavLink></span></div> : <form className="auth-form" onSubmit={enviar}><span className="section-kicker">Nueva cuenta</span><h2>Únete a VíaCTG</h2><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}<button className="primary-button full" disabled={enviando}>{enviando ? "Creando cuenta…" : "Crear mi cuenta"} <Icon name="arrow" /></button><span className="auth-switch">¿Ya tienes cuenta? <NavLink to="/login" state={{ desde }}>Inicia sesión</NavLink></span></form>}</div></div>
+}
+
+// Pide otro enlace de confirmación. El backend responde igual exista o no la cuenta, así que el aviso es condicional.
+function ReenviarConfirmacion({ email }: { email: string }) {
+  const [fase, setFase] = useState<"inicial" | "enviando" | "enviado">("inicial")
+  const [error, setError] = useState("")
+  async function reenviar() {
+    setFase("enviando")
+    setError("")
+    try {
+      await authApi.reenviarVerificacion(email)
+      setFase("enviado")
+    } catch (exception) {
+      setError(mensajeDe(exception, "No fue posible reenviar el correo."))
+      setFase("inicial")
+    }
+  }
+  if (fase === "enviado") return <div className="success-message" role="status">Si la cuenta de {email} está pendiente de confirmar, te enviamos un enlace nuevo; el anterior deja de funcionar.</div>
+  return <>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}<button type="button" className="ghost-button full" disabled={fase === "enviando"} onClick={reenviar}>{fase === "enviando" ? "Enviando…" : "Reenviar correo de confirmación"}</button></>
+}
+
+export function VerificarCorreo() {
+  const [params] = useSearchParams()
+  const token = params.get("token") ?? ""
+  const { renovarSesion } = useAuth()
+  const [listo, setListo] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState("")
+  // Con un clic y no al cargar la página: el enlace es de un solo uso y un efecto puede ejecutarse dos veces
+  // (modo estricto de React), y así la vista previa de un enlace tampoco confirma la cuenta por su cuenta.
+  async function confirmar(event: FormEvent) {
+    event.preventDefault()
+    setEnviando(true)
+    setError("")
+    try {
+      renovarSesion(await authApi.verificarCorreo(token))
+      setListo(true)
+    } catch (exception) {
+      setError(mensajeDe(exception, "No fue posible confirmar el correo."))
+    } finally {
+      setEnviando(false)
+    }
+  }
+  return <div className="auth-page"><div className="auth-image"><NavLink to="/" className="auth-back">← Volver al inicio</NavLink><div><span>Súmate a la comunidad</span><h1>Un paso más y estás dentro.</h1></div></div><div className="auth-panel"><Logo /><form className="auth-form" onSubmit={confirmar}><span className="section-kicker">Confirmar correo</span><h2>Activa tu cuenta</h2>{listo ? <><div className="success-message" role="status">Tu correo quedó confirmado y ya iniciaste sesión.</div><NavLink className="primary-button full" to="/reportes/nuevo">Reportar un daño <Icon name="arrow" /></NavLink><span className="auth-switch"><NavLink to="/">Ir al inicio</NavLink></span></> : !token ? <div className="alert-panel error-panel">El enlace está incompleto. Ábrelo de nuevo desde el correo que te enviamos.</div> : <><p>Confirma que este correo es tuyo para empezar a reportar y seguir los daños de tu barrio.</p>{error && <><div className="alert-panel error-panel" role="alert">{error}</div><span className="auth-switch">Para pedir un enlace nuevo, <NavLink to="/login">inicia sesión</NavLink> con tu correo y contraseña.</span></>}<button className="primary-button full" disabled={enviando}>{enviando ? "Confirmando…" : "Confirmar mi correo"} <Icon name="arrow" /></button></>}</form></div></div>
 }
 
 export function RecuperarPassword() {
@@ -837,45 +896,45 @@ export function Perfil() {
   const [actual, setActual] = useState("")
   const [nueva, setNueva] = useState("")
   const [confirmacion, setConfirmacion] = useState("")
-  const [mensaje, setMensaje] = useState("")
-  const [error, setError] = useState("")
+  // Cada formulario muestra su resultado junto a su botón: con un solo aviso arriba de la página, quien cambiaba la
+  // contraseña (más abajo) no veía ni el error ni la confirmación y parecía que el botón no hacía nada.
+  const [errorCarga, setErrorCarga] = useState("")
+  const [avisoDatos, setAvisoDatos] = useState<AvisoFormulario | null>(null)
+  const [avisoSeguridad, setAvisoSeguridad] = useState<AvisoFormulario | null>(null)
   useEffect(() => {
-    usuariosApi.perfil().then((dato) => { setUsuario(dato); setNombre(dato.nombre); setTelefono(dato.telefono ?? "") }).catch((exception) => setError(mensajeDe(exception, "No fue posible cargar el perfil.")))
+    usuariosApi.perfil().then((dato) => { setUsuario(dato); setNombre(dato.nombre); setTelefono(dato.telefono ?? "") }).catch((exception) => setErrorCarga(mensajeDe(exception, "No fue posible cargar el perfil.")))
   }, [])
-  function limpiarMensajes() {
-    setMensaje("")
-    setError("")
-  }
   async function guardar(event: FormEvent) {
     event.preventDefault()
-    limpiarMensajes()
+    setAvisoDatos(null)
     try {
       // Un teléfono vacío borra el guardado.
       const actualizado = await usuariosApi.actualizarPerfil({ nombre: nombre.trim(), telefono: telefono.trim() })
       setUsuario(actualizado)
       actualizarNombre(actualizado.nombre)
-      setMensaje("Perfil actualizado.")
-    } catch (exception) { setError(mensajeDe(exception, "No fue posible actualizar el perfil.")) }
+      setAvisoDatos({ tipo: "exito", texto: "Perfil actualizado." })
+    } catch (exception) { setAvisoDatos({ tipo: "error", texto: mensajeDe(exception, "No fue posible actualizar el perfil.") }) }
   }
   async function cambiarClave(event: FormEvent) {
     event.preventDefault()
-    limpiarMensajes()
-    if (nueva !== confirmacion) return setError("Las contraseñas nuevas no coinciden.")
+    setAvisoSeguridad(null)
+    if (nueva !== confirmacion) return setAvisoSeguridad({ tipo: "error", texto: "Las contraseñas nuevas no coinciden." })
     try {
       renovarSesion(await usuariosApi.cambiarPassword(actual, nueva))
-      setActual(""); setNueva(""); setConfirmacion(""); setMensaje("Contraseña actualizada y otras sesiones cerradas.")
-    } catch (exception) { setError(mensajeDe(exception, "No fue posible cambiar la contraseña.")) }
+      setActual(""); setNueva(""); setConfirmacion("")
+      setAvisoSeguridad({ tipo: "exito", texto: "Contraseña actualizada y otras sesiones cerradas." })
+    } catch (exception) { setAvisoSeguridad({ tipo: "error", texto: mensajeDe(exception, "No fue posible cambiar la contraseña.") }) }
   }
   async function cerrarTodo() {
-    limpiarMensajes()
+    setAvisoSeguridad(null)
     if (!window.confirm("¿Cerrar la sesión en todos tus dispositivos, incluido este?")) return
     try {
       await usuariosApi.cerrarSesiones()
       logout()
       navigate("/login")
-    } catch (exception) { setError(mensajeDe(exception, "No fue posible cerrar las sesiones.")) }
+    } catch (exception) { setAvisoSeguridad({ tipo: "error", texto: mensajeDe(exception, "No fue posible cerrar las sesiones.") }) }
   }
-  return <PortalShell eyebrow="Tu espacio ciudadano" title="Mi perfil"><section className="account-layout"><CuentaNav /><div className="profile-stack">{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{mensaje && <div className="success-message" role="status">{mensaje}</div>}<div className="profile-card"><div className="profile-intro"><div className="avatar">{nombre.slice(0, 2).toUpperCase()}</div><div><h2>{usuario?.nombre ?? "Cargando…"}</h2><span>{usuario?.rol} · {usuario?.email}</span></div></div><form className="profile-form" onSubmit={guardar}><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input value={usuario?.email ?? ""} disabled /></label><label>Teléfono<input type="tel" autoComplete="tel" value={telefono} onChange={(event) => setTelefono(event.target.value)} placeholder="Opcional" /></label><button className="primary-button">Guardar cambios</button></form></div><div className="profile-card"><div className="content-heading"><div><h2>Seguridad</h2><p>Cambiar la contraseña invalida las demás sesiones.</p></div></div><form className="profile-form" onSubmit={cambiarClave}><label>Contraseña actual<input type="password" autoComplete="current-password" value={actual} onChange={(event) => setActual(event.target.value)} required /></label><label>Nueva contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={nueva} onChange={(event) => setNueva(event.target.value)} required /></label><label>Confirmar contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required /></label><button className="primary-button">Cambiar contraseña</button></form><button className="danger-link" onClick={cerrarTodo}>Cerrar sesiones en todos los dispositivos</button></div></div></section></PortalShell>
+  return <PortalShell eyebrow="Tu espacio ciudadano" title="Mi perfil"><section className="account-layout"><CuentaNav /><div className="profile-stack">{errorCarga && <div className="alert-panel error-panel" role="alert">{errorCarga}</div>}<div className="profile-card"><div className="profile-intro"><div className="avatar">{nombre.slice(0, 2).toUpperCase()}</div><div><h2>{usuario?.nombre ?? "Cargando…"}</h2><span>{usuario?.rol} · {usuario?.email}</span></div></div><form className="profile-form" onSubmit={guardar}><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input value={usuario?.email ?? ""} disabled /></label><label>Teléfono<input type="tel" autoComplete="tel" value={telefono} onChange={(event) => setTelefono(event.target.value)} placeholder="Opcional" /></label><MensajeFormulario aviso={avisoDatos} /><button className="primary-button">Guardar cambios</button></form></div><div className="profile-card"><div className="content-heading"><div><h2>Seguridad</h2><p>Cambiar la contraseña invalida las demás sesiones.</p></div></div><form className="profile-form" onSubmit={cambiarClave}><label>Contraseña actual<input type="password" autoComplete="current-password" value={actual} onChange={(event) => setActual(event.target.value)} required /></label><label>Nueva contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={nueva} onChange={(event) => setNueva(event.target.value)} required /></label><label>Confirmar contraseña<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required /></label><MensajeFormulario aviso={avisoSeguridad} /><button className="primary-button">Cambiar contraseña</button></form><button className="danger-link" onClick={cerrarTodo}>Cerrar sesiones en todos los dispositivos</button></div></div></section></PortalShell>
 }
 
 export function Admin() {

@@ -1,6 +1,7 @@
 package com.viactg.config;
 
 import com.viactg.exception.BusinessRuleException;
+import com.viactg.exception.InvalidRequestException;
 import com.viactg.service.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ public class AdminInicial implements ApplicationRunner {
         try {
             usuarioService.asegurarAdministrador(email, password, "Administrador");
             log.info("Administrador inicial asegurado: {}", email);
-        } catch (BusinessRuleException invalida) {
+        } catch (BusinessRuleException | InvalidRequestException invalida) {
             // Por ejemplo, una contraseña de más de 72 bytes: se avisa sin impedir que arranque la API.
             log.warn("No se creó el administrador inicial: {}", invalida.getMessage());
         }

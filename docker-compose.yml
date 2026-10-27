@@ -37,6 +37,8 @@ services:
       NOMINATIM_USER_AGENT: "${NOMINATIM_USER_AGENT:-ViaCTG/1.0 (+https://github.com/Reinel-J/RepoViasCTG)}"
       ZONA_HABILITADA: ${ZONA_HABILITADA:-true}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      CIERRE_COMUNITARIO: ${CIERRE_COMUNITARIO:-false}
     ports:
       - "8080:8080"
     volumes:

@@ -38,21 +38,49 @@
 - «Mis reportes» (`GET /api/reportes/mios`, índice `reportes(usuarioId, fechaCreacion)`) y contador de
   notificaciones sin leer (`GET /api/notificaciones/sin-leer`, índice `notificaciones(usuarioId, leida)`) para la
   campana del frontend.
+- Hallazgos de las pruebas de caja negra:
+  - El login cuenta los fallos por correo + IP (5 / 15 min) con un techo de 50 intentos por correo: desde otra red ya
+    no se puede bloquear una cuenta ajena. Restablecer la contraseña quita los bloqueos del correo.
+  - `X-Forwarded-For` solo se acepta de los proxies de `TRUSTED_PROXIES` (vacío por defecto); antes, de cualquier red
+    privada.
+  - Barrios con nombre único (sin tildes ni mayúsculas, índice `nombreClave`) y modificaciones atómicas
+    (`$set`/`$push`/`$pull`) en lugar de `save()`.
+  - Los roles también se exigen por URL en `SecurityConfig`: sin permiso, 403 antes de validar el cuerpo (antes, 400
+    con los errores del formulario).
+  - Contraseña de más de 72 bytes: 400 (antes 409). URL mal formadas: `ErrorResponse` 400 en JSON, tanto las que
+    rechaza el firewall de Spring Security (antes 401 «inicia sesión») como las que rechaza Tomcat (antes su
+    página HTML).
+  - `EditarReporte` avisa al cargar si el reporte no es de quien lo abre o ya no está pendiente.
+- Cierre por la comunidad (opcional): un reporte `EN_PROCESO` se propone como resuelto con ≥ 3 votos «arreglado» y
+  ≥ 75 % (el del autor vale doble, solo votos desde `EN_PROCESO`); 72 horas de gracia con aviso a los moderadores,
+  «Mantener abierto» desde el panel y cierre en la tarea diaria.
+- Revisión del frontend (26 de octubre de 2026): editar un barrio desde el panel borraba todas sus calles (el `PUT`
+  las reemplazaba por la lista vacía). Ahora `PUT /api/barrios/{id}` solo cambia nombre y localidad. En el frontend:
+  los mensajes del perfil y de «Editar reporte» salen junto a su botón (antes, arriba y fuera de la vista); el mapa ya
+  no tapa el menú desplegable; la rueda del mouse solo hace zoom tras un clic en el mapa, y en móvil el mapa de
+  `/mapa` mide el 60 % de la pantalla para que siempre quede por dónde desplazar la página.
+- Verificación del correo al registrarse: enlace de un solo uso (48 h, solo su SHA-256 en `tokens_verificacion`),
+  login bloqueado con 403 hasta confirmar, reenvío con límites, y restablecer la contraseña también confirma el correo
+  (así se recupera una cuenta que otra persona registró con un correo ajeno). Las cuentas anteriores se marcan como
+  verificadas al arrancar (`MigracionEmailVerificado`).
+- Pruebas HTTP de todos los controladores con `@WebMvcTest` y la seguridad real (paquete `controller` de los tests):
+  rutas públicas, 401 sin sesión, 403 por rol, tokens inválidos o revocados, validaciones y códigos de error.
 
 ## Pendiente recomendado
 
 - Migrar a Spring Boot 4.x: toda la rama 3.x quedó sin soporte de código abierto el 30 de junio de 2026
   (3.3.13 es solo el último parche de 3.3). Implica Spring Framework 7, Jackson 3 y springdoc 3.
-- Pruebas de integración con MongoDB desechable (Testcontainers) y pruebas HTTP de seguridad/controladores
-  (`@WebMvcTest`) que verifiquen qué rutas son públicas y cuáles exigen rol.
+- Pruebas de integración con MongoDB desechable (Testcontainers) para índices, consultas geoespaciales y
+  actualizaciones atómicas.
 - Paginación en `GET /api/reportes`, comentarios y notificaciones (el listado y el mapa aún descargan todos).
-- Verificar el correo al registrarse (hoy cualquiera puede registrar un correo ajeno).
 - Quitar también en el servidor los metadatos EXIF de las fotos (hoy lo hace el navegador antes de subirlas).
 - Content-Security-Policy en nginx y, a mediano plazo, sesión en cookie `HttpOnly` en lugar de `localStorage`.
 - No exponer los id internos de usuarios en respuestas públicas: `GET /confirmaciones` (bastan el conteo y
   `confirmadoPorMi`), `ReporteResponse.usuarioId` y sobre todo `ComentarioResponse`, que junta `usuarioId` con
   `usuarioNombre` y permite, sin sesión, listar todos los reportes (con coordenadas) de una persona con nombre.
 - Regla de fotos: permitir a moderadores y restringir por estado del reporte.
+- Borrar las cuentas que nunca confirmaron su correo (por ejemplo, a los 7 días): hoy quedan ocupando el correo hasta
+  que su dueña lo recupera con «¿Olvidaste tu contraseña?».
 - Mover el límite de intentos a un almacén compartido si se despliegan varias réplicas del backend.
 - Configuración por perfiles (`local`, `test`, `prod`) y despliegue automatizado. Hoy los valores por defecto de
   `application.properties` son de desarrollo y en producción una variable olvidada no falla: `MONGODB_URI` cae en
@@ -60,27 +88,12 @@
   queda público. `prod` exigiría esas variables sin valor por defecto (falla al arrancar si faltan), apagaría
   Swagger y bajaría el nivel de log; `test` fijaría un `JWT_SECRET` de prueba y apagaría Nominatim; `local`
   conservaría los valores actuales.
-- Opción de resolver automáticamente un reporte `EN_PROCESO` cuando suficientes votos digan «ya está arreglado».
 - Decidir si el modelo vuelve a relacionar reportes con el catálogo de barrios/calles (hoy usa el barrio de OSM).
 
 ### Hallazgos de las pruebas de caja negra (18 de octubre de 2026)
 
-- **Bloqueo de cuentas ajenas**: 5 contraseñas malas para un correo, desde IPs distintas, bloquean esa cuenta 15
-  minutos también para su dueña (su contraseña correcta recibe 429); repitiéndolo, un moderador queda fuera
-  indefinidamente. `AuthService.login` cuenta los fallos solo por correo (`login-email:`): contarlos por
-  correo + IP y dejar un umbral global por correo mucho más alto.
-- **`X-Forwarded-For` aceptado desde cualquier red privada**: con `server.forward-headers-strategy=native`, Tomcat
-  confía en la cabecera si la conexión viene de 10.x, 172.16–31.x, 192.168.x o 127.x. Como Compose publica el
-  8080 en todas las interfaces, cualquiera en la red local puede saltarse todos los límites por IP (login,
-  registro, recuperación, geocodificación). Al desplegar: que solo el proxy alcance el backend y fijar
-  `server.tomcat.remoteip.internal-proxies` a su IP.
-- **Barrios sin unicidad**: dos `POST /api/barrios` con el mismo nombre crean dos barrios (no hay índice único ni
-  comparación sin tildes/mayúsculas como en categorías), y `BarrioService.actualizar` y el alta de calles usan
-  `save()` sobre el documento existente.
-- Menores: una contraseña de más de 72 bytes da 409 en lugar de 400; una URL mal formada en `/uploads/` devuelve
-  la página HTML de error de Tomcat en vez de `ErrorResponse`; `EditarReporte` (frontend) no comprueba al cargar
-  si el reporte sigue `PENDIENTE` ni si quien edita es el autor (el backend sí lo impide, pero el aviso llega al
-  guardar).
+Corregidos el 26 de octubre de 2026 (ver «Completado»). Queda una tarea de despliegue: si se pone un proxy inverso
+delante del backend, definir `TRUSTED_PROXIES` con su IP y no publicar el puerto 8080 a otras máquinas.
 
 ## Decisiones vigentes
 
@@ -88,7 +101,8 @@
 - Las categorías se activan o desactivan; no se eliminan físicamente.
 - Los reportes no exponen una operación de borrado y los rechazados se conservan.
 - La integridad referencial se valida desde los servicios porque MongoDB no la impone.
-- Los votos «¿ya lo arreglaron?» no cambian el estado del reporte; lo decide un moderador.
+- Los votos «¿ya lo arreglaron?» no cambian el estado del reporte; lo decide un moderador. Excepción opcional, apagada
+  por defecto: el cierre por la comunidad (`CIERRE_COMUNITARIO`), con 72 horas para que un moderador lo evite.
 - La persistencia es MongoDB (no PostgreSQL/JPA/Flyway como plantea el documento de visión); ver la sección de
   decisiones del README raíz.
 - Toda modificación de un documento existente usa actualizaciones parciales atómicas, no `save()`.

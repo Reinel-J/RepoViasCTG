@@ -12,3 +12,4 @@ public class ViactgApplication {
         SpringApplication.run(ViactgApplication.class, args);
     }
 }
+

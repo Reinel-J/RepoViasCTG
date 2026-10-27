@@ -6,6 +6,7 @@ import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.TooManyRequestsException;
 import com.viactg.model.Confirmacion;
 import com.viactg.model.EstadoReporte;
+import com.viactg.model.HistorialEstado;
 import com.viactg.model.Reporte;
 import com.viactg.repository.ConfirmacionRepository;
 import com.viactg.repository.ReporteRepository;
@@ -286,6 +287,44 @@ class ReporteServiceTests {
 
         verify(notificacionService).crear("autor-1", "reporte-1", "Tu reporte \"Hueco grande\" cambió a en revisión");
         verify(confirmacionRepository, never()).findByReporteId(anyString());
+    }
+
+    @Test
+    void cerrarPorLaComunidadResuelveDesdeEnProcesoSinModeradorYNotifica() {
+        Reporte reporte = Reporte.builder().id("reporte-1").usuarioId("autor-1").estado(EstadoReporte.EN_PROCESO).build();
+        Reporte actualizado = Reporte.builder().id("reporte-1").usuarioId("autor-1").descripcion("Hueco grande")
+                .estado(EstadoReporte.RESUELTO).build();
+        when(reporteRepository.findById("reporte-1")).thenReturn(Optional.of(reporte));
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Reporte.class)))
+                .thenReturn(actualizado);
+        when(confirmacionRepository.findByReporteId("reporte-1")).thenReturn(List.of(
+                Confirmacion.builder().reporteId("reporte-1").usuarioId("vecina-1").build()));
+
+        crearServicio().cerrarPorLaComunidad("reporte-1", "Resuelto por la comunidad: 3 voto(s)");
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).findAndModify(query.capture(), update.capture(), any(FindAndModifyOptions.class), eq(Reporte.class));
+        // Solo si sigue en proceso: si un moderador lo cambió a la vez, su decisión prevalece.
+        assertThat(query.getValue().getQueryObject()).containsEntry("estado", EstadoReporte.EN_PROCESO);
+        Document cambios = update.getValue().getUpdateObject();
+        assertThat(cambios.get("$set", Document.class)).containsEntry("estado", EstadoReporte.RESUELTO);
+        assertThat(cambios.get("$unset", Document.class)).containsKey("cierreComunitarioDesde");
+        HistorialEstado historial = (HistorialEstado) cambios.get("$push", Document.class).get("historialEstados");
+        assertThat(historial.getUsuarioAdminId()).isNull();
+        assertThat(historial.getComentarioAdmin()).isEqualTo("Resuelto por la comunidad: 3 voto(s)");
+        verify(usuarioService, never()).esAdministradorOModerador(any());
+        verify(notificacionService).crear("autor-1", "reporte-1", "Tu reporte \"Hueco grande\" cambió a resuelto");
+        verify(notificacionService).crear(eq("vecina-1"), eq("reporte-1"), anyString());
+    }
+
+    @Test
+    void soloUnReporteEnProcesoPuedeCerrarsePorLaComunidad() {
+        when(reporteRepository.findById("reporte-1")).thenReturn(Optional.of(
+                Reporte.builder().id("reporte-1").estado(EstadoReporte.EN_REVISION).build()));
+
+        assertThatThrownBy(() -> crearServicio().cerrarPorLaComunidad("reporte-1", "x")).isInstanceOf(BusinessRuleException.class);
+        verify(mongoTemplate, never()).findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Reporte.class));
     }
 
     @Test

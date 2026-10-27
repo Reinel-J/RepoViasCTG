@@ -4,6 +4,7 @@ import com.mongodb.client.result.UpdateResult;
 import com.viactg.exception.BusinessRuleException;
 import com.viactg.model.Confirmacion;
 import com.viactg.model.EstadoReporte;
+import com.viactg.model.HistorialEstado;
 import com.viactg.model.Reporte;
 import com.viactg.model.Seguimiento;
 import com.viactg.model.Usuario;
@@ -11,6 +12,7 @@ import com.viactg.repository.ConfirmacionRepository;
 import com.viactg.repository.ReporteRepository;
 import com.viactg.repository.SeguimientoRepository;
 import com.viactg.repository.UsuarioRepository;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -20,6 +22,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -30,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -45,6 +49,7 @@ class SeguimientoServiceTests {
     private NotificacionService notificacionService;
     private CorreoService correoService;
     private MongoTemplate mongoTemplate;
+    private ReporteService reporteService;
     private SeguimientoService service;
 
     @BeforeEach
@@ -56,8 +61,15 @@ class SeguimientoServiceTests {
         notificacionService = mock(NotificacionService.class);
         correoService = mock(CorreoService.class);
         mongoTemplate = mock(MongoTemplate.class);
-        service = new SeguimientoService(seguimientoRepository, reporteRepository, confirmacionRepository, usuarioRepository,
-                notificacionService, correoService, mongoTemplate, 30, "http://localhost:5173/");
+        reporteService = mock(ReporteService.class);
+        service = servicio(true);
+    }
+
+    // Cierre por la comunidad con los valores por defecto: 3 votos, 75 % y 72 horas de gracia.
+    private SeguimientoService servicio(boolean cierreHabilitado) {
+        return new SeguimientoService(seguimientoRepository, reporteRepository, confirmacionRepository, usuarioRepository,
+                notificacionService, correoService, mongoTemplate, reporteService, 30, "http://localhost:5173/",
+                cierreHabilitado, 3, 0.75, 72);
     }
 
     @Test
@@ -131,6 +143,186 @@ class SeguimientoServiceTests {
 
         assertThat(service.enviarRecordatorios(AHORA)).isZero();
         verify(notificacionService, never()).crear(anyString(), anyString(), anyString());
+    }
+
+    // --- Cierre por la comunidad ---
+
+    private static final Instant EN_PROCESO_DESDE = AHORA.minus(Duration.ofDays(5));
+
+    private Reporte enProceso(Instant cierreDesde, Instant vetadoEn) {
+        HistorialEstado aProceso = new HistorialEstado("h1", "moderador", EstadoReporte.EN_REVISION, EstadoReporte.EN_PROCESO, null, EN_PROCESO_DESDE);
+        Reporte reporte = Reporte.builder().id("r1").usuarioId("autor").descripcion("Hueco en la avenida").estado(EstadoReporte.EN_PROCESO)
+                .historialEstados(new ArrayList<>(List.of(aProceso))).cierreComunitarioDesde(cierreDesde).cierreComunitarioVetadoEn(vetadoEn).build();
+        when(reporteRepository.findById("r1")).thenReturn(Optional.of(reporte));
+        return reporte;
+    }
+
+    private void votos(Seguimiento... votos) {
+        when(seguimientoRepository.findByReporteId("r1")).thenReturn(List.of(votos));
+    }
+
+    private static Seguimiento voto(String usuarioId, boolean arreglado, Instant fecha) {
+        return Seguimiento.builder().reporteId("r1").usuarioId(usuarioId).arreglado(arreglado).fecha(fecha).build();
+    }
+
+    private static Seguimiento votoReciente(String usuarioId, boolean arreglado) {
+        return voto(usuarioId, arreglado, EN_PROCESO_DESDE.plus(Duration.ofDays(1)));
+    }
+
+    private void marcarDevuelve(long modificados) {
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(Reporte.class)))
+                .thenReturn(UpdateResult.acknowledged(modificados, modificados, null));
+    }
+
+    private Update unicaActualizacionDelReporte(ArgumentCaptor<Query> query) {
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).updateFirst(query.capture(), update.capture(), eq(Reporte.class));
+        return update.getValue();
+    }
+
+    @Test
+    void unVotoQueCompletaLaReglaProponeElCierreYAvisaALosModeradores() {
+        enProceso(null, null);
+        // El autor cuenta doble: autor + un vecino = 3 votos «arreglado».
+        votos(votoReciente("autor", true), votoReciente("vecino", true));
+        marcarDevuelve(1);
+        when(usuarioRepository.findByRolInAndActivoTrue(any())).thenReturn(List.of(usuario("moderadora", true)));
+
+        service.responder("r1", "vecino", true);
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        Update update = unicaActualizacionDelReporte(query);
+        // Solo marca si sigue en proceso y nadie lo marcó antes.
+        assertThat(query.getValue().getQueryObject()).containsEntry("estado", EstadoReporte.EN_PROCESO).containsEntry("cierreComunitarioDesde", null);
+        assertThat(update.getUpdateObject().get("$set", Document.class)).containsKey("cierreComunitarioDesde");
+        verify(notificacionService).crear(eq("moderadora"), eq("r1"), contains("Se cerrará solo el"));
+    }
+
+    @Test
+    void siOtraPeticionYaLoPropusoNoSeAvisaDosVeces() {
+        enProceso(null, null);
+        votos(votoReciente("autor", true), votoReciente("vecino", true));
+        marcarDevuelve(0);
+
+        service.responder("r1", "vecino", true);
+
+        verify(notificacionService, never()).crear(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void unVotoSigueIgualQueRompeLaReglaQuitaLaPropuesta() {
+        enProceso(AHORA, null);
+        votos(votoReciente("v1", true), votoReciente("v2", true), votoReciente("v3", true),
+                votoReciente("v4", false), votoReciente("v5", false));
+
+        service.responder("r1", "v5", false);
+
+        Update update = unicaActualizacionDelReporte(ArgumentCaptor.forClass(Query.class));
+        assertThat(update.getUpdateObject().get("$unset", Document.class)).containsKey("cierreComunitarioDesde");
+    }
+
+    @Test
+    void losVotosAnterioresAEnProcesoNoCuentan() {
+        enProceso(null, null);
+        Instant antes = EN_PROCESO_DESDE.minus(Duration.ofDays(2));
+        votos(voto("v1", true, antes), voto("v2", true, antes), voto("v3", true, antes));
+
+        service.responder("r1", "v3", true);
+
+        verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(Reporte.class));
+    }
+
+    @Test
+    void trasMantenerloAbiertoSoloCuentanLosVotosPosteriores() {
+        Instant veto = EN_PROCESO_DESDE.plus(Duration.ofDays(2));
+        enProceso(null, veto);
+        // Tres votos entre EN_PROCESO y el veto, y solo uno después: no alcanza.
+        votos(votoReciente("v1", true), votoReciente("v2", true), votoReciente("v3", true),
+                voto("v4", true, veto.plus(Duration.ofHours(1))));
+
+        service.responder("r1", "v4", true);
+
+        verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(Reporte.class));
+    }
+
+    @Test
+    void conElCierreApagadoLosVotosNoProponenNada() {
+        service = servicio(false);
+        enProceso(AHORA, null);
+        votos(votoReciente("autor", true), votoReciente("vecino", true));
+
+        SeguimientoService.Resumen resumen = service.responder("r1", "vecino", true);
+
+        verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(Reporte.class));
+        assertThat(resumen.cierrePrevisto()).isNull();
+        assertThat(service.aplicarCierresComunitarios(AHORA)).isZero();
+        verify(mongoTemplate, never()).find(any(Query.class), eq(Reporte.class));
+    }
+
+    @Test
+    void elResumenIndicaCuandoSeCerraraSolo() {
+        enProceso(AHORA, null);
+
+        assertThat(service.resumen("r1", null).cierrePrevisto()).isEqualTo(AHORA.plus(Duration.ofHours(72)));
+    }
+
+    @Test
+    void laTareaCierraLasPropuestasConLaGraciaVencidaQueSiguenCumpliendo() {
+        Reporte reporte = enProceso(AHORA.minus(Duration.ofHours(73)), null);
+        votos(votoReciente("autor", true), votoReciente("vecino", true), votoReciente("otro", false));
+        when(mongoTemplate.find(any(Query.class), eq(Reporte.class))).thenReturn(List.of(reporte));
+
+        assertThat(service.aplicarCierresComunitarios(AHORA)).isEqualTo(1);
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(query.capture(), eq(Reporte.class));
+        assertThat(query.getValue().getQueryObject().toString()).contains("EN_PROCESO", "cierreComunitarioDesde", "$lte",
+                AHORA.minus(Duration.ofHours(72)).toString());
+        verify(reporteService).cerrarPorLaComunidad(eq("r1"), contains("3 voto(s) dicen que ya está arreglado y 1 que sigue igual"));
+    }
+
+    @Test
+    void laTareaNoCierraSiAlVencerLaGraciaYaNoCumpleLaRegla() {
+        Reporte reporte = enProceso(AHORA.minus(Duration.ofHours(80)), null);
+        votos(votoReciente("autor", true), votoReciente("vecino", true), votoReciente("v2", false), votoReciente("v3", false));
+        when(mongoTemplate.find(any(Query.class), eq(Reporte.class))).thenReturn(List.of(reporte));
+
+        assertThat(service.aplicarCierresComunitarios(AHORA)).isZero();
+
+        verify(reporteService, never()).cerrarPorLaComunidad(anyString(), anyString());
+        Update update = unicaActualizacionDelReporte(ArgumentCaptor.forClass(Query.class));
+        assertThat(update.getUpdateObject().get("$unset", Document.class)).containsKey("cierreComunitarioDesde");
+    }
+
+    @Test
+    void siUnModeradorCambioElEstadoAntesLaTareaSigueConLosDemas() {
+        Reporte reporte = enProceso(AHORA.minus(Duration.ofHours(73)), null);
+        votos(votoReciente("autor", true), votoReciente("vecino", true));
+        when(mongoTemplate.find(any(Query.class), eq(Reporte.class))).thenReturn(List.of(reporte));
+        doThrow(new BusinessRuleException("El reporte cambió de estado")).when(reporteService).cerrarPorLaComunidad(anyString(), anyString());
+
+        assertThat(service.aplicarCierresComunitarios(AHORA)).isZero();
+    }
+
+    @Test
+    void mantenerAbiertoQuitaLaPropuestaYGuardaElMomentoDelVeto() {
+        enProceso(AHORA, null);
+
+        service.mantenerAbierto("r1");
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        Update update = unicaActualizacionDelReporte(query);
+        assertThat(query.getValue().getQueryObject()).containsEntry("estado", EstadoReporte.EN_PROCESO);
+        assertThat(update.getUpdateObject().get("$unset", Document.class)).containsKey("cierreComunitarioDesde");
+        assertThat(update.getUpdateObject().get("$set", Document.class)).containsKey("cierreComunitarioVetadoEn");
+    }
+
+    @Test
+    void mantenerAbiertoUnReporteQueNoEstaEnProcesoFalla() {
+        when(reporteRepository.findById("r1")).thenReturn(Optional.of(Reporte.builder().id("r1").estado(EstadoReporte.RESUELTO).build()));
+
+        assertThatThrownBy(() -> service.mantenerAbierto("r1")).isInstanceOf(BusinessRuleException.class);
+        verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(Reporte.class));
     }
 
     private Usuario usuario(String id, boolean activo) {

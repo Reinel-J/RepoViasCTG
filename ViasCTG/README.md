@@ -14,7 +14,7 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
-Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque el registro no verifica el correo y otra persona pudo crear antes esa cuenta; un administrador existente conserva su contraseña), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión si el catálogo está vacío) y `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`).
+Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque otra persona pudo registrar antes ese correo; un administrador existente conserva su contraseña; esa cuenta queda con el correo verificado), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `CIERRE_COMUNITARIO` (`false` por defecto; `true` permite que los votos cierren un reporte en proceso, ver «¿Ya lo arreglaron?») con `CIERRE_COMUNITARIO_MINIMO` (`3`), `CIERRE_COMUNITARIO_PROPORCION` (`0.75`) y `CIERRE_COMUNITARIO_GRACIA_HORAS` (`72`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión si el catálogo está vacío) `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`) y `TRUSTED_PROXIES` (IP del proxy inverso cuyo `X-Forwarded-For` se acepta, como expresión regular; vacía por defecto: no se confía en ninguno).
 
 No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`, y los de consulta `reportes(estado, fechaCreacion)`, `reportes.fechaCreacion`, `reportes(usuarioId, fechaCreacion)`, `comentarios(reporteId, fecha)`, `notificaciones(usuarioId, fecha)` y `notificaciones(usuarioId, leida)`.
 
@@ -24,7 +24,7 @@ No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices
 
 El código se organiza bajo `com.viactg` por responsabilidad: `controller`, `service`, `repository`, `model`, `dto`, `mapper`, `security`, `exception` y `config`. Los controladores solo usan DTOs; los servicios concentran reglas de negocio y validan referencias MongoDB.
 
-`Calle` está embebida en `Barrio`, y `HistorialEstado` en `Reporte`. Las demás entidades tienen su propia colección.
+`Calle` está embebida en `Barrio`, y `HistorialEstado` en `Reporte`. Las demás entidades tienen su propia colección. El nombre de un barrio es único sin distinguir tildes, mayúsculas ni espacios repetidos (`nombreClave`, índice único); las calles se agregan y quitan con `$push`/`$pull` atómicos desde sus propios endpoints. `PUT /api/barrios/{id}` solo cambia nombre y localidad (si el cuerpo trae `calles`, responde `400`): antes las reemplazaba y, como el panel no las envía, editar un barrio borraba todas sus calles.
 
 El cliente React vive en el directorio hermano `../FrontEnd`. Consume esta API en desarrollo desde `http://localhost:5173` y usa `http://localhost:8080/api` como URL base.
 
@@ -90,13 +90,23 @@ confirmar» en vez de crear un reporte repetido (`DuplicadoService`).
 
 - `POST /api/reportes/{id}/seguimiento` con `{"arreglado": true|false}` registra o cambia el voto del usuario
   (uno por usuario y reporte, colección `seguimientos`). Solo para reportes activos (si no, `409`).
-- `GET /api/reportes/{id}/seguimiento` (público) devuelve `{reporteId, arreglado, sigue, ultimaRespuesta, miRespuesta}`.
-- Los votos **no cambian el estado**: son una señal para el moderador, que los ve en
+- `GET /api/reportes/{id}/seguimiento` (público) devuelve `{reporteId, arreglado, sigue, ultimaRespuesta, miRespuesta,
+  cierrePrevisto}`.
+- Por defecto los votos **no cambian el estado**: son una señal para el moderador, que los ve en
   `GET /api/admin/reportes/seguimiento` (una agregación `$group` por reporte).
+- **Cierre por la comunidad** (opcional, `CIERRE_COMUNITARIO=true`): un reporte `EN_PROCESO` pasa a ser candidato a
+  cierre cuando, contando solo los votos emitidos desde que pasó a `EN_PROCESO`, hay al menos 3 votos «ya está
+  arreglado» y son al menos el 75 % (el voto del autor cuenta doble; `CierreComunitario` es la regla, pura y probada caso
+  por caso). Se avisa a los moderadores y `cierrePrevisto` indica cuándo se cerrará: si en 72 horas nadie vota «sigue
+  igual» (lo que puede romper la regla) ni un moderador usa `POST /api/admin/reportes/{id}/mantener-abierto`, la tarea
+  diaria lo pasa a `RESUELTO` con el comentario «Resuelto por la comunidad: …» y avisa como cualquier cierre.
+  «Mantener abierto» descarta la propuesta y desde ese momento solo cuentan los votos nuevos. Umbrales configurables con
+  `CIERRE_COMUNITARIO_MINIMO`, `CIERRE_COMUNITARIO_PROPORCION` y `CIERRE_COMUNITARIO_GRACIA_HORAS`.
 - Una tarea diaria (`SeguimientoService.tareaDiaria`) busca reportes activos sin cambios ni recordatorios en
   `SEGUIMIENTO_DIAS` y avisa al autor y a quienes lo confirmaron, con notificación y correo. Cada reporte se
   marca en `fechaUltimoSeguimiento` antes de avisar, así que dos ejecuciones no envían el mismo aviso.
-  `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) la ejecuta en el momento.
+  La misma tarea aplica los cierres por la comunidad cuya espera venció. `POST /api/admin/reportes/seguimiento/recordatorios`
+  (`ADMIN`) la ejecuta en el momento y devuelve `{reportesRecordados, reportesCerrados}`.
 
 ### Estadísticas
 
@@ -117,15 +127,16 @@ activos en celdas de ~110 m (coordenadas redondeadas a 3 decimales).
 | Ejecutar los recordatorios de seguimiento en el momento | `ADMIN` |
 | Administrar barrios, calles y categorías; listar usuarios, cambiar su rol y activarlos/desactivarlos | `ADMIN` |
 
-El registro público crea un usuario `CIUDADANO`. El primer `ADMIN` se crea con `ADMIN_EMAIL`/`ADMIN_PASSWORD`. Un administrador no puede cambiar su propio rol ni desactivarse. Los permisos se leen de la base en cada petición: un cambio de rol o una desactivación aplica de inmediato, incluso sobre tokens ya emitidos (un usuario desactivado recibe 401). Usa el JWT recibido en el encabezado `Authorization: Bearer <token>`.
+Los roles se exigen por URL en `SecurityConfig` (antes de leer el cuerpo, así que sin permiso la respuesta es `403` y no errores de validación) y otra vez con `@PreAuthorize` en los controladores. El registro público crea un usuario `CIUDADANO` con el correo sin confirmar. El primer `ADMIN` se crea con `ADMIN_EMAIL`/`ADMIN_PASSWORD`. Un administrador no puede cambiar su propio rol ni desactivarse. Los permisos se leen de la base en cada petición: un cambio de rol o una desactivación aplica de inmediato, incluso sobre tokens ya emitidos (un usuario desactivado recibe 401). Usa el JWT recibido en el encabezado `Authorization: Bearer <token>`.
 
 ## Protección de cuentas
 
-- `security/LimitadorIntentos` cuenta intentos por clave en una ventana deslizante en memoria (sirve para una sola instancia). Verificar y registrar es una sola operación atómica, así que enviar intentos en paralelo no permite superar el máximo; el login cuenta cada intento antes de comparar la contraseña y lo borra si es correcta. Se aplica al login (20 por IP y 5 fallos por correo / 15 min), registro (5 por IP / hora), recuperación (5 por IP y 3 por correo / hora), cambio de contraseña (5 fallos / 15 min), creación de reportes (10 por usuario / hora), comentarios (20 por usuario / 10 min) y geocodificación pública (30 por IP / minuto). Excederlo responde `429`.
+- `security/LimitadorIntentos` cuenta intentos por clave en una ventana deslizante en memoria (sirve para una sola instancia). Verificar y registrar es una sola operación atómica, así que enviar intentos en paralelo no permite superar el máximo; el login cuenta cada intento antes de comparar la contraseña y lo borra si es correcta. Se aplica al login (20 por IP, 5 fallos por correo desde una misma IP y un techo de 50 intentos por correo / 15 min: así nadie puede bloquear una cuenta ajena desde su propia red; restablecer la contraseña quita los bloqueos de ese correo), registro (5 por IP / hora), recuperación y reenvío de la confirmación (5 por IP y 3 por correo / hora cada uno), cambio de contraseña (5 fallos / 15 min), creación de reportes (10 por usuario / hora), comentarios (20 por usuario / 10 min) y geocodificación pública (30 por IP / minuto). Excederlo responde `429`.
 - Usuarios y reportes se modifican con actualizaciones parciales atómicas (`$set`/`$inc`/`$push` con `findAndModify`), nunca reescribiendo el documento completo: un cambio de perfil no deshace una desactivación hecha a la vez, ni editar un reporte o subir fotos revierte un cambio de estado o su historial.
-- BCrypt solo usa 72 bytes: contraseñas más largas (las letras con tilde cuentan doble) se rechazan con `409` y un mensaje claro.
-- Detrás de un proxy, `server.forward-headers-strategy=native` toma la IP real de `X-Forwarded-For` solo si viene de un proxy interno.
+- BCrypt solo usa 72 bytes: contraseñas más largas (las letras con tilde cuentan doble) se rechazan con `400` y un mensaje claro.
+- La IP de cada petición es la de la conexión: `X-Forwarded-For` se ignora salvo que la conexión venga de una IP que coincida con `TRUSTED_PROXIES` (expresión regular, por ejemplo `172\.18\.0\.5`; vacía por defecto). Antes Tomcat confiaba en cualquier red privada, y desde la red local se podían saltar todos los límites por IP. Si pones un proxy delante, fija ahí su IP y haz que solo él alcance el puerto del backend.
 - El JWT incluye el claim `ver` con `Usuario.versionToken`; el filtro rechaza tokens con una versión distinta. Cambiar o restablecer la contraseña y `cerrar-sesiones` incrementan la versión.
+- Verificación del correo: el registro no inicia sesión; crea la cuenta con `emailVerificado=false` y envía `FRONTEND_URL/verificar-correo?token=…` (válido 48 horas, `app.email-verification.expiration-hours`; un solo uso; solo el SHA-256 se guarda en `tokens_verificacion`, índice TTL). `POST /api/auth/verificar` confirma el correo y devuelve el JWT. Hasta entonces el login responde `403` con la contraseña correcta (con una incorrecta, el `401` de siempre, así que no revela nada). `POST /api/auth/reenviar-verificacion` responde siempre `202` (3 por correo y 5 por IP / hora) e invalida el enlace anterior. Restablecer la contraseña también confirma el correo: si alguien registró un correo ajeno, su dueña recupera la cuenta con «¿Olvidaste tu contraseña?» y la contraseña del intruso deja de valer. Al arrancar, `MigracionEmailVerificado` marca como verificadas las cuentas anteriores a esta función.
 - La recuperación genera 32 bytes aleatorios, guarda solo su SHA-256 en `tokens_recuperacion` (índice TTL) y envía `FRONTEND_URL/restablecer?token=…`. Sin SMTP configurado (`SPRING_MAIL_HOST`), el enlace se registra en el log.
 
 ## Errores
@@ -140,9 +151,9 @@ Toda respuesta de error tiene el mismo cuerpo, con el mensaje en español y pens
 
 | Código | Cuándo |
 |--------|--------|
-| 400 | Campos inválidos (detalle por campo en `validationErrors`), JSON ilegible, parámetro faltante o con valor no válido |
+| 400 | Campos inválidos (detalle por campo en `validationErrors`), JSON ilegible, parámetro faltante o con valor no válido, contraseña de más de 72 bytes, URL mal formada (también las que Tomcat rechaza antes de llegar a Spring) |
 | 401 | Sin token, token vencido o revocado, o credenciales incorrectas en el login |
-| 403 | Sesión válida sin permiso para la operación |
+| 403 | Sesión válida sin permiso para la operación (se decide antes de validar el cuerpo) |
 | 404 | El recurso o la dirección no existe |
 | 405 / 415 | Método o tipo de contenido no admitido |
 | 409 | Regla de negocio (transición no permitida, máximo de fotos, duplicados…) |
@@ -157,7 +168,7 @@ defecto de Bean Validation sale en inglés.
 
 | Recurso | Rutas |
 | --- | --- |
-| Autenticación | `POST /api/auth/registro`, `POST /api/auth/login`, `POST /api/auth/recuperar` (`{"email"}`, siempre `202`), `POST /api/auth/restablecer` (`{"token","passwordNueva"}`) |
+| Autenticación | `POST /api/auth/registro` (devuelve el usuario, sin token), `POST /api/auth/verificar` (`{"token"}`, devuelve el JWT), `POST /api/auth/reenviar-verificacion` (`{"email"}`, siempre `202`), `POST /api/auth/login`, `POST /api/auth/recuperar` (`{"email"}`, siempre `202`), `POST /api/auth/restablecer` (`{"token","passwordNueva"}`) |
 | Perfil y usuarios | `GET/PUT /api/usuarios/me`, `PUT /api/usuarios/me/password` (`{"passwordActual","passwordNueva"}`, devuelve un token nuevo), `POST /api/usuarios/me/cerrar-sesiones`; `GET /api/usuarios`, `PATCH /api/usuarios/{id}/rol` (`{"rol":"MODERADOR"}`), `PATCH /api/usuarios/{id}/activo?activo=false` (`ADMIN`) |
 | Reportes | `GET/POST /api/reportes` (del más reciente al más antiguo; `?estado=` y `?limite=` opcionales), `GET /api/reportes/mios` (los del usuario autenticado, del más reciente al más antiguo; `?estado=` opcional; exige sesión aunque los demás GET de reportes sean públicos), `GET /api/reportes/resumen` (cifras de la portada), `GET /api/reportes/cercanos` (radio máximo 50 km), `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
 | Seguimiento | `GET/POST /api/reportes/{reporteId}/seguimiento` |
@@ -179,6 +190,9 @@ La documentación interactiva está en `http://localhost:8080/swagger-ui/index.h
 ./mvnw test
 ./mvnw clean verify
 ```
+
+Las pruebas no necesitan MongoDB: las de servicios usan Mockito y las de `controller/` levantan solo la capa web con
+`@WebMvcTest` (seguridad, filtro JWT y manejo de errores reales; servicios simulados).
 
 ## Desarrollo con frontend
 

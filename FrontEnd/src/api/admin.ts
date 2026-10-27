@@ -43,9 +43,16 @@ export async function seguimientos(): Promise<SeguimientoResumenResponse[]> {
   return response.data
 }
 
-export async function enviarRecordatorios(): Promise<number> {
-  const response = await client.post<{ reportesRecordados: number }>('/admin/reportes/seguimiento/recordatorios')
-  return response.data.reportesRecordados
+// Ejecuta ya la tarea diaria: recordatorios y cierres por la comunidad cuya espera venció.
+export async function enviarRecordatorios(): Promise<{ reportesRecordados: number; reportesCerrados: number }> {
+  const response = await client.post<{ reportesRecordados: number; reportesCerrados: number }>('/admin/reportes/seguimiento/recordatorios')
+  return response.data
+}
+
+// Descarta la propuesta de cierre por los votos: solo contarán los que lleguen desde ahora.
+export async function mantenerAbierto(reporteId: string): Promise<SeguimientoResumenResponse> {
+  const response = await client.post<SeguimientoResumenResponse>(`/admin/reportes/${reporteId}/mantener-abierto`)
+  return response.data
 }
 
 export async function listarUsuarios(): Promise<UsuarioResponse[]> {

@@ -92,6 +92,21 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
     }
   }
 
+  async function mantenerAbierto(reporte: ReporteResponse) {
+    setProcesandoId(reporte.id)
+    setError("")
+    setAviso("")
+    try {
+      const seguimiento = await adminApi.mantenerAbierto(reporte.id)
+      setSeguimientos((actuales) => ({ ...actuales, [reporte.id]: seguimiento }))
+      setAviso("Propuesta de cierre descartada: desde ahora solo cuentan los votos nuevos.")
+    } catch (exception) {
+      setError(mensajeError(exception, "No fue posible mantener abierto el reporte."))
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
   async function alternarHistorial(id: string) {
     if (historiales[id]) {
       setHistoriales((actuales) => sinClave(actuales, id))
@@ -146,6 +161,12 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
                 </div>
                 <h2><Link to={`/reportes/${reporte.id}`}>{reporte.descripcion}</Link></h2>
                 <p>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(5)}, ${reporte.longitud.toFixed(5)}`} · {new Date(reporte.fechaCreacion).toLocaleDateString("es-CO")} · {reporte.fotos.length} foto(s)</p>
+                {reporte.estado === "EN_PROCESO" && seguimientos[reporte.id]?.cierrePrevisto && (
+                  <div className="community-closure">
+                    <span>La comunidad dice que ya está arreglado: se cerrará solo el <strong>{new Date(seguimientos[reporte.id].cierrePrevisto!).toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}</strong> si nadie lo desmiente.</span>
+                    <button className="button button-ghost button-small" disabled={ocupado} onClick={() => mantenerAbierto(reporte)}>Mantener abierto</button>
+                  </div>
+                )}
                 <button className="text-button" onClick={() => alternarHistorial(reporte.id)}>{historiales[reporte.id] ? "Ocultar historial" : "Ver historial"}</button>
                 {historiales[reporte.id] && (
                   <ol className="admin-history">

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "ViaCTG",
-    "description": "Backend ViaCTG. Haz Login (o Registro) primero: el token se guarda en {{token}} y la colección lo envía como Bearer en todas las peticiones. Las carpetas marcadas (ADMIN/MODERADOR) exigen ese rol: un usuario nuevo es CIUDADANO.",
+    "description": "Backend ViaCTG. Haz Login primero (una cuenta nueva necesita Registro y luego «Confirmar correo»): el token se guarda en {{token}} y la colección lo envía como Bearer en todas las peticiones. Las carpetas marcadas (ADMIN/MODERADOR) exigen ese rol: un usuario nuevo es CIUDADANO.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,6 +11,10 @@
     },
     {
       "key": "token",
+      "value": ""
+    },
+    {
+      "key": "tokenVerificacion",
       "value": ""
     },
     {
@@ -63,10 +67,38 @@
                 "registro"
               ]
             },
-            "description": "Crea un usuario CIUDADANO y devuelve el JWT (se guarda en {{token}}). 409 si el correo ya existe.",
+            "description": "Crea un usuario CIUDADANO sin confirmar y envía el enlace de confirmación al correo (sin SMTP configurado, el enlace aparece en el log del backend). No devuelve token: copia el token del enlace en {{tokenVerificacion}} y ejecuta «Confirmar correo». 409 si el correo ya existe.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nombre\": \"Usuario Postman\",\n  \"email\": \"postman@test.com\",\n  \"password\": \"Password123\",\n  \"telefono\": \"300 123 4567\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Confirmar correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verificar"
+              ]
+            },
+            "description": "Confirma el correo con el token del enlace /verificar-correo?token=… y devuelve el JWT (se guarda en {{token}}). El enlace es de un solo uso y vence a las 48 horas (409 si no es válido).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{tokenVerificacion}}\"\n}"
             }
           },
           "event": [
@@ -81,6 +113,34 @@
               }
             }
           ]
+        },
+        {
+          "name": "Reenviar correo de confirmación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/reenviar-verificacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "reenviar-verificacion"
+              ]
+            },
+            "description": "Envía un enlace nuevo si la cuenta existe y está sin confirmar (el anterior deja de valer). Siempre responde 202, para no revelar qué cuentas existen; máximo 3 por correo y 5 por IP cada hora.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman@test.com\"\n}"
+            }
+          }
         },
         {
           "name": "Login",
@@ -103,7 +163,7 @@
                 "login"
               ]
             },
-            "description": "Devuelve el JWT (se guarda en {{token}}). 401 si las credenciales son inválidas.",
+            "description": "Devuelve el JWT (se guarda en {{token}}). 401 si las credenciales son inválidas; 403 si la contraseña es correcta pero el correo no se ha confirmado.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"postman@test.com\",\n  \"password\": \"Password123\"\n}"
@@ -1276,6 +1336,48 @@
                 }
               ]
             }
+          }
+        },
+        {
+          "name": "Mantener abierto (descartar cierre por la comunidad)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reportes/{{reporteId}}/mantener-abierto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reportes",
+                "{{reporteId}}",
+                "mantener-abierto"
+              ]
+            },
+            "description": "ADMIN o MODERADOR. Descarta la propuesta de cierre por los votos de un reporte EN_PROCESO; desde ese momento solo cuentan los votos nuevos. 409 si el reporte no está en proceso."
+          }
+        },
+        {
+          "name": "Ejecutar tarea diaria (recordatorios y cierres)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reportes/seguimiento/recordatorios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reportes",
+                "seguimiento",
+                "recordatorios"
+              ]
+            },
+            "description": "Solo ADMIN. Envía los recordatorios «¿ya lo arreglaron?» pendientes y aplica los cierres por la comunidad cuya espera venció. Devuelve {reportesRecordados, reportesCerrados}."
           }
         }
       ]

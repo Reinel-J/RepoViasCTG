@@ -16,6 +16,7 @@ export interface UsuarioResponse {
   telefono: string | null
   rol: Rol
   activo: boolean
+  emailVerificado: boolean
   fechaRegistro: string
 }
 
@@ -116,6 +117,8 @@ export interface SeguimientoResumenResponse {
   ultimaRespuesta: string | null
   // null si el usuario no ha respondido o no inició sesión.
   miRespuesta: boolean | null
+  // Cuándo se cerrará solo por los votos (cierre por la comunidad); null si no hay propuesta de cierre.
+  cierrePrevisto: string | null
 }
 
 export interface EstadisticasResponse {

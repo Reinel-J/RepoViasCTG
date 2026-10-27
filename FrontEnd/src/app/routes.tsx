@@ -23,6 +23,7 @@ export const router = createBrowserRouter([
   { path: "/registro", lazy: pagina("Registro") },
   { path: "/recuperar", lazy: pagina("RecuperarPassword") },
   { path: "/restablecer", lazy: pagina("RestablecerPassword") },
+  { path: "/verificar-correo", lazy: pagina("VerificarCorreo") },
   { path: "/perfil", lazy: paginaProtegida("Perfil") },
   { path: "/mis-reportes", lazy: paginaProtegida("MisReportes") },
   { path: "/notificaciones", lazy: paginaProtegida("Notificaciones") },
