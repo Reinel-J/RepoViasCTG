@@ -6,6 +6,7 @@ import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaf
 import { imagenCategoria, textoEstado, urlFoto } from '../api/reporteVista'
 import type { ReporteResponse } from '../api/types'
 import { ATRIBUCION_OSM, CARTAGENA, COLOR_ESTADO, TESELAS_OSM } from './mapaBase'
+import { ZoomConRueda } from './ZoomConRueda'
 
 interface MapaReportesProps {
   reportes: ReporteResponse[]
@@ -72,8 +73,9 @@ export function MapaReportes({ reportes, enlaces = true }: MapaReportesProps) {
   }
 
   return (
-    <MapContainer className="leaflet-map" center={CARTAGENA} zoom={13} scrollWheelZoom>
+    <MapContainer className="leaflet-map" center={CARTAGENA} zoom={13} scrollWheelZoom={false}>
       <TileLayer attribution={ATRIBUCION_OSM} url={TESELAS_OSM} />
+      <ZoomConRueda />
       <AjustarVista reportes={reportes} />
       {reportes.map((reporte) => {
         const foto = reporte.fotos?.[0]

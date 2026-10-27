@@ -11,10 +11,9 @@ export interface AuthSession {
 export interface AuthContextValue {
   session: AuthSession | null
   login: (email: string, password: string) => Promise<void>
-  registro: (nombre: string, email: string, password: string) => Promise<void>
   logout: () => void
   actualizarNombre: (nombre: string) => void
-  /** Guarda el token nuevo que devuelve el backend al cambiar la contraseña. */
+  /** Guarda el token nuevo que devuelve el backend al cambiar la contraseña o al confirmar el correo. */
   renovarSesion: (response: AuthResponse) => void
 }
 

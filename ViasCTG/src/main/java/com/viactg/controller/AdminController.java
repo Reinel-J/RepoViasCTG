@@ -32,7 +32,14 @@ public class AdminController {
     }
     @GetMapping("/{id}/historial") public List<HistorialEstadoResponse> historial(@PathVariable String id) { return reporteService.historial(id).stream().map(reporteMapper::toHistorialResponse).toList(); }
     @GetMapping("/seguimiento") public List<SeguimientoResumenResponse> seguimientos() { return seguimientoService.resumenes().stream().map(SeguimientoController::aRespuesta).toList(); }
-    // Ejecuta ya la tarea diaria; respeta el mismo intervalo, así que repetirla no vuelve a avisar.
+    // Ejecuta ya la tarea diaria (recordatorios y cierres por la comunidad); respeta los mismos plazos, así que repetirla
+    // no vuelve a avisar ni adelanta un cierre.
     @PostMapping("/seguimiento/recordatorios") @PreAuthorize("hasRole('ADMIN')")
-    public RecordatoriosResponse enviarRecordatorios() { return new RecordatoriosResponse(seguimientoService.enviarRecordatorios(Instant.now())); }
+    public RecordatoriosResponse enviarRecordatorios() {
+        SeguimientoService.Ejecucion ejecucion = seguimientoService.ejecutarTareaDiaria(Instant.now());
+        return new RecordatoriosResponse(ejecucion.recordados(), ejecucion.cerrados());
+    }
+    // Descarta la propuesta de cierre por los votos; solo contarán los que lleguen desde ahora.
+    @PostMapping("/{id}/mantener-abierto")
+    public SeguimientoResumenResponse mantenerAbierto(@PathVariable String id) { return SeguimientoController.aRespuesta(seguimientoService.mantenerAbierto(id)); }
 }

@@ -34,6 +34,8 @@ public class Usuario {
     private String telefono;
     private Rol rol;
     private boolean activo;
+    // false hasta abrir el enlace enviado al registrarse (o restablecer la contraseña): sin él no se puede iniciar sesión.
+    private boolean emailVerificado;
     private Instant fechaRegistro;
     // Se incrementa para invalidar todos los JWT emitidos antes (cerrar sesiones, cambio de contraseña).
     private int versionToken;

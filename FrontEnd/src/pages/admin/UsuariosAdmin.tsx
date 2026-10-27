@@ -80,7 +80,7 @@ export function UsuariosAdmin({ usuarioActualId }: { usuarioActualId?: string })
               const ocupado = procesandoId === usuario.id
               return (
                 <tr key={usuario.id} className={usuario.activo ? "" : "is-inactive"}>
-                  <td><strong>{usuario.nombre}{esYo && " (tú)"}</strong><small>{usuario.email}</small></td>
+                  <td><strong>{usuario.nombre}{esYo && " (tú)"}</strong><small>{usuario.email}{!usuario.emailVerificado && " · correo sin confirmar"}</small></td>
                   <td>{usuario.telefono ?? "—"}</td>
                   <td>{new Date(usuario.fechaRegistro).toLocaleDateString("es-CO")}</td>
                   <td>

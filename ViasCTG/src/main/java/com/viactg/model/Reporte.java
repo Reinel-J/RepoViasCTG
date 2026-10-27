@@ -57,6 +57,10 @@ public class Reporte {
     private Instant fechaActualizacion;
     // Último recordatorio "¿ya lo arreglaron?" enviado; null si nunca se envió.
     private Instant fechaUltimoSeguimiento;
+    // Cierre por la comunidad (solo EN_PROCESO): desde cuándo los votos lo proponen, null si no lo proponen; y el último
+    // «mantener abierto» de un moderador, desde el cual vuelven a contarse los votos.
+    private Instant cierreComunitarioDesde;
+    private Instant cierreComunitarioVetadoEn;
 
     @Field("historialEstados")
     @Builder.Default

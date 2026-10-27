@@ -4,6 +4,7 @@ import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-le
 import type { EstadisticasResponse } from '../api/types'
 import { colorDensidad } from './densidad'
 import { ATRIBUCION_OSM, CARTAGENA, TESELAS_OSM } from './mapaBase'
+import { ZoomConRueda } from './ZoomConRueda'
 
 type Celda = EstadisticasResponse['densidad'][number]
 
@@ -22,8 +23,9 @@ export function MapaDensidad({ celdas }: { celdas: Celda[] }) {
   const maximo = Math.max(1, ...celdas.map((celda) => celda.total))
 
   return (
-    <MapContainer className="leaflet-map density-map" center={CARTAGENA} zoom={12} scrollWheelZoom>
+    <MapContainer className="leaflet-map density-map" center={CARTAGENA} zoom={12} scrollWheelZoom={false}>
       <TileLayer attribution={ATRIBUCION_OSM} url={TESELAS_OSM} />
+      <ZoomConRueda />
       <AjustarVista celdas={celdas} />
       {celdas.map((celda) => {
         const color = colorDensidad(celda.total, maximo)

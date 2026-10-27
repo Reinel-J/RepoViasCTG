@@ -39,6 +39,18 @@ export function textoEstado(estado: EstadoReporte) {
   return estadoVisual[estado]?.texto ?? estado
 }
 
+/**
+ * Por qué no se puede editar un reporte (texto para mostrar), o null si sí se puede. Repite las reglas de
+ * ReporteService.actualizar para avisar al abrir el formulario y no recién al guardar.
+ */
+export function motivoNoEditable(reporte: Pick<ReporteResponse, 'usuarioId' | 'estado'>, usuarioId?: string) {
+  if (reporte.usuarioId !== usuarioId) return 'Solo quien creó este reporte puede editarlo.'
+  if (reporte.estado !== 'PENDIENTE') {
+    return `Este reporte ya está «${textoEstado(reporte.estado).toLowerCase()}»: solo se pueden editar los reportes pendientes, antes de que un moderador los revise.`
+  }
+  return null
+}
+
 function tiempoRelativo(fecha?: string) {
   if (!fecha) return 'Recientemente'
   const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / 86_400_000)

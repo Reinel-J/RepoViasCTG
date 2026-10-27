@@ -3,8 +3,11 @@ package com.viactg.controller;
 import com.viactg.dto.AuthResponse;
 import com.viactg.dto.LoginRequest;
 import com.viactg.dto.RecuperarPasswordRequest;
+import com.viactg.dto.ReenviarVerificacionRequest;
 import com.viactg.dto.RestablecerPasswordRequest;
 import com.viactg.dto.UsuarioRegistroRequest;
+import com.viactg.dto.UsuarioResponse;
+import com.viactg.dto.VerificarEmailRequest;
 import com.viactg.mapper.UsuarioMapper;
 import com.viactg.model.Usuario;
 import com.viactg.security.JwtService;
@@ -33,9 +36,20 @@ public class AuthController {
         this.jwtService = jwtService;
     }
 
+    // Sin token: la sesión empieza al confirmar el correo con el enlace enviado (POST /verificar).
     @PostMapping("/registro")
-    public ResponseEntity<AuthResponse> registrar(@Valid @RequestBody UsuarioRegistroRequest request, HttpServletRequest http) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(respuesta(authService.registrar(request, http.getRemoteAddr())));
+    public ResponseEntity<UsuarioResponse> registrar(@Valid @RequestBody UsuarioRegistroRequest request, HttpServletRequest http) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(usuarioMapper.toResponse(authService.registrar(request, http.getRemoteAddr())));
+    }
+
+    @PostMapping("/verificar")
+    public AuthResponse verificar(@Valid @RequestBody VerificarEmailRequest request) {
+        return respuesta(authService.verificarEmail(request.token()));
+    }
+
+    @PostMapping("/reenviar-verificacion") @ResponseStatus(HttpStatus.ACCEPTED)
+    public void reenviarVerificacion(@Valid @RequestBody ReenviarVerificacionRequest request, HttpServletRequest http) {
+        authService.reenviarVerificacion(request.email(), http.getRemoteAddr());
     }
 
     @PostMapping("/login")

@@ -32,8 +32,8 @@ export function PanelAdmin() {
   async function enviarRecordatorios() {
     setRecordatorio("Enviando recordatorios…")
     try {
-      const enviados = await adminApi.enviarRecordatorios()
-      setRecordatorio(`${enviados} recordatorio(s) enviado(s).`)
+      const { reportesRecordados, reportesCerrados } = await adminApi.enviarRecordatorios()
+      setRecordatorio(`${reportesRecordados} recordatorio(s) enviado(s) · ${reportesCerrados} reporte(s) cerrado(s) por la comunidad.`)
     } catch (exception) {
       setRecordatorio(exception instanceof Error ? exception.message : "No fue posible enviar los recordatorios.")
     }

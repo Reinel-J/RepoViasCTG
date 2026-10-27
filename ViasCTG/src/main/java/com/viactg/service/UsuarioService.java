@@ -4,6 +4,7 @@ import com.viactg.dto.UsuarioActualizacionRequest;
 import com.viactg.dto.UsuarioRegistroRequest;
 import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.DuplicateResourceException;
+import com.viactg.exception.InvalidRequestException;
 import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.model.Rol;
 import com.viactg.model.Usuario;
@@ -61,7 +62,7 @@ public class UsuarioService {
      */
     public static void validarLongitudPassword(String password) {
         if (password != null && password.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES_PASSWORD) {
-            throw new BusinessRuleException("La contraseña es demasiado larga: usa como máximo 72 caracteres "
+            throw new InvalidRequestException("La contraseña es demasiado larga: usa como máximo 72 caracteres "
                     + "(las letras con tilde y la ñ cuentan doble)");
         }
     }
@@ -74,7 +75,7 @@ public class UsuarioService {
         validarLongitudPassword(request.password());
         Usuario usuario = Usuario.builder().nombre(request.nombre().trim()).email(email)
                 .passwordHash(passwordEncoder.encode(request.password())).telefono(limpiarTelefono(request.telefono()))
-                .rol(Rol.CIUDADANO).activo(true).fechaRegistro(Instant.now()).build();
+                .rol(Rol.CIUDADANO).activo(true).emailVerificado(false).fechaRegistro(Instant.now()).build();
         try {
             return usuarioRepository.save(usuario);
         } catch (DuplicateKeyException carrera) {
@@ -121,6 +122,17 @@ public class UsuarioService {
     }
 
     /** Guarda una contraseña nueva e invalida todos los JWT emitidos antes (sube la versión del token). */
+    /** Contraseña nueva desde el enlace de recuperación: abrirlo también prueba que el correo es de quien lo usa. */
+    public Usuario restablecerPassword(String id, String passwordNueva) {
+        validarLongitudPassword(passwordNueva);
+        return actualizarCampos(id, new Update().set("passwordHash", passwordEncoder.encode(passwordNueva))
+                .set("emailVerificado", true).inc("versionToken", 1));
+    }
+
+    public Usuario marcarEmailVerificado(String id) {
+        return actualizarCampos(id, new Update().set("emailVerificado", true));
+    }
+
     public Usuario actualizarPassword(String id, String passwordNueva) {
         validarLongitudPassword(passwordNueva);
         return actualizarCampos(id, new Update().set("passwordHash", passwordEncoder.encode(passwordNueva)).inc("versionToken", 1));
@@ -140,20 +152,22 @@ public class UsuarioService {
     public Usuario asegurarAdministrador(String email, String password, String nombre) {
         String emailNormalizado = normalizarEmail(email);
         Optional<Usuario> existente = usuarioRepository.findByEmail(emailNormalizado);
+        // ADMIN_EMAIL lo fija quien administra el servidor: la cuenta queda con el correo verificado.
         if (existente.isEmpty()) {
             validarLongitudPassword(password);
             return usuarioRepository.save(Usuario.builder().nombre(nombre).email(emailNormalizado)
-                    .passwordHash(passwordEncoder.encode(password)).rol(Rol.ADMIN).activo(true)
+                    .passwordHash(passwordEncoder.encode(password)).rol(Rol.ADMIN).activo(true).emailVerificado(true)
                     .fechaRegistro(Instant.now()).build());
         }
         Usuario usuario = existente.get();
         if (usuario.getRol() == Rol.ADMIN) {
-            return usuario.isActivo() ? usuario : actualizarCampos(usuario.getId(), new Update().set("activo", true));
+            return usuario.isActivo() && usuario.isEmailVerificado() ? usuario
+                    : actualizarCampos(usuario.getId(), new Update().set("activo", true).set("emailVerificado", true));
         }
         validarLongitudPassword(password);
         log.warn("La cuenta {} existía sin rol de administrador: se promovió, su contraseña pasó a ser ADMIN_PASSWORD "
                 + "y se cerraron sus sesiones", emailNormalizado);
-        return actualizarCampos(usuario.getId(), new Update().set("rol", Rol.ADMIN).set("activo", true)
+        return actualizarCampos(usuario.getId(), new Update().set("rol", Rol.ADMIN).set("activo", true).set("emailVerificado", true)
                 .set("passwordHash", passwordEncoder.encode(password)).inc("versionToken", 1));
     }
 

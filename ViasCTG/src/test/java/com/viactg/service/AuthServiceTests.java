@@ -1,11 +1,16 @@
 package com.viactg.service;
 
+import com.viactg.dto.UsuarioRegistroRequest;
 import com.viactg.exception.BusinessRuleException;
+import com.viactg.exception.ForbiddenOperationException;
+import com.viactg.exception.InvalidRequestException;
 import com.viactg.exception.TooManyRequestsException;
 import com.viactg.model.Rol;
 import com.viactg.model.TokenRecuperacion;
+import com.viactg.model.TokenVerificacion;
 import com.viactg.model.Usuario;
 import com.viactg.repository.TokenRecuperacionRepository;
+import com.viactg.repository.TokenVerificacionRepository;
 import com.viactg.repository.UsuarioRepository;
 import com.viactg.security.LimitadorIntentos;
 import org.junit.jupiter.api.Test;
@@ -18,12 +23,14 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,24 +38,74 @@ class AuthServiceTests {
     private final UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
     private final UsuarioService usuarioService = mock(UsuarioService.class);
     private final TokenRecuperacionRepository tokenRepository = mock(TokenRecuperacionRepository.class);
+    private final TokenVerificacionRepository tokenVerificacionRepository = mock(TokenVerificacionRepository.class);
     private final CorreoService correoService = mock(CorreoService.class);
     // Costo mínimo de BCrypt para que las pruebas sean rápidas.
     private final PasswordEncoder encoder = new BCryptPasswordEncoder(4);
-    private final AuthService service = new AuthService(usuarioRepository, usuarioService, tokenRepository, encoder,
-            new LimitadorIntentos(), correoService, "http://localhost:5173/", 30);
+    private final AuthService service = new AuthService(usuarioRepository, usuarioService, tokenRepository, tokenVerificacionRepository,
+            encoder, new LimitadorIntentos(), correoService, "http://localhost:5173/", 30, 48);
 
     private Usuario usuario(String password) {
         return Usuario.builder().id("u-1").nombre("Ana").email("ana@test.com").passwordHash(encoder.encode(password))
-                .rol(Rol.CIUDADANO).activo(true).versionToken(0).build();
+                .rol(Rol.CIUDADANO).activo(true).emailVerificado(true).versionToken(0).build();
+    }
+
+    private Usuario sinVerificar() {
+        Usuario usuario = usuario("Correcta123");
+        usuario.setEmailVerificado(false);
+        return usuario;
+    }
+
+    private void enlaceDeVerificacion(String token, Instant expira) {
+        when(tokenVerificacionRepository.findByTokenHash(AuthService.sha256(token))).thenReturn(Optional.of(
+                TokenVerificacion.builder().usuarioId("u-1").tokenHash(AuthService.sha256(token)).expira(expira).build()));
     }
 
     @Test
-    void bloqueaElCorreoTrasCincoFallosAunqueLuegoLaContrasenaSeaCorrecta() {
+    void bloqueaElCorreoDesdeEsaIpTrasCincoFallosAunqueLuegoLaContrasenaSeaCorrecta() {
         when(usuarioRepository.findByEmail("ana@test.com")).thenReturn(Optional.of(usuario("Correcta123")));
         for (int i = 0; i < 5; i++) {
             assertThatThrownBy(() -> service.login("ana@test.com", "mala", "1.1.1.1")).isInstanceOf(BadCredentialsException.class);
         }
-        assertThatThrownBy(() -> service.login("ANA@test.com", "Correcta123", "2.2.2.2")).isInstanceOf(TooManyRequestsException.class);
+        assertThatThrownBy(() -> service.login("ANA@test.com", "Correcta123", "1.1.1.1")).isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    void losFallosDesdeOtraRedNoBloqueanALaDuena() {
+        when(usuarioRepository.findByEmail("ana@test.com")).thenReturn(Optional.of(usuario("Correcta123")));
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> service.login("ana@test.com", "mala", "6.6.6.6")).isInstanceOf(BadCredentialsException.class);
+        }
+
+        assertThat(service.login("ana@test.com", "Correcta123", "2.2.2.2").getId()).isEqualTo("u-1");
+    }
+
+    @Test
+    void unAtaqueRepartidoEntreMuchasIpChocaConElTechoPorCuenta() {
+        when(usuarioRepository.findByEmail("ana@test.com")).thenReturn(Optional.of(usuario("Correcta123")));
+        for (int i = 0; i < 50; i++) {
+            String ip = "10.0.0." + i;
+            assertThatThrownBy(() -> service.login("ana@test.com", "mala", ip)).isInstanceOf(BadCredentialsException.class);
+        }
+
+        assertThatThrownBy(() -> service.login("ana@test.com", "mala", "10.0.1.1")).isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    void restablecerLaContrasenaQuitaLosBloqueosDeLogin() {
+        Usuario ana = usuario("Correcta123");
+        when(usuarioRepository.findByEmail("ana@test.com")).thenReturn(Optional.of(ana));
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> service.login("ana@test.com", "mala", "1.1.1.1")).isInstanceOf(BadCredentialsException.class);
+        }
+        when(tokenRepository.findByTokenHash(AuthService.sha256("tok"))).thenReturn(Optional.of(
+                TokenRecuperacion.builder().usuarioId("u-1").expira(Instant.now().plusSeconds(60)).build()));
+        when(usuarioService.buscarPorId("u-1")).thenReturn(ana);
+
+        service.restablecer("tok", "Nueva12345");
+
+        // El repositorio simulado sigue devolviendo el hash anterior: basta para ver que la IP ya no está bloqueada.
+        assertThat(service.login("ana@test.com", "Correcta123", "1.1.1.1").getId()).isEqualTo("u-1");
     }
 
     @Test
@@ -101,16 +158,18 @@ class AuthServiceTests {
 
         service.restablecer("tok", "Nueva12345");
 
-        // UsuarioService.actualizarPassword guarda el hash nuevo y sube la versión del token en una sola operación.
-        verify(usuarioService).actualizarPassword("u-1", "Nueva12345");
+        // UsuarioService.restablecerPassword guarda el hash nuevo, verifica el correo (el enlace llegó a esa bandeja)
+        // y sube la versión del token en una sola operación.
+        verify(usuarioService).restablecerPassword("u-1", "Nueva12345");
         verify(tokenRepository).deleteByUsuarioId("u-1");
+        verify(tokenVerificacionRepository).deleteByUsuarioId("u-1");
     }
 
     @Test
     void restablecerConUnaContrasenaDemasiadoLargaNoGastaElEnlace() {
-        assertThatThrownBy(() -> service.restablecer("tok", "ñ".repeat(40))).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> service.restablecer("tok", "ñ".repeat(40))).isInstanceOf(InvalidRequestException.class);
         verify(tokenRepository, never()).deleteByUsuarioId(anyString());
-        verify(usuarioService, never()).actualizarPassword(anyString(), anyString());
+        verify(usuarioService, never()).restablecerPassword(anyString(), anyString());
     }
 
     @Test
@@ -118,6 +177,101 @@ class AuthServiceTests {
         when(tokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(
                 TokenRecuperacion.builder().usuarioId("u-1").expira(Instant.now().minusSeconds(1)).build()));
         assertThatThrownBy(() -> service.restablecer("tok", "Nueva12345")).isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test
+    void registrarEnviaUnEnlaceDeConfirmacionDelQueSoloSeGuardaElHash() {
+        when(usuarioService.registrar(any())).thenReturn(sinVerificar());
+
+        Usuario creado = service.registrar(new UsuarioRegistroRequest("Ana", "ana@test.com", "Correcta123", null), "1.1.1.1");
+
+        assertThat(creado.isEmailVerificado()).isFalse();
+        ArgumentCaptor<TokenVerificacion> guardado = ArgumentCaptor.forClass(TokenVerificacion.class);
+        verify(tokenVerificacionRepository).save(guardado.capture());
+        ArgumentCaptor<String> cuerpo = ArgumentCaptor.forClass(String.class);
+        verify(correoService).enviar(eq("ana@test.com"), eq("Confirma tu correo en ViaCTG"), cuerpo.capture());
+        assertThat(cuerpo.getValue()).contains("http://localhost:5173/verificar-correo?token=", "48 horas");
+        String token = cuerpo.getValue().replaceAll("(?s).*verificar-correo\\?token=(\\S+).*", "$1");
+        assertThat(guardado.getValue().getTokenHash()).isEqualTo(AuthService.sha256(token)).isNotEqualTo(token);
+        assertThat(guardado.getValue().getExpira()).isAfter(Instant.now().plusSeconds(47 * 3600));
+    }
+
+    @Test
+    void sinConfirmarElCorreoNoSePuedeIniciarSesion() {
+        when(usuarioRepository.findByEmail("ana@test.com")).thenReturn(Optional.of(sinVerificar()));
+
+        assertThatThrownBy(() -> service.login("ana@test.com", "Correcta123", "1.1.1.1"))
+                .isInstanceOf(ForbiddenOperationException.class)
+                .hasMessageContaining("Confirma tu correo antes de iniciar sesión")
+                .hasMessageContaining("ana@test.com");
+    }
+
+    @Test
+    void conLaContrasenaIncorrectaNoSeRevelaQueLaCuentaEstaSinConfirmar() {
+        when(usuarioRepository.findByEmail("ana@test.com")).thenReturn(Optional.of(sinVerificar()));
+
+        assertThatThrownBy(() -> service.login("ana@test.com", "mala", "1.1.1.1"))
+                .isInstanceOf(BadCredentialsException.class).hasMessage("Credenciales inválidas o usuario inactivo");
+    }
+
+    @Test
+    void verificarMarcaElCorreoYGastaElEnlace() {
+        enlaceDeVerificacion("tok", Instant.now().plusSeconds(60));
+        when(usuarioService.buscarPorId("u-1")).thenReturn(sinVerificar());
+        when(usuarioService.marcarEmailVerificado("u-1")).thenReturn(usuario("Correcta123"));
+
+        Usuario verificado = service.verificarEmail("tok");
+
+        assertThat(verificado.isEmailVerificado()).isTrue();
+        verify(tokenVerificacionRepository).deleteByUsuarioId("u-1");
+    }
+
+    @Test
+    void verificarConUnEnlaceVencidoODesconocidoFalla() {
+        enlaceDeVerificacion("viejo", Instant.now().minusSeconds(1));
+
+        assertThatThrownBy(() -> service.verificarEmail("viejo")).isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("pide un enlace nuevo");
+        assertThatThrownBy(() -> service.verificarEmail("inventado")).isInstanceOf(BusinessRuleException.class);
+        verify(usuarioService, never()).marcarEmailVerificado(anyString());
+    }
+
+    @Test
+    void verificarUnaCuentaDesactivadaFalla() {
+        enlaceDeVerificacion("tok", Instant.now().plusSeconds(60));
+        Usuario desactivada = sinVerificar();
+        desactivada.setActivo(false);
+        when(usuarioService.buscarPorId("u-1")).thenReturn(desactivada);
+
+        assertThatThrownBy(() -> service.verificarEmail("tok")).isInstanceOf(BusinessRuleException.class);
+        verify(usuarioService, never()).marcarEmailVerificado(anyString());
+    }
+
+    @Test
+    void reenviarSoloEscribeACuentasSinConfirmarYReemplazaElEnlaceAnterior() {
+        when(usuarioRepository.findByEmail("ana@test.com")).thenReturn(Optional.of(sinVerificar()));
+        when(usuarioRepository.findByEmail("luis@test.com")).thenReturn(Optional.of(usuario("Correcta123")));
+        when(usuarioRepository.findByEmail("nadie@test.com")).thenReturn(Optional.empty());
+
+        service.reenviarVerificacion("luis@test.com", "1.1.1.1");
+        service.reenviarVerificacion("nadie@test.com", "1.1.1.1");
+        verify(correoService, never()).enviar(anyString(), anyString(), anyString());
+
+        service.reenviarVerificacion(" ANA@test.com ", "1.1.1.1");
+        verify(tokenVerificacionRepository).deleteByUsuarioId("u-1");
+        verify(correoService).enviar(eq("ana@test.com"), eq("Confirma tu correo en ViaCTG"), anyString());
+    }
+
+    @Test
+    void reenviarMasDeTresVecesPorHoraNoEnviaNiRevelaNada() {
+        when(usuarioRepository.findByEmail("ana@test.com")).thenReturn(Optional.of(sinVerificar()));
+
+        for (int i = 0; i < 5; i++) {
+            String ip = "10.0.0." + i;
+            assertThatCode(() -> service.reenviarVerificacion("ana@test.com", ip)).doesNotThrowAnyException();
+        }
+
+        verify(correoService, times(3)).enviar(eq("ana@test.com"), anyString(), anyString());
     }
 
     @Test

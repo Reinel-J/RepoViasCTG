@@ -271,11 +271,30 @@ public class ReporteService {
         }
         Reporte reporte = buscarPorId(reporteId);
         validarTransicion(reporte.getEstado(), nuevoEstado);
+        return aplicarCambioEstado(reporte, nuevoEstado, adminId, comentario, prioridad);
+    }
+
+    /**
+     * Cierre automático por los votos «¿ya lo arreglaron?» (lo decide SeguimientoService). Solo desde EN_PROCESO; en el
+     * historial queda sin moderador ({@code usuarioAdminId} null) y con el comentario que explica los votos.
+     */
+    public Reporte cerrarPorLaComunidad(String reporteId, String comentario) {
+        Reporte reporte = buscarPorId(reporteId);
+        if (reporte.getEstado() != EstadoReporte.EN_PROCESO) {
+            throw new BusinessRuleException("Solo un reporte en proceso puede cerrarse por los votos de la comunidad");
+        }
+        return aplicarCambioEstado(reporte, EstadoReporte.RESUELTO, null, comentario, null);
+    }
+
+    // Filtra por el estado leído: si otro cambio llegó antes, no se pisa y se responde 409.
+    private Reporte aplicarCambioEstado(Reporte reporte, EstadoReporte nuevoEstado, String adminId, String comentario, PrioridadReporte prioridad) {
         Instant ahora = Instant.now();
         String comentarioLimpio = comentario == null || comentario.isBlank() ? null : comentario.trim();
         HistorialEstado historial = new HistorialEstado(UUID.randomUUID().toString(), adminId, reporte.getEstado(), nuevoEstado, comentarioLimpio, ahora);
-        Query query = Query.query(Criteria.where("_id").is(reporteId).and("estado").is(reporte.getEstado()));
-        Update update = new Update().set("estado", nuevoEstado).set("fechaActualizacion", ahora).push("historialEstados", historial);
+        Query query = Query.query(Criteria.where("_id").is(reporte.getId()).and("estado").is(reporte.getEstado()));
+        // Una propuesta de cierre por la comunidad solo tiene sentido mientras el reporte sigue en proceso.
+        Update update = new Update().set("estado", nuevoEstado).set("fechaActualizacion", ahora).push("historialEstados", historial)
+                .unset("cierreComunitarioDesde");
         if (prioridad != null) {
             update.set("prioridad", prioridad);
         }

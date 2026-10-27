@@ -70,7 +70,7 @@ Si existe un token en `localStorage` bajo la clave `token`, lo envía como
 
 Los módulos API disponibles están en `src/api/`:
 
-- `auth.ts`: login y registro.
+- `auth.ts`: login, registro, confirmación del correo (y su reenvío) y recuperación de contraseña.
 - `reportes.ts`: listado, detalle, creación, actualización, subida de fotos, búsqueda cercana y posibles duplicados.
 - `reporteVista.ts`: `cargarReportes` / `cargarReporte` sobre `reportes.ts`, que convierten el DTO en el
   `Reporte` que pintan la portada y las pantallas públicas (texto y clase del estado, fecha relativa,
@@ -119,6 +119,7 @@ pantallas son exports de `src/app/pages/Screens.tsx`, que el router carga bajo d
 | `/` | Inicio con estadísticas y reportes recientes, siempre calculados con datos reales de la API | Público |
 | `/login`, `/registro` | Inicio de sesión y registro | Público |
 | `/recuperar`, `/restablecer?token=` | Solicitar enlace y crear contraseña nueva | Público |
+| `/verificar-correo?token=` | Confirmar el correo con un clic (inicia la sesión) | Público |
 | `/reportes` | Lista con búsqueda sin tildes y filtros por estado (incluye rechazados), categoría y barrio | Público |
 | `/reportes/:id` | Detalle con foto, mapa, dirección, comentarios, confirmaciones y línea de tiempo con cada cambio de estado | Público (comentar y confirmar requieren sesión) |
 | `/mapa` | Mapa general con filtros por estado (por defecto, daños activos), categoría y barrio, y la lista de lo visible en la barra lateral | Público |
