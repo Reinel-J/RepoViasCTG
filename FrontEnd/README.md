@@ -53,6 +53,12 @@ El cliente Axios está configurado en `src/api/client.ts`. La URL base sale de l
 http://localhost:8080/api
 ```
 
+Esa es la URL de `npm run dev`. En la imagen de Docker (`docker compose`) el valor es `/api`, relativo: el nginx
+del frontend (`nginx.conf`) reenvía `/api` y `/uploads` al backend, así que el sitio completo queda en una sola
+dirección (`http://localhost:5173`), el navegador no hace peticiones a otro origen y un túnel o proxy delante solo
+necesita exponer ese puerto. nginx pasa al backend el host con su puerto y el esquema original
+(`X-Forwarded-Proto`), que Spring usa para reconocer las peticiones del mismo sitio.
+
 `VITE_NOTIFICACIONES_INTERVALO_MS` (opcional, por defecto `60000`) fija cada cuánto la campana consulta
 el número de notificaciones sin leer. Como `VITE_API_URL`, se fija al construir.
 
@@ -89,12 +95,17 @@ Los módulos API disponibles están en `src/api/`:
 
 `MapaSeleccionPunto` permite escoger las coordenadas pulsando el mapa o usando la
 ubicación del navegador. `MapaReportes` dibuja los reportes recibidos por la API
-como círculos coloreados por estado (`COLOR_ESTADO` en `mapaBase.ts`) y encuadra
+como marcadores en forma de gota, al estilo de FixMyStreet, coloreados por estado
+(`pinMapa.ts`, SVG con los colores de `COLOR_ESTADO` en `mapaBase.ts`; la punta señala
+la coordenada exacta), y encuadra
 los reportes visibles al cargar o al cambiar un filtro. La ventanita de cada reporte
 se abre al pasar el mouse (o con un toque en el celular) y muestra la primera foto o,
 si no tiene, la ilustración de su categoría (`imagenCategoria`, SVG en
 `public/img/categorias/`) rotulada como «Imagen ilustrativa», junto con la categoría,
-el estado, la descripción, la dirección OSM y el enlace al detalle.
+el estado, la descripción, la dirección OSM y el enlace al detalle. Si la ventanita no cabe, el mapa se
+desplaza para mostrarla entera sin tapar los botones de zoom ni la atribución, y se cierra igual al alejar el
+mouse. El mapa vuelve a encuadrar los reportes cuando cambia de tamaño (un `ResizeObserver`), mientras la
+persona no lo haya movido: así el marcador del detalle queda centrado en cualquier ancho.
 
 Los mapas usan tiles de OpenStreetMap y conservan la atribución visible
 `© OpenStreetMap` con enlace a su página de derechos. Esta opción es apropiada para la demo; para un
@@ -117,10 +128,10 @@ pantallas son exports de `src/app/pages/Screens.tsx`, que el router carga bajo d
 | Ruta | Pantalla | Acceso |
 |------|----------|--------|
 | `/` | Inicio con estadísticas y reportes recientes, siempre calculados con datos reales de la API | Público |
-| `/login`, `/registro` | Inicio de sesión y registro | Público |
+| `/login`, `/registro` | Inicio de sesión y registro (con la sesión ya iniciada redirigen a la página de origen o al inicio) | Público |
 | `/recuperar`, `/restablecer?token=` | Solicitar enlace y crear contraseña nueva | Público |
 | `/verificar-correo?token=` | Confirmar el correo con un clic (inicia la sesión) | Público |
-| `/reportes` | Lista con búsqueda sin tildes y filtros por estado (incluye rechazados), categoría y barrio | Público |
+| `/reportes` | Lista con búsqueda sin tildes y filtros por estado (incluye rechazados), categoría y barrio; los filtros van en la URL (`?estado=&categoria=&barrio=&q=`), así que sobreviven al volver atrás y se pueden compartir | Público |
 | `/reportes/:id` | Detalle con foto, mapa, dirección, comentarios, confirmaciones y línea de tiempo con cada cambio de estado | Público (comentar y confirmar requieren sesión) |
 | `/mapa` | Mapa general con filtros por estado (por defecto, daños activos), categoría y barrio, y la lista de lo visible en la barra lateral | Público |
 | `/reportes/nuevo` | Formulario en 3 pasos: ubicación en el mapa, categoría libre con descripción y hasta 3 fotos, y revisión | Sesión iniciada |
@@ -147,7 +158,9 @@ Notas de comportamiento:
   activos a menos de 100 m, muestra «¿Ya lo reportaron?» (primero los de la misma categoría, comparada sin
   mayúsculas ni tildes) con la opción «Es el mismo: confirmar», que confirma el existente y abre su detalle.
 - El detalle muestra la tarjeta «¿Ya lo arreglaron?» con los votos de la comunidad; con sesión se responde
-  «Ya está arreglado» o «Sigue igual»; la tarjeta se oculta en reportes `RESUELTO` o `RECHAZADO`.
+  «Ya está arreglado» o «Sigue igual»; la tarjeta se oculta en reportes `RESUELTO` o `RECHAZADO`. Los conteos
+  grandes son personas; con el cierre por la comunidad activo y el reporte en proceso, debajo se explican los votos
+  tal como los cuenta la regla (`progresoCierre`: solo desde `EN_PROCESO`, el del autor doble) y lo que exige.
 - El backend resuelve la dirección de forma asíncrona, así que un reporte recién creado puede
   llegar con `direccionOsm` en `null`; mientras tanto se muestran las coordenadas.
 - Al cambiar la contraseña el backend devuelve un token nuevo y `renovarSesion` lo guarda, así que la sesión actual sigue abierta y las demás se cierran.
@@ -159,7 +172,14 @@ Notas de comportamiento:
   las no leídas (tope «9+») con `GET /notificaciones/sin-leer`: consulta al montarse, al cambiar de página, al
   volver a la pestaña, al marcar notificaciones como leídas (evento de `components/notificacionesEventos.ts`) y
   cada `VITE_NOTIFICACIONES_INTERVALO_MS` solo con la pestaña visible; si el backend falla, la espera se duplica
-  hasta 5 minutos. En pantallas de 980 px o menos la campana se oculta, como el resto de botones de icono.
+  hasta 5 minutos. En pantallas de 980 px o menos sigue visible junto al botón del menú (el menú desplegable no
+  muestra el número de no leídas).
+- Las confirmaciones (eliminar, rechazar, cambiar rol, desactivar, cerrar sesiones) y la edición de comentarios
+  usan `components/Dialogo.tsx` con el hook `useDialogo`, sobre un `<dialog>` nativo: no `window.confirm` ni
+  `window.prompt`, que congelan la página. Esc o un clic fuera cancelan y el foco empieza en «Cancelar».
+- Las fotos de la portada (Centro Histórico, de Leandro Loureiro en Unsplash) y del login y el registro se sirven
+  desde `public/img/` en WebP. Antes se cargaban desde `images.unsplash.com`: dependían de esa URL y le enviaban la
+  IP de cada visitante.
 - Con sesión iniciada, la cabecera muestra «Mis reportes» (en la portada, junto a «Cómo funciona»), y el menú
   lateral de la cuenta reúne Mi perfil, Mis reportes y Notificaciones.
   Al guardar el perfil se actualiza también el nombre mostrado en la barra superior.
@@ -183,7 +203,10 @@ así que se puede enlazar directamente.
 | Categorías | Admin | Crear, editar, activar y desactivar (no se eliminan) |
 
 Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coincidir con
-`ReporteService.validarTransicion` del backend. Las acciones destructivas piden confirmación.
+`ReporteService.validarTransicion` del backend. Las acciones destructivas piden confirmación con el diálogo
+propio, y el resultado de cada acción sobre un reporte aparece dentro de su tarjeta (arriba solo cuando el reporte
+sale del filtro y desaparece). «Ejecutar tarea diaria» (recordatorios y cierres por la comunidad, solo admin) está en
+la pestaña Reportes.
 
 ## Rendimiento
 

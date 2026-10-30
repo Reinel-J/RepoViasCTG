@@ -115,7 +115,19 @@ public class SeguimientoService {
         Boolean miRespuesta = usuarioId == null ? null
                 : seguimientoRepository.findByReporteIdAndUsuarioId(reporteId, usuarioId).map(Seguimiento::isArreglado).orElse(null);
         return new Resumen(reporteId, seguimientoRepository.countByReporteIdAndArreglado(reporteId, true),
-                seguimientoRepository.countByReporteIdAndArreglado(reporteId, false), ultima, miRespuesta, cierrePrevisto(reporte));
+                seguimientoRepository.countByReporteIdAndArreglado(reporteId, false), ultima, miRespuesta, cierrePrevisto(reporte),
+                progresoCierre(reporte));
+    }
+
+    /**
+     * Los votos tal como los cuenta la regla de cierre (solo los recientes, el del autor doble) junto a lo que exige.
+     * Sin esto, la página mostraba solo personas y no cuadraba con la regla. Null si el cierre está apagado o el
+     * reporte no está en proceso.
+     */
+    private ProgresoCierre progresoCierre(Reporte reporte) {
+        if (!cierreHabilitado || reporte.getEstado() != EstadoReporte.EN_PROCESO) return null;
+        CierreComunitario.Evaluacion evaluacion = evaluarCierre(reporte);
+        return new ProgresoCierre(evaluacion.arreglado(), evaluacion.sigue(), reglaCierre.minimoVotos(), reglaCierre.proporcionMinima());
     }
 
     /** Conteos de todos los reportes con votos, en una sola agregación ($group por reporte). */
@@ -160,8 +172,9 @@ public class SeguimientoService {
                 continue;
             }
             try {
-                reporteService.cerrarPorLaComunidad(reporte.getId(), "Resuelto por la comunidad: " + evaluacion.arreglado()
-                        + " voto(s) dicen que ya está arreglado y " + evaluacion.sigue() + " que sigue igual (el voto del autor cuenta doble).");
+                reporteService.cerrarPorLaComunidad(reporte.getId(), "Resuelto por la comunidad: "
+                        + (evaluacion.arreglado() == 1 ? "1 voto dice" : evaluacion.arreglado() + " votos dicen") + " que ya está arreglado y "
+                        + evaluacion.sigue() + " que sigue igual (el voto del autor cuenta doble).");
                 cerrados++;
             } catch (BusinessRuleException cambioSimultaneo) {
                 // Un moderador lo cambió de estado mientras tanto: su decisión prevalece.
@@ -310,9 +323,19 @@ public class SeguimientoService {
         return descripcion.length() <= 60 ? descripcion : descripcion.substring(0, 57) + "...";
     }
 
-    /** {@code cierrePrevisto}: cuándo se cerrará solo por los votos, o null si no hay propuesta de cierre. */
+    /**
+     * {@code arreglado} y {@code sigue} cuentan personas; {@code cierrePrevisto} es cuándo se cerrará solo por los votos
+     * (null si no hay propuesta) y {@code progresoCierre}, los votos según la regla (null si no aplica).
+     */
     public record Resumen(String reporteId, long arreglado, long sigue, Instant ultimaRespuesta, Boolean miRespuesta,
-                          Instant cierrePrevisto) {
+                          Instant cierrePrevisto, ProgresoCierre progresoCierre) {
+        public Resumen(String reporteId, long arreglado, long sigue, Instant ultimaRespuesta, Boolean miRespuesta, Instant cierrePrevisto) {
+            this(reporteId, arreglado, sigue, ultimaRespuesta, miRespuesta, cierrePrevisto, null);
+        }
+    }
+
+    /** Votos ponderados que cuentan para el cierre por la comunidad y lo que exige la regla. */
+    public record ProgresoCierre(int arreglado, int sigue, int minimoVotos, double proporcionMinima) {
     }
 
     public record Ejecucion(int recordados, int cerrados) {

@@ -1,8 +1,8 @@
 import 'leaflet/dist/leaflet.css'
-import './leafletIconFix'
 import { useEffect, useState } from 'react'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import { ATRIBUCION_OSM, CARTAGENA, TESELAS_OSM } from './mapaBase'
+import { PIN_NUEVO } from './pinMapa'
 import { ZoomConRueda } from './ZoomConRueda'
 
 type Punto = [number, number]
@@ -97,7 +97,7 @@ export function MapaSeleccionPunto({ onSeleccionar, puntoInicial }: MapaSeleccio
         <ZoomConRueda />
         <SelectorPunto onSeleccionar={onSeleccionar} seleccionarPunto={seleccionarPunto} />
         {destino && <CentrarMapa destino={destino} />}
-        {punto && <Marker position={punto} />}
+        {punto && <Marker position={punto} icon={PIN_NUEVO} />}
       </MapContainer>
     </section>
   )

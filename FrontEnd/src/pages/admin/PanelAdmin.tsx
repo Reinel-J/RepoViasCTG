@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router"
 import { useState } from "react"
 import * as adminApi from "../../api/admin"
 import { useAuth } from "../../context/useAuth"
+import { plural } from "../../utils/texto"
 import { BarriosAdmin } from "./BarriosAdmin"
 import { CategoriasAdmin } from "./CategoriasAdmin"
 import { EstadisticasAdmin } from "./EstadisticasAdmin"
@@ -29,11 +30,17 @@ export function PanelAdmin() {
   const actual = disponibles.find((seccion) => seccion.id === pedida)?.id ?? "resumen"
   const [recordatorio, setRecordatorio] = useState("")
 
+  // El resultado de la tarea diaria es de la pestaña Reportes: se borra al cambiar de pestaña.
+  function irA(nuevos: Record<string, string>) {
+    setRecordatorio("")
+    setParams(nuevos)
+  }
+
   async function enviarRecordatorios() {
     setRecordatorio("Enviando recordatorios…")
     try {
       const { reportesRecordados, reportesCerrados } = await adminApi.enviarRecordatorios()
-      setRecordatorio(`${reportesRecordados} recordatorio(s) enviado(s) · ${reportesCerrados} reporte(s) cerrado(s) por la comunidad.`)
+      setRecordatorio(`${plural(reportesRecordados, "recordatorio enviado", "recordatorios enviados")} · ${plural(reportesCerrados, "reporte cerrado", "reportes cerrados")} por la comunidad.`)
     } catch (exception) {
       setRecordatorio(exception instanceof Error ? exception.message : "No fue posible enviar los recordatorios.")
     }
@@ -54,14 +61,15 @@ export function PanelAdmin() {
             key={seccion.id}
             className={seccion.id === actual ? "is-active" : ""}
             aria-current={seccion.id === actual ? "page" : undefined}
-            onClick={() => setParams({ seccion: seccion.id })}
+            onClick={() => irA({ seccion: seccion.id })}
           >
             {seccion.etiqueta}
           </button>
         ))}
       </nav>
-      {esAdmin && <div className="admin-utility"><button className="button button-ghost button-small" onClick={enviarRecordatorios}>Ejecutar recordatorios</button>{recordatorio && <span>{recordatorio}</span>}</div>}
-      {actual === "resumen" && <ResumenAdmin onVerReportes={(estado) => setParams(estado ? { seccion: "reportes", estado } : { seccion: "reportes" })} />}
+      {/* La tarea diaria (recordatorios y cierres por la comunidad) solo tiene sentido junto a los reportes. */}
+      {esAdmin && actual === "reportes" && <div className="admin-utility"><button className="button button-ghost button-small" onClick={enviarRecordatorios}>Ejecutar tarea diaria</button>{recordatorio && <span role="status">{recordatorio}</span>}</div>}
+      {actual === "resumen" && <ResumenAdmin onVerReportes={(estado) => irA(estado ? { seccion: "reportes", estado } : { seccion: "reportes" })} />}
       {actual === "reportes" && <ReportesAdmin estadoInicial={params.get("estado")} />}
       {actual === "estadisticas" && <EstadisticasAdmin />}
       {actual === "usuarios" && <UsuariosAdmin usuarioActualId={session?.usuarioId} />}

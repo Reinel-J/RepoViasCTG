@@ -63,6 +63,15 @@
   login bloqueado con 403 hasta confirmar, reenvío con límites, y restablecer la contraseña también confirma el correo
   (así se recupera una cuenta que otra persona registró con un correo ajeno). Las cuentas anteriores se marcan como
   verificadas al arrancar (`MigracionEmailVerificado`).
+- Segunda tanda de la revisión del frontend (27 de octubre de 2026): las ventanitas del mapa se desplazan para verse
+  enteras; el mapa del detalle se vuelve a centrar al cambiar de tamaño; diálogos propios en lugar de
+  `window.confirm`/`window.prompt`; campana visible en móvil; textos de estados vacíos según el filtro; tarjetas de
+  notificación ordenadas; plurales sin «(s)» (también en mensajes del backend); filtros de la lista en la URL con
+  «Limpiar filtros»; la lupa de la portada enfoca el buscador; el detalle ya no muestra el id interno; `/login` y
+  `/registro` redirigen con sesión; ilustraciones para Hundimiento, Derrumbe y Obstáculo (y «pare» ya no coincide
+  con «reparar»); fotos de la portada y del login servidas desde el proyecto (antes, desde Unsplash); la tarea diaria solo en la pestaña Reportes; sin el aviso de
+  `HydrateFallback`. Cierre por la comunidad: `progresoCierre` explica los votos ponderados en el detalle, el
+  encabezado de notificaciones de moderadores lo menciona y el resultado de «Mantener abierto» sale en la tarjeta.
 - Pruebas HTTP de todos los controladores con `@WebMvcTest` y la seguridad real (paquete `controller` de los tests):
   rutas públicas, 401 sin sesión, 403 por rol, tokens inválidos o revocados, validaciones y códigos de error.
 

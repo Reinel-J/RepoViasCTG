@@ -31,7 +31,8 @@ class SeguimientoControllerTests extends ControllerTestBase {
                 .andExpect(jsonPath("$.sigue").value(1))
                 .andExpect(jsonPath("$.ultimaRespuesta").value("2026-10-22T08:00:00Z"))
                 .andExpect(jsonPath("$.miRespuesta").isEmpty())
-                .andExpect(jsonPath("$.cierrePrevisto").isEmpty());
+                .andExpect(jsonPath("$.cierrePrevisto").isEmpty())
+                .andExpect(jsonPath("$.progresoCierre").isEmpty());
     }
 
     @Test
@@ -42,6 +43,19 @@ class SeguimientoControllerTests extends ControllerTestBase {
         mvc.perform(get("/api/reportes/r1/seguimiento"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cierrePrevisto").value("2026-10-25T08:00:00Z"));
+    }
+
+    @Test
+    void incluyeElProgresoDelCierrePorLaComunidad() throws Exception {
+        when(seguimientoService.resumen("r1", null)).thenReturn(new SeguimientoService.Resumen("r1", 2, 0, ULTIMA, null, null,
+                new SeguimientoService.ProgresoCierre(3, 0, 3, 0.75)));
+
+        mvc.perform(get("/api/reportes/r1/seguimiento"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.arreglado").value(2))
+                .andExpect(jsonPath("$.progresoCierre.arreglado").value(3))
+                .andExpect(jsonPath("$.progresoCierre.minimoVotos").value(3))
+                .andExpect(jsonPath("$.progresoCierre.proporcionMinima").value(0.75));
     }
 
     @Test

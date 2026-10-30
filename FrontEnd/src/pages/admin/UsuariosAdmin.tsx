@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 import * as adminApi from "../../api/admin"
 import type { Rol, UsuarioResponse } from "../../api/types"
+import { Dialogo } from "../../components/Dialogo"
+import { useDialogo } from "../../components/useDialogo"
 import { ROLES, mensajeError } from "./estados"
 
 const ETIQUETA_ROL: Record<Rol, string> = { CIUDADANO: "Ciudadano", MODERADOR: "Moderador", ADMIN: "Administrador" }
@@ -13,6 +15,7 @@ export function UsuariosAdmin({ usuarioActualId }: { usuarioActualId?: string })
   const [error, setError] = useState("")
   const [aviso, setAviso] = useState("")
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
+  const { dialogo, confirmar } = useDialogo()
 
   useEffect(() => {
     adminApi.listarUsuarios()
@@ -36,13 +39,13 @@ export function UsuariosAdmin({ usuarioActualId }: { usuarioActualId?: string })
     }
   }
 
-  function cambiarRol(usuario: UsuarioResponse, rol: Rol) {
-    if (rol === "ADMIN" && !window.confirm(`¿Dar permisos de administrador a ${usuario.nombre}?`)) return
+  async function cambiarRol(usuario: UsuarioResponse, rol: Rol) {
+    if (rol === "ADMIN" && !await confirmar({ titulo: `¿Hacer administrador a ${usuario.nombre}?`, mensaje: "Podrá gestionar usuarios, barrios y categorías, y cambiar el rol de otras personas.", aceptar: "Dar permisos" })) return
     ejecutar(usuario, () => adminApi.cambiarRol(usuario.id, rol), `${usuario.nombre} ahora es ${ETIQUETA_ROL[rol].toLowerCase()}.`)
   }
 
-  function alternarActivo(usuario: UsuarioResponse) {
-    if (usuario.activo && !window.confirm(`¿Desactivar a ${usuario.nombre}? No podrá iniciar sesión ni usar su sesión actual.`)) return
+  async function alternarActivo(usuario: UsuarioResponse) {
+    if (usuario.activo && !await confirmar({ titulo: `¿Desactivar a ${usuario.nombre}?`, mensaje: "No podrá iniciar sesión y su sesión actual dejará de funcionar. Puedes volver a activarla después.", aceptar: "Desactivar", peligro: true })) return
     ejecutar(usuario, () => adminApi.cambiarActivo(usuario.id, !usuario.activo), `${usuario.nombre} fue ${usuario.activo ? "desactivado" : "activado"}.`)
   }
 
@@ -53,6 +56,7 @@ export function UsuariosAdmin({ usuarioActualId }: { usuarioActualId?: string })
 
   return (
     <section className="admin-section">
+      <Dialogo dialogo={dialogo} />
       <div className="toolbar">
         <label>Rol
           <select value={filtroRol} onChange={(event) => setFiltroRol(event.target.value as Rol | "")}>

@@ -27,7 +27,9 @@ public class SeguimientoController {
     }
 
     static SeguimientoResumenResponse aRespuesta(SeguimientoService.Resumen resumen) {
+        SeguimientoService.ProgresoCierre progreso = resumen.progresoCierre();
         return new SeguimientoResumenResponse(resumen.reporteId(), resumen.arreglado(), resumen.sigue(),
-                resumen.ultimaRespuesta(), resumen.miRespuesta(), resumen.cierrePrevisto());
+                resumen.ultimaRespuesta(), resumen.miRespuesta(), resumen.cierrePrevisto(), progreso == null ? null
+                : new SeguimientoResumenResponse.ProgresoCierre(progreso.arreglado(), progreso.sigue(), progreso.minimoVotos(), progreso.proporcionMinima()));
     }
 }
