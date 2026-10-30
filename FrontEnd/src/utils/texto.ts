@@ -32,3 +32,15 @@ export function valoresUnicos(valores: (string | null | undefined)[]): string[] 
   }
   return [...vistos.values()].sort((a, b) => a.localeCompare(b, "es"))
 }
+
+// "1 reporte", "3 reportes": la cantidad con la palabra en singular o plural (sin el "reporte(s)" de antes).
+export function plural(cantidad: number, singular: string, enPlural = `${singular}s`): string {
+  return `${cantidad} ${cantidad === 1 ? singular : enPlural}`
+}
+
+// ¿Alguna palabra del texto empieza por la clave? Así "pare" encuentra "Señal de pare" pero no "reparar" ni
+// "desaparecida". Compara sin tildes ni mayúsculas, y la clave puede tener varias palabras ("sin pavimentar").
+export function empiezaPalabra(texto: string, clave: string): boolean {
+  const normalizado = ` ${normalizarBusqueda(texto)}`
+  return normalizado.includes(` ${normalizarBusqueda(clave)}`)
+}

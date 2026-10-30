@@ -4,12 +4,22 @@ import * as adminApi from "../../api/admin"
 import * as reportesApi from "../../api/reportes"
 import type { EstadoReporte, HistorialEstadoResponse, PrioridadReporte, ReporteResponse, SeguimientoResumenResponse } from "../../api/types"
 import { Icon, StatusBadge } from "../../app/components/UI"
+import { Dialogo } from "../../components/Dialogo"
+import { useDialogo } from "../../components/useDialogo"
+import { plural } from "../../utils/texto"
 import { ACCION_ESTADO, ESTADOS, ETIQUETA_ESTADO, PRIORIDADES, SIGUIENTES, mensajeError } from "./estados"
 
 const POR_PAGINA = 10
 
 function sinClave<T>(registro: Record<string, T>, clave: string) {
   return Object.fromEntries(Object.entries(registro).filter(([actual]) => actual !== clave))
+}
+
+// Resultado de una acción sobre un reporte, mostrado dentro de su tarjeta: arriba de la lista quedaba lejos del botón.
+interface Resultado {
+  id: string
+  tipo: "error" | "exito"
+  texto: string
 }
 
 interface Borrador {
@@ -37,6 +47,8 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState("")
   const [aviso, setAviso] = useState("")
+  const [resultado, setResultado] = useState<Resultado | null>(null)
+  const { dialogo, confirmar } = useDialogo()
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
   const [borradores, setBorradores] = useState<Record<string, Borrador>>({})
   const [historiales, setHistoriales] = useState<Record<string, HistorialEstadoResponse[]>>({})
@@ -72,21 +84,25 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
   }
 
   async function aplicar(reporte: ReporteResponse, nuevoEstado: EstadoReporte) {
-    if (nuevoEstado === "RECHAZADO" && !window.confirm("¿Rechazar este reporte? Esta acción no se puede deshacer.")) return
+    if (nuevoEstado === "RECHAZADO" && !await confirmar({ titulo: "¿Rechazar este reporte?", mensaje: "Es un estado final: el reporte ya no se podrá mover a otro estado. Se notificará a su autor.", aceptar: "Rechazar reporte", peligro: true })) return
     const { prioridad, comentario } = borrador(reporte.id)
     setProcesandoId(reporte.id)
-    setError("")
     setAviso("")
+    setResultado(null)
     try {
       const actualizado = await adminApi.cambiarEstado(reporte.id, nuevoEstado, comentario.trim() || undefined, prioridad)
-      setReportes((actuales) => estado && actualizado.estado !== estado
+      const saleDelFiltro = Boolean(estado) && actualizado.estado !== estado
+      setReportes((actuales) => saleDelFiltro
         ? actuales.filter((item) => item.id !== reporte.id)
         : actuales.map((item) => (item.id === reporte.id ? actualizado : item)))
       setBorradores((actuales) => ({ ...actuales, [reporte.id]: { comentario: "" } }))
       setHistoriales((actuales) => sinClave(actuales, reporte.id))
-      setAviso(`Reporte movido a «${ETIQUETA_ESTADO[nuevoEstado]}». Se notificó a su autor.`)
+      const texto = `Reporte movido a «${ETIQUETA_ESTADO[nuevoEstado]}». Se notificó a su autor.`
+      // Si el reporte ya no cumple el filtro desaparece de la lista: el aviso va arriba porque no hay tarjeta.
+      if (saleDelFiltro) setAviso(texto)
+      else setResultado({ id: reporte.id, tipo: "exito", texto })
     } catch (exception) {
-      setError(mensajeError(exception, "No fue posible actualizar el estado."))
+      setResultado({ id: reporte.id, tipo: "error", texto: mensajeError(exception, "No fue posible actualizar el estado.") })
     } finally {
       setProcesandoId(null)
     }
@@ -94,14 +110,14 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
 
   async function mantenerAbierto(reporte: ReporteResponse) {
     setProcesandoId(reporte.id)
-    setError("")
     setAviso("")
+    setResultado(null)
     try {
       const seguimiento = await adminApi.mantenerAbierto(reporte.id)
       setSeguimientos((actuales) => ({ ...actuales, [reporte.id]: seguimiento }))
-      setAviso("Propuesta de cierre descartada: desde ahora solo cuentan los votos nuevos.")
+      setResultado({ id: reporte.id, tipo: "exito", texto: "Propuesta de cierre descartada: desde ahora solo cuentan los votos nuevos." })
     } catch (exception) {
-      setError(mensajeError(exception, "No fue posible mantener abierto el reporte."))
+      setResultado({ id: reporte.id, tipo: "error", texto: mensajeError(exception, "No fue posible mantener abierto el reporte.") })
     } finally {
       setProcesandoId(null)
     }
@@ -116,7 +132,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
       const lista = await adminApi.historial(id)
       setHistoriales((actuales) => ({ ...actuales, [id]: lista }))
     } catch (exception) {
-      setError(mensajeError(exception, "No fue posible cargar el historial."))
+      setResultado({ id, tipo: "error", texto: mensajeError(exception, "No fue posible cargar el historial.") })
     }
   }
 
@@ -130,6 +146,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
 
   return (
     <section className="admin-section">
+      <Dialogo dialogo={dialogo} />
       <div className="toolbar">
         <label>Estado
           <select value={estado} onChange={(event) => cambiarFiltro(event.target.value as EstadoReporte | "")}>
@@ -140,7 +157,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
         <label>Buscar
           <input type="search" value={busqueda} onChange={(event) => { setBusqueda(event.target.value); setPagina(1) }} placeholder="Descripción, categoría o dirección" />
         </label>
-        <span className="muted">{filtrados.length} reportes</span>
+        <span className="muted">{plural(filtrados.length, "reporte")}</span>
       </div>
       {cargando && <div className="loading">Cargando reportes…</div>}
       {error && <p className="alert error" role="alert">{error}</p>}
@@ -160,7 +177,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
                   {siguientes.length > 0 && <SenalComunidad seguimiento={seguimientos[reporte.id]} />}
                 </div>
                 <h2><Link to={`/reportes/${reporte.id}`}>{reporte.descripcion}</Link></h2>
-                <p>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(5)}, ${reporte.longitud.toFixed(5)}`} · {new Date(reporte.fechaCreacion).toLocaleDateString("es-CO")} · {reporte.fotos.length} foto(s)</p>
+                <p>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(5)}, ${reporte.longitud.toFixed(5)}`} · {new Date(reporte.fechaCreacion).toLocaleDateString("es-CO")} · {plural(reporte.fotos.length, "foto")}</p>
                 {reporte.estado === "EN_PROCESO" && seguimientos[reporte.id]?.cierrePrevisto && (
                   <div className="community-closure">
                     <span>La comunidad dice que ya está arreglado: se cerrará solo el <strong>{new Date(seguimientos[reporte.id].cierrePrevisto!).toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}</strong> si nadie lo desmiente.</span>
@@ -200,6 +217,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
                   </div>
                 </div>
               ) : <p className="muted admin-final">Estado final</p>}
+              {resultado?.id === reporte.id && <p className={`alert ${resultado.tipo === "error" ? "error" : "success"} admin-report-resultado`} role={resultado.tipo === "error" ? "alert" : "status"}>{resultado.texto}</p>}
             </article>
           )
         })}

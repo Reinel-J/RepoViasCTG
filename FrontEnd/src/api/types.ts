@@ -119,6 +119,16 @@ export interface SeguimientoResumenResponse {
   miRespuesta: boolean | null
   // Cuándo se cerrará solo por los votos (cierre por la comunidad); null si no hay propuesta de cierre.
   cierrePrevisto: string | null
+  // arreglado y sigue cuentan personas; esto son los votos según la regla del cierre (solo desde EN_PROCESO o el
+  // último «mantener abierto», el del autor doble). null si el cierre está apagado o el reporte no está en proceso.
+  progresoCierre: ProgresoCierre | null
+}
+
+export interface ProgresoCierre {
+  arreglado: number
+  sigue: number
+  minimoVotos: number
+  proporcionMinima: number
 }
 
 export interface EstadisticasResponse {

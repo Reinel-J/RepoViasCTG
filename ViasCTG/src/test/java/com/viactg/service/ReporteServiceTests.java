@@ -300,7 +300,7 @@ class ReporteServiceTests {
         when(confirmacionRepository.findByReporteId("reporte-1")).thenReturn(List.of(
                 Confirmacion.builder().reporteId("reporte-1").usuarioId("vecina-1").build()));
 
-        crearServicio().cerrarPorLaComunidad("reporte-1", "Resuelto por la comunidad: 3 voto(s)");
+        crearServicio().cerrarPorLaComunidad("reporte-1", "Resuelto por la comunidad: 3 votos");
 
         ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
         ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
@@ -312,7 +312,7 @@ class ReporteServiceTests {
         assertThat(cambios.get("$unset", Document.class)).containsKey("cierreComunitarioDesde");
         HistorialEstado historial = (HistorialEstado) cambios.get("$push", Document.class).get("historialEstados");
         assertThat(historial.getUsuarioAdminId()).isNull();
-        assertThat(historial.getComentarioAdmin()).isEqualTo("Resuelto por la comunidad: 3 voto(s)");
+        assertThat(historial.getComentarioAdmin()).isEqualTo("Resuelto por la comunidad: 3 votos");
         verify(usuarioService, never()).esAdministradorOModerador(any());
         verify(notificacionService).crear("autor-1", "reporte-1", "Tu reporte \"Hueco grande\" cambió a resuelto");
         verify(notificacionService).crear(eq("vecina-1"), eq("reporte-1"), anyString());

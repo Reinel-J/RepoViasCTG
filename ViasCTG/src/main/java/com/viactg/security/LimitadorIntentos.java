@@ -110,7 +110,7 @@ public class LimitadorIntentos {
 
     private static TooManyRequestsException demasiadosIntentos(long segundos) {
         long minutos = Math.max(1, (segundos + 59) / 60);
-        return new TooManyRequestsException("Demasiados intentos. Intenta de nuevo en " + minutos + " minuto(s).");
+        return new TooManyRequestsException("Demasiados intentos. Intenta de nuevo en " + minutos + (minutos == 1 ? " minuto." : " minutos."));
     }
 
     private static void purgar(Deque<Instant> registro, Instant limite) {

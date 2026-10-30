@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { coincideBusqueda, coincideFiltro, normalizarBusqueda, valoresUnicos } from "./texto"
+import { coincideBusqueda, coincideFiltro, empiezaPalabra, normalizarBusqueda, plural, valoresUnicos } from "./texto"
 
 describe("normalizarBusqueda", () => {
   it("ignora tildes, mayúsculas y espacios repetidos", () => {
@@ -38,5 +38,27 @@ describe("coincideFiltro", () => {
 describe("valoresUnicos", () => {
   it("deduplica sin distinguir tildes ni mayúsculas, conserva la primera forma y ordena", () => {
     expect(valoresUnicos(["Manga", "manga", "Bocagrande", null, " ", "El Bosque"])).toEqual(["Bocagrande", "El Bosque", "Manga"])
+  })
+})
+
+describe("plural", () => {
+  it("usa el singular solo para 1", () => {
+    expect(plural(1, "reporte")).toBe("1 reporte")
+    expect(plural(0, "reporte")).toBe("0 reportes")
+    expect(plural(3, "comentario")).toBe("3 comentarios")
+  })
+
+  it("acepta un plural irregular", () => {
+    expect(plural(2, "reporte activo", "reportes activos")).toBe("2 reportes activos")
+    expect(plural(1, "reporte activo", "reportes activos")).toBe("1 reporte activo")
+  })
+})
+
+describe("empiezaPalabra", () => {
+  it("busca la clave al inicio de alguna palabra, sin tildes ni mayúsculas", () => {
+    expect(empiezaPalabra("Señal de PARE", "pare")).toBe(true)
+    expect(empiezaPalabra("Inundación en Manga", "inunda")).toBe(true)
+    expect(empiezaPalabra("Vía sin pavimentar", "sin pavimentar")).toBe(true)
+    expect(empiezaPalabra("Por reparar", "pare")).toBe(false)
   })
 })

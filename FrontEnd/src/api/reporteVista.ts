@@ -1,4 +1,5 @@
 import * as reportesApi from './reportes'
+import { empiezaPalabra } from '../utils/texto'
 import type { EstadoReporte, HistorialEstadoResponse, PrioridadReporte, ReporteResponse } from './types'
 
 // Reporte tal como lo consumen las pantallas públicas: el DTO del backend más los textos y clases ya resueltos.
@@ -109,22 +110,25 @@ export function fotoReporte(reporte: Reporte): string | null {
   return foto ? urlFoto(foto) : null
 }
 
-// La categoría es texto libre: se busca por palabras clave, en este orden, sobre el texto sin tildes ni eñes.
+// La categoría es texto libre: se busca, en este orden, una palabra que empiece por alguna clave (sin tildes ni
+// mayúsculas). Derrumbe va antes que la vía sin pavimentar para que "derrumbe de tierra" no caiga en "tierra".
 const ilustraciones: [string[], string][] = [
   [['alcantarilla', 'manjol'], 'alcantarilla'],
   [['hueco', 'bache'], 'hueco'],
+  [['hundimiento', 'hundid', 'socavon', 'deformacion'], 'hundimiento'],
+  [['derrumbe', 'desliz', 'alud'], 'derrumbe'],
   [['inunda', 'encharc'], 'inundacion'],
   [['alumbrado', 'poste', 'luz', 'lampara'], 'alumbrado'],
   [['sin pavimentar', 'destapad', 'tierra'], 'via_sin_pavimentar'],
   [['anden', 'acera'], 'anden'],
   [['senal', 'semaforo', 'pare'], 'senalizacion'],
   [['escombro', 'basura'], 'escombros'],
+  [['obstaculo', 'bloque', 'arbol'], 'obstaculo'],
 ]
 
 // Ilustración genérica de la categoría, para reportes sin fotos. No es evidencia: debe rotularse como ilustrativa.
 export function imagenCategoria(texto: string): string {
-  const categoria = texto.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const nombre = ilustraciones.find(([claves]) => claves.some((clave) => categoria.includes(clave)))?.[1] ?? 'otro'
+  const nombre = ilustraciones.find(([claves]) => claves.some((clave) => empiezaPalabra(texto, clave)))?.[1] ?? 'otro'
   return `/img/categorias/${nombre}.svg`
 }
 

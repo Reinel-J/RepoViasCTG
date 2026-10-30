@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router"
 import type { ComponentType } from "react"
 import { ProtectedRoute } from "../routes/ProtectedRoute"
 import type { Rol } from "../api/types"
+import { CargandoPagina } from "./components/CargandoPagina"
 
 const pagina = (nombre: string) => async () => ({
   Component: (await import("./pages/Screens"))[nombre as keyof typeof import("./pages/Screens")] as ComponentType,
@@ -29,4 +30,4 @@ export const router = createBrowserRouter([
   { path: "/notificaciones", lazy: paginaProtegida("Notificaciones") },
   { path: "/admin", lazy: paginaProtegida("Admin", "ADMIN") },
   { path: "*", lazy: async () => ({ Component: (await import("./pages/Home")).Home }) },
-])
+].map((ruta) => ({ ...ruta, HydrateFallback: CargandoPagina })))

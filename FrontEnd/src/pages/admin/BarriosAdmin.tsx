@@ -1,6 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react"
 import * as barriosApi from "../../api/barrios"
 import type { BarrioRequest, BarrioResponse } from "../../api/types"
+import { Dialogo } from "../../components/Dialogo"
+import { useDialogo } from "../../components/useDialogo"
+import { plural } from "../../utils/texto"
 import { mensajeError } from "./estados"
 
 const VACIO: BarrioRequest = { nombre: "", localidad: "" }
@@ -19,6 +22,7 @@ export function BarriosAdmin() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState("")
   const [aviso, setAviso] = useState("")
+  const { dialogo, confirmar } = useDialogo()
 
   useEffect(() => {
     barriosApi.listar()
@@ -60,8 +64,8 @@ export function BarriosAdmin() {
     setFormulario({ nombre: barrio.nombre, localidad: barrio.localidad ?? "" })
   }
 
-  function eliminar(barrio: BarrioResponse) {
-    if (!window.confirm(`¿Eliminar el barrio ${barrio.nombre} y sus ${barrio.calles.length} calles?`)) return
+  async function eliminar(barrio: BarrioResponse) {
+    if (!await confirmar({ titulo: `¿Eliminar el barrio ${barrio.nombre}?`, mensaje: barrio.calles.length ? `También se eliminarán sus ${plural(barrio.calles.length, "calle")}. No se puede deshacer.` : "No se puede deshacer.", aceptar: "Eliminar barrio", peligro: true })) return
     ejecutar(async () => {
       await barriosApi.eliminar(barrio.id)
       setBarrios((actuales) => actuales.filter((item) => item.id !== barrio.id))
@@ -76,13 +80,14 @@ export function BarriosAdmin() {
     }, "Calle agregada.")
   }
 
-  function eliminarCalle(barrioId: string, calleId: string, nombre: string) {
-    if (!window.confirm(`¿Eliminar la calle ${nombre}?`)) return
+  async function eliminarCalle(barrioId: string, calleId: string, nombre: string) {
+    if (!await confirmar({ titulo: `¿Quitar la calle ${nombre}?`, mensaje: "No se puede deshacer.", aceptar: "Quitar calle", peligro: true })) return
     ejecutar(async () => reemplazar(await barriosApi.eliminarCalle(barrioId, calleId)), "Calle eliminada.")
   }
 
   return (
     <section className="admin-section">
+      <Dialogo dialogo={dialogo} />
       <form className="admin-card admin-inline-form" onSubmit={guardarBarrio}>
         <h2>{editandoId ? "Editar barrio" : "Nuevo barrio"}</h2>
         <label>Nombre<input value={formulario.nombre} maxLength={100} onChange={(event) => setFormulario({ ...formulario, nombre: event.target.value })} required /></label>
@@ -100,7 +105,7 @@ export function BarriosAdmin() {
         {barrios.map((barrio) => (
           <article key={barrio.id} className="admin-catalog">
             <div className="admin-catalog-head">
-              <div><h2>{barrio.nombre}</h2><p>{barrio.localidad ?? "Sin localidad"} · {barrio.calles.length} calle(s)</p></div>
+              <div><h2>{barrio.nombre}</h2><p>{barrio.localidad ?? "Sin localidad"} · {plural(barrio.calles.length, "calle")}</p></div>
               <div className="admin-buttons">
                 <button className="button button-ghost button-small" onClick={() => setAbiertoId(abiertoId === barrio.id ? null : barrio.id)}>{abiertoId === barrio.id ? "Ocultar calles" : "Calles"}</button>
                 <button className="button button-ghost button-small" onClick={() => editar(barrio)}>Editar</button>

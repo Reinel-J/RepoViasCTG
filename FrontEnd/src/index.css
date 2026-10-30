@@ -30,10 +30,13 @@
 .real-picker .leaflet-map, .real-picker .leaflet-map-picker { height: 100%; }
 .real-picker .location-picker { position: relative; height: 100%; }
 .real-picker .location-picker .alert { position: absolute; z-index: 500; left: 12px; right: 12px; bottom: 28px; margin: 0; }
-.real-full-map .leaflet-map { min-height: 650px; height: 100%; }
+.real-full-map .leaflet-map { min-height: 0; height: 100%; }
 /* Las capas de Leaflet usan z-index de 400 a 1000. Sin un contexto de apilamiento propio compiten con el resto de la
    página y el mapa quedaba encima del menú desplegable (z-index 20). Aislado, todo el mapa cuenta como una sola capa. */
 .leaflet-container { font-family: var(--sans); isolation: isolate; }
+.mapa-pin svg { display: block; filter: drop-shadow(0 2px 2px rgba(7, 59, 63, .35)); }
+.mapa-pin:focus-visible { outline: none; }
+.mapa-pin:focus-visible svg { filter: drop-shadow(0 0 2px var(--teal)) drop-shadow(0 0 2px var(--teal)); }
 .leaflet-popup-content-wrapper { border-radius: 3px 14px 3px 14px; }
 .mapa-popup { width: 240px; color: var(--ink); }
 .mapa-popup-img { position: relative; width: 240px; height: 135px; margin-bottom: 9px; overflow: hidden; border-radius: 3px 12px 3px 12px; background: var(--sand); }
@@ -122,6 +125,7 @@ button.admin-stat:hover { border-color: var(--coral); }
 .admin-list article.admin-report, .admin-list article.admin-catalog { padding: 19px; border: 1px solid var(--line); border-radius: 3px 18px 3px 3px; background: var(--white); }
 .admin-list article.admin-report { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 330px); gap: 20px; }
 .admin-report-main { min-width: 0; }
+.admin-report-resultado { grid-column: 1 / -1; margin: 0; }
 .admin-report-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .admin-report h2 { margin: 12px 0 6px; font: 400 20px/1.2 var(--serif); }
 .admin-report p { margin: 0; color: var(--ink-soft); font-size: 12px; }
@@ -133,6 +137,8 @@ button.admin-stat:hover { border-color: var(--coral); }
 .priority { padding: 5px 7px; border-radius: 99px; color: var(--white); font-size: 11px; font-weight: 700; }
 .priority.priority-media { color: var(--ink); }
 .community-closure { margin: 10px 0; padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid rgba(77,155,115,.3); border-radius: 3px 12px 3px 12px; background: #e8f6ee; color: #256749; font-size: 13px; }
+.followup-progress { margin: -8px 0 4px; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+.followup-progress strong { color: var(--ink); }
 .followup-note { margin: 8px 0 12px; padding: 9px 11px; border-radius: 3px 10px 3px 10px; background: #e8f6ee; color: #256749; font-size: 13px; line-height: 1.45; }
 .admin-chip { padding: 5px 8px; border-radius: 99px; background: var(--sand); color: var(--ink-soft); font-size: 11px; font-weight: 700; }
 .admin-report-actions, .admin-inline-form { display: grid; gap: 9px; }
@@ -200,7 +206,8 @@ button, a { font: inherit; }
 button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 
-.app-shell { min-height: 100vh; overflow: hidden; }
+/* clip y no hidden: con hidden el sol y la ola que sobresalen se podían desplazar de lado al enfocar un elemento. */
+.app-shell { min-height: 100vh; overflow: clip; }
 .top-ribbon { height: 29px; display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--coral); color: var(--white); text-transform: uppercase; font-size: 11px; letter-spacing: 2.4px; font-weight: 700; white-space: nowrap; overflow: hidden; }
 .ribbon-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--yellow); }
 
@@ -229,10 +236,10 @@ a { color: inherit; text-decoration: none; }
 .menu-button { display: none; }
 
 .hero { min-height: 610px; position: relative; display: flex; align-items: center; padding: 50px 7vw 100px; color: var(--white); isolation: isolate; }
-.hero-photo { position: absolute; inset: 0; background: url("https://images.unsplash.com/photo-1583531352515-8884af319dc1?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=1800") center 54% / cover; z-index: -3; }
+.hero-photo { position: absolute; inset: 0; background: var(--deep) url("/img/centro-historico.webp") center 54% / cover; z-index: -3; }
+.photo-credit { position: absolute; right: 22px; bottom: 50px; font-size: 12px; letter-spacing: .5px; opacity: .7; writing-mode: vertical-rl; }
 .hero-overlay { position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, rgba(3,48,52,.93) 0%, rgba(3,48,52,.78) 42%, rgba(3,48,52,.16) 78%), linear-gradient(0deg, rgba(4,54,57,.42), transparent 55%); }
 .hero-sun { position: absolute; width: 340px; height: 340px; border-radius: 50%; background: rgba(245,190,56,.2); right: -130px; top: -170px; border: 1px solid rgba(255,255,255,.12); z-index: -1; }
-.photo-credit { position: absolute; right: 22px; bottom: 50px; font-size: 12px; letter-spacing: .5px; opacity: .7; writing-mode: vertical-rl; }
 .hero-content { max-width: 720px; position: relative; z-index: 1; }
 .eyebrow, .section-kicker { display: flex; align-items: center; gap: 9px; text-transform: uppercase; letter-spacing: 2.4px; font-size: 14px; font-weight: 700; color: var(--yellow); }
 .eyebrow span { width: 26px; height: 1px; background: currentColor; }
@@ -348,6 +355,11 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .page-hero::after { content: ""; position: absolute; right: 8%; bottom: -65px; width: 240px; height: 180px; opacity: .12; background: repeating-radial-gradient(circle at 0 100%, transparent 0 22px, var(--yellow) 23px 25px, transparent 26px 44px); background-size: 90px 90px; transform: rotate(-7deg); }
 .page-hero > span { display: block; margin-bottom: 12px; color: var(--yellow); text-transform: uppercase; letter-spacing: 2.5px; font-size: 13px; font-weight: 700; }
 .page-hero h1 { margin: 0; max-width: 900px; font: 400 clamp(43px, 5vw, 66px)/.98 var(--serif); letter-spacing: -2px; }
+/* Mapa ciudadano: cabecera baja para que el mapa quepa en la pantalla sin desplazarse. */
+.page-hero.compact { min-height: 0; padding: 22px 7vw 20px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 18px; }
+.page-hero.compact > span { margin: 0; }
+.page-hero.compact h1 { font-size: clamp(30px, 3vw, 40px); letter-spacing: -1px; }
+.page-hero.compact::after { display: none; }
 .page-hero-sun { position: absolute; width: 230px; height: 230px; border-radius: 50%; background: rgba(245,190,56,.09); right: -55px; top: -110px; border: 1px solid rgba(255,255,255,.09); }
 .portal-main { min-height: 50vh; }
 .portal-footer { min-height: 130px; }
@@ -461,8 +473,11 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .success-panel h2 { margin: 12px 0; font: 400 40px var(--serif); }
 .success-panel p { margin: 0 auto 25px; color: rgba(7,59,63,.6); font-size: 15px; }
 
-.full-map-layout { min-height: 650px; display: grid; grid-template-columns: 340px 1fr; }
-.map-sidebar { max-height: 650px; overflow-y: auto; padding: 24px; z-index: 2; background: var(--white); border-right: 1px solid var(--line); box-shadow: 8px 0 28px rgba(7,59,63,.06); }
+/* El mapa ocupa el alto que queda bajo la cabecera (cinta, menú y título compacto, ~180 px): con 650 px fijos su
+   parte baja, y los reportes que el encuadre ponía ahí, quedaban fuera de la pantalla. */
+.full-map-layout { height: clamp(480px, calc(100svh - 180px), 820px); display: grid; grid-template-columns: 340px 1fr; grid-template-rows: minmax(0, 1fr); }
+.interactive-map.real-full-map { min-height: 0; }
+.map-sidebar { overflow-y: auto; padding: 24px; z-index: 2; background: var(--white); border-right: 1px solid var(--line); box-shadow: 8px 0 28px rgba(7,59,63,.06); }
 .map-sidebar-note { margin: 0; font-size: 13px; color: var(--ink-soft); }
 .map-empty-note { position: absolute; z-index: 500; left: 50%; top: 18px; transform: translateX(-50%); padding: 9px 13px; display: flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--ink); background: var(--white); border-radius: 99px; font-size: 13px; font-weight: 700; box-shadow: 0 5px 20px rgba(7,59,63,.14); }
 .map-empty-note svg { color: var(--coral); }
@@ -493,7 +508,7 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .map-floating-legend span:nth-child(3) i { background: var(--green); }
 
 .auth-page { min-height: 100vh; display: grid; grid-template-columns: 1.05fr .95fr; background: var(--cream); }
-.auth-image { position: relative; padding: 45px 6vw; display: flex; align-items: flex-end; color: var(--white); background: linear-gradient(0deg, rgba(3,48,52,.83), rgba(3,48,52,.1)), url("https://images.unsplash.com/photo-1536308037887-165852797016?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=1300") center / cover; }
+.auth-image { position: relative; padding: 45px 6vw; display: flex; align-items: flex-end; color: var(--white); background: linear-gradient(0deg, rgba(3,48,52,.83), rgba(3,48,52,.1)), url("/img/acceso.webp") center / cover; }
 .auth-back { position: absolute; left: 6vw; top: 40px; font-size: 14px; font-weight: 700; }
 .auth-image > div { max-width: 600px; }
 .auth-image span { color: var(--yellow); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
@@ -525,7 +540,9 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .content-heading h3 { font-size: 20px; }
 .content-heading p { margin: 0; color: rgba(7,59,63,.55); font-size: 13px; }
 .content-heading button { border: 0; color: var(--teal); background: transparent; font-size: 13px; font-weight: 700; }
-.notification { position: relative; padding: 21px 5px; display: grid; grid-template-columns: 42px 1fr; gap: 14px; border-bottom: 1px solid var(--line); }
+/* Tercera columna para «Marcar leída»: sin ella el botón caía a una fila nueva, partido debajo del ícono. */
+.notification { position: relative; padding: 21px 5px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 14px; border-bottom: 1px solid var(--line); }
+.notification .read-button { white-space: nowrap; }
 .notification.unread { background: linear-gradient(90deg, rgba(245,190,56,.08), transparent); }
 .notification-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: var(--coral); background: rgba(242,102,75,.1); }
 .notification div { display: flex; flex-direction: column; gap: 4px; }
@@ -591,7 +608,8 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
   .nav-cuenta { display: flex; flex-direction: column; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
   .nav-cuenta button { padding: 13px 0; border: 0; background: transparent; color: var(--coral-dark); font: inherit; font-weight: 700; text-align: left; }
   .menu-button { display: grid; }
-  .login-button, .icon-button { display: none; }
+  /* La campana se queda: el menú desplegable no muestra el número de notificaciones sin leer. */
+  .login-button, .icon-button:not(.campana) { display: none; }
   .hero-status-card { right: 4vw; }
   .stats-strip { grid-template-columns: repeat(4, 1fr); }
   .stat-intro { grid-column: 1 / -1; }
@@ -654,7 +672,7 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
   .coords-row, .review-card { grid-template-columns: 1fr; }
   .picker-map { height: 280px; }
   .review-image { min-height: 180px; }
-  .full-map-layout { grid-template-columns: 1fr; }
+  .full-map-layout { height: auto; grid-template-columns: 1fr; grid-template-rows: none; }
   .map-sidebar { max-height: 330px; overflow: auto; }
   .interactive-map { min-height: 500px; }
   /* En una columna el mapa ya no puede medir 650 px: más alto que la pantalla, arrastrar con el dedo lo movía a él
@@ -669,6 +687,8 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
   .account-layout { padding: 30px 6vw 65px; grid-template-columns: 1fr; }
   .account-nav { grid-template-columns: 1fr 1fr; }
   .notification-list, .profile-card { padding: 22px 17px; }
+  .notification { grid-template-columns: 42px minmax(0, 1fr); }
+  .notification .read-button { grid-column: 2; justify-self: start; padding: 0; }
   .my-reports-grid { grid-template-columns: 1fr; }
   .profile-form { grid-template-columns: 1fr; }
   .profile-form label:first-child { grid-column: auto; }
@@ -703,7 +723,8 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .map-filter { margin-bottom: 14px; }
 .map-legend { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 14px; color: var(--ink-soft); }
 .map-legend li { display: flex; align-items: center; gap: 6px; }
-.map-legend i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--white); box-shadow: 0 0 0 1px var(--line); }
+/* Gota girada, igual que los marcadores del mapa. */
+.map-legend i { width: 11px; height: 11px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid var(--white); box-shadow: 0 0 0 1px var(--line); }
 .leaflet-popup-content a { color: var(--teal); font-weight: 700; }
 @media (max-width: 720px) {
   .photo-thumbs button { width: 48px; height: 38px; }
@@ -715,3 +736,27 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
   .listing-filters { order: 1; }
   .listing-toolbar > .primary-button { order: 2; }
 }
+
+/* Diálogo propio (components/Dialogo.tsx) en lugar de window.confirm / window.prompt. El relleno va en el
+   formulario: así un clic en el fondo oscuro (que llega al <dialog>) cancela y uno dentro del cuadro no. */
+/* margin: auto centra el modal; el reset de Tailwind (margin: 0) lo dejaba pegado arriba a la izquierda. */
+.dialogo { width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 0; border-radius: 4px 20px 4px 20px; color: var(--ink); background: var(--white); box-shadow: 0 24px 60px rgba(7,59,63,.28); }
+.dialogo::backdrop { background: rgba(3,48,52,.55); }
+.dialogo form { padding: 26px 24px 22px; display: grid; gap: 14px; }
+.dialogo h2 { margin: 0; font: 400 26px/1.15 var(--serif); }
+.dialogo p { margin: 0; color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
+.dialogo label { display: grid; gap: 7px; font-size: 13px; font-weight: 700; }
+.dialogo textarea { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 3px 12px 3px 12px; background: var(--cream); color: var(--ink); font: inherit; font-size: 15px; font-weight: 400; resize: vertical; }
+.dialogo small { justify-self: end; color: var(--ink-soft); font-weight: 400; }
+.dialogo-acciones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.dialogo-boton { min-height: 42px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: transparent; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.dialogo-boton.principal { border-color: var(--ink); color: var(--white); background: var(--ink); }
+.dialogo-boton.peligro { border-color: var(--coral-dark); color: var(--white); background: var(--coral-dark); }
+.dialogo-boton:disabled { opacity: .5; cursor: not-allowed; }
+.dialogo-boton:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+
+/* Campos de solo lectura y enlaces dentro de avisos. */
+.readonly-field { border-style: dashed !important; background: transparent !important; color: var(--ink-soft) !important; cursor: default; }
+.field-hint { color: var(--ink-soft); font-size: 12px; font-weight: 400; }
+.alert-link { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.empty-action { margin-top: 18px; }

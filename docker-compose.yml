@@ -37,10 +37,17 @@ services:
       NOMINATIM_USER_AGENT: "${NOMINATIM_USER_AGENT:-ViaCTG/1.0 (+https://github.com/Reinel-J/RepoViasCTG)}"
       ZONA_HABILITADA: ${ZONA_HABILITADA:-true}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      # El backend siempre recibe las peticiones a través del nginx del frontend (y, con la demo, del túnel), ambos
+      # en la red interna de Docker (172.16.0.0/12). Solo de esas IP se aceptan X-Forwarded-For (IP real del visitante,
+      # para los límites de intentos) y X-Forwarded-Proto (https, para que Spring no confunda el sitio con otro origen).
+      # Comillas simples para que YAML conserve las barras; la expresión no usa llaves porque Compose las tomaría
+      # como el cierre de ${...}.
+      TRUSTED_PROXIES: '${TRUSTED_PROXIES:-172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+}'
       CIERRE_COMUNITARIO: ${CIERRE_COMUNITARIO:-false}
+    # Solo desde este PC (Swagger, Postman, npm run dev): el sitio llega al backend por el nginx del frontend. Así nadie
+    # de la red local puede hablarle directo y hacerse pasar por un proxy de confianza con un X-Forwarded-For falso.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -57,13 +64,26 @@ services:
     build:
       context: ./FrontEnd
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api}
+        # Relativa: el nginx del frontend reenvía /api al backend (ver FrontEnd/nginx.conf).
+        VITE_API_URL: ${VITE_API_URL:-/api}
         VITE_NOTIFICACIONES_INTERVALO_MS: ${VITE_NOTIFICACIONES_INTERVALO_MS:-60000}
     restart: unless-stopped
     ports:
       - "5173:80"
     depends_on:
       - backend
+
+  # Túnel rápido de Cloudflare para mostrar la demo desde internet sin abrir puertos ni contratar un servidor.
+  # Solo arranca con el perfil: docker compose --profile tunel up -d. La dirección pública (https://….trycloudflare.com)
+  # aparece en: docker compose logs tunel. Cambia cada vez que el túnel se reinicia y deja de funcionar al apagar el PC.
+  tunel:
+    image: cloudflare/cloudflared:2026.10.5
+    profiles: ["tunel"]
+    # Apunta al nginx del frontend, que reenvía /api y /uploads al backend: una sola dirección para todo el sitio.
+    command: tunnel --no-autoupdate --url http://frontend:80
+    restart: unless-stopped
+    depends_on:
+      - frontend
 
 volumes:
   mongo_data:

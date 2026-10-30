@@ -260,6 +260,29 @@ class SeguimientoServiceTests {
     }
 
     @Test
+    void elResumenMuestraLosVotosComoLosCuentaLaRegla() {
+        enProceso(null, null);
+        Instant antes = EN_PROCESO_DESDE.minus(Duration.ofDays(2));
+        // El autor vale doble y el «sigue igual» de antes de EN_PROCESO no cuenta: 2 personas, 3 votos para la regla.
+        votos(votoReciente("autor", true), votoReciente("vecino", true), voto("viejo", false, antes));
+
+        SeguimientoService.ProgresoCierre progreso = service.resumen("r1", null).progresoCierre();
+
+        assertThat(progreso).isEqualTo(new SeguimientoService.ProgresoCierre(3, 0, 3, 0.75));
+    }
+
+    @Test
+    void sinCierreHabilitadoOFueraDeEnProcesoNoHayProgreso() {
+        service = servicio(false);
+        enProceso(null, null);
+        assertThat(service.resumen("r1", null).progresoCierre()).isNull();
+
+        service = servicio(true);
+        when(reporteRepository.findById("r1")).thenReturn(Optional.of(Reporte.builder().id("r1").estado(EstadoReporte.EN_REVISION).build()));
+        assertThat(service.resumen("r1", null).progresoCierre()).isNull();
+    }
+
+    @Test
     void elResumenIndicaCuandoSeCerraraSolo() {
         enProceso(AHORA, null);
 
@@ -278,7 +301,7 @@ class SeguimientoServiceTests {
         verify(mongoTemplate).find(query.capture(), eq(Reporte.class));
         assertThat(query.getValue().getQueryObject().toString()).contains("EN_PROCESO", "cierreComunitarioDesde", "$lte",
                 AHORA.minus(Duration.ofHours(72)).toString());
-        verify(reporteService).cerrarPorLaComunidad(eq("r1"), contains("3 voto(s) dicen que ya está arreglado y 1 que sigue igual"));
+        verify(reporteService).cerrarPorLaComunidad(eq("r1"), contains("3 votos dicen que ya está arreglado y 1 que sigue igual"));
     }
 
     @Test

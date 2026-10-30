@@ -87,7 +87,7 @@ export function Home() {
           <a href="#como-funciona">Cómo funciona</a>
           {session && <NavLink to="/mis-reportes">Mis reportes</NavLink>}
           {(session?.rol === "ADMIN" || session?.rol === "MODERADOR") && <NavLink to="/admin">Panel de gestión</NavLink>}
-          {/* Solo en el menú desplegable (≤ 980 px), donde la campana y el botón de sesión están ocultos. */}
+          {/* Solo en el menú desplegable (≤ 980 px), donde el botón de sesión está oculto. */}
           <div className="nav-cuenta">
             {session ? <>
               <NavLink to="/notificaciones">Notificaciones</NavLink>
@@ -106,6 +106,7 @@ export function Home() {
 
       <main>
         <section className="hero" id="inicio">
+          {/* Foto servida desde public/img: cargada desde Unsplash dependía de su URL y le enviaba la IP de cada visitante. */}
           <div className="hero-photo">
             <div className="photo-credit">Foto: Leandro Loureiro / Unsplash</div>
           </div>
@@ -154,7 +155,7 @@ export function Home() {
                   <button key={item} className={filtro === item ? "selected" : ""} onClick={() => setFiltro(item)}>{item}</button>
                 ))}
               </div>
-              <button className="search-button" onClick={() => navigate("/reportes")} aria-label="Buscar reportes"><Icon name="search" /></button>
+              <button className="search-button" onClick={() => navigate("/reportes", { state: { buscar: true } })} aria-label="Buscar reportes"><Icon name="search" /></button>
             </div>
           </div>
 
@@ -181,7 +182,9 @@ export function Home() {
             })}
           </div>
           {error && <div className="empty-panel"><h2>No pudimos cargar los reportes</h2><p>{error}</p></div>}
-          {cargado && !error && reportes.length === 0 && <div className="empty-panel"><h2>Aún no hay reportes</h2><p>Sé la primera persona en reportar un problema de tu sector.</p></div>}
+          {cargado && !error && reportes.length === 0 && (filtro === "Todos"
+            ? <div className="empty-panel"><h2>Aún no hay reportes</h2><p>Sé la primera persona en reportar un problema de tu sector.</p></div>
+            : <div className="empty-panel"><h2>No hay reportes {filtro.toLowerCase()} por ahora</h2><p>Prueba con otro filtro o mira todos los reportes de la comunidad.</p></div>)}
 
           <button className="outline-button" onClick={() => navigate("/reportes")}>Ver todos los reportes <Icon name="arrow" /></button>
         </section>
