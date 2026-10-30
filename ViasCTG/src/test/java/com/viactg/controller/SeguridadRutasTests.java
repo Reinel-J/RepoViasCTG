@@ -1,5 +1,6 @@
 package com.viactg.controller;
 
+import com.viactg.dto.DashboardResponse;
 import com.viactg.model.Barrio;
 import com.viactg.model.Categoria;
 import com.viactg.model.Rol;
@@ -20,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -50,6 +52,7 @@ class SeguridadRutasTests extends ControllerTestBase {
         when(seguimientoService.resumen(eq("r1"), any())).thenReturn(new SeguimientoService.Resumen("r1", 0, 0, null, null, null));
         when(seguimientoService.mantenerAbierto("r1")).thenReturn(new SeguimientoService.Resumen("r1", 0, 0, null, null, null));
         when(seguimientoService.ejecutarTareaDiaria(any())).thenReturn(new SeguimientoService.Ejecucion(0, 0));
+        when(metabaseService.urlDashboard()).thenReturn(new DashboardResponse("http://localhost:3000/embed/dashboard/t", Instant.now()));
         Barrio barrio = Barrio.builder().id("b1").nombre("Manga").localidad("Histórica").build();
         when(barrioService.buscarPorId("b1")).thenReturn(barrio);
         when(barrioService.crear(any())).thenReturn(barrio);
@@ -98,6 +101,7 @@ class SeguridadRutasTests extends ControllerTestBase {
                 Arguments.of(HttpMethod.GET, "/api/admin/reportes/pendientes"),
                 Arguments.of(HttpMethod.PATCH, "/api/admin/reportes/r1/estado"),
                 Arguments.of(HttpMethod.GET, "/api/admin/estadisticas"),
+                Arguments.of(HttpMethod.GET, "/api/admin/dashboard"),
                 Arguments.of(HttpMethod.POST, "/api/barrios"),
                 Arguments.of(HttpMethod.DELETE, "/api/barrios/b1"),
                 Arguments.of(HttpMethod.POST, "/api/categorias"),
@@ -112,7 +116,8 @@ class SeguridadRutasTests extends ControllerTestBase {
                 Arguments.of(HttpMethod.GET, "/api/admin/reportes/r1/historial", null),
                 Arguments.of(HttpMethod.GET, "/api/admin/reportes/seguimiento", null),
                 Arguments.of(HttpMethod.POST, "/api/admin/reportes/r1/mantener-abierto", null),
-                Arguments.of(HttpMethod.GET, "/api/admin/estadisticas", null));
+                Arguments.of(HttpMethod.GET, "/api/admin/estadisticas", null),
+                Arguments.of(HttpMethod.GET, "/api/admin/dashboard", null));
     }
 
     static Stream<Arguments> rutasSoloAdmin() {
@@ -140,7 +145,7 @@ class SeguridadRutasTests extends ControllerTestBase {
 
     private void sinTocarLosServicios() {
         verifyNoInteractions(reporteService, seguimientoService, estadisticasService, barrioService, categoriaService,
-                usuarioService, comentarioService, confirmacionService, notificacionService, authService);
+                usuarioService, comentarioService, confirmacionService, notificacionService, authService, metabaseService);
     }
 
     @ParameterizedTest(name = "GET {0}")

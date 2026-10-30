@@ -26,6 +26,7 @@ import com.viactg.service.ConfirmacionService;
 import com.viactg.service.DuplicadoService;
 import com.viactg.service.EstadisticasService;
 import com.viactg.service.GeocodingService;
+import com.viactg.service.MetabaseService;
 import com.viactg.service.NotificacionService;
 import com.viactg.service.ReporteService;
 import com.viactg.service.SeguimientoService;
@@ -70,6 +71,7 @@ abstract class ControllerTestBase {
     @MockBean protected DuplicadoService duplicadoService;
     @MockBean protected EstadisticasService estadisticasService;
     @MockBean protected GeocodingService geocodingService;
+    @MockBean protected MetabaseService metabaseService;
     @MockBean protected NotificacionService notificacionService;
     @MockBean protected ReporteService reporteService;
     @MockBean protected SeguimientoService seguimientoService;

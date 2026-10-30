@@ -77,6 +77,11 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), Map.of());
     }
 
+    @ExceptionHandler(ServicioNoDisponibleException.class)
+    public ResponseEntity<ErrorResponse> handleServiceUnavailable(ServicioNoDisponibleException exception) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), Map.of());
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException exception) {
         return response(HttpStatus.UNAUTHORIZED, "El correo o la contraseña no son correctos, o la cuenta está desactivada", Map.of());
