@@ -62,7 +62,7 @@ class MetabaseServiceTests {
     void laUrlApuntaAlEmbebidoDelDashboardEnMetabase() {
         DashboardResponse respuesta = service.urlDashboard();
 
-        assertThat(respuesta.url()).matches("http://localhost:3000/embed/dashboard/[\\w-]+\\.[\\w-]+\\.[\\w-]+#bordered=false&titled=true");
+        assertThat(respuesta.url()).matches("http://localhost:3000/embed/dashboard/[\\w-]+\\.[\\w-]+\\.[\\w-]+#bordered=false&titled=true&refresh=60");
     }
 
     @Test

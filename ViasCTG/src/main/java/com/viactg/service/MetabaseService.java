@@ -63,7 +63,9 @@ public class MetabaseService {
                 .expiration(Date.from(expiraEn))
                 .signWith(llave, Jwts.SIG.HS256)
                 .compact();
-        return new DashboardResponse(siteUrl + "/embed/dashboard/" + token + "#bordered=false&titled=true", expiraEn);
+        // refresh=60: el embebido vuelve a consultar sus tarjetas cada minuto (el auto-refresco que se elige en la
+        // interfaz de Metabase no aplica a los dashboards embebidos).
+        return new DashboardResponse(siteUrl + "/embed/dashboard/" + token + "#bordered=false&titled=true&refresh=60", expiraEn);
     }
 
     private long numeroDashboard() {
