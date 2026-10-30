@@ -45,6 +45,10 @@ puerto `27017`, base `viasctg_db`), ocultar las colecciones sensibles, crear las
 dashboard. Copia la clave de embebido y el id del dashboard al `.env` y recrea el backend con
 `docker compose up -d backend`.
 
+Atajo: después de crear la cuenta de administrador en el asistente de Metabase, `python3 configurar-metabase.py` hace el
+resto (conexión, colecciones ocultas, preguntas, dashboard publicado y las dos variables en el `.env`); pide la contraseña
+de Metabase sin mostrarla.
+
 ### Variables nuevas
 
 | Variable | Por defecto | Para qué |

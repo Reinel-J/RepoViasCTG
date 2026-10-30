@@ -67,6 +67,12 @@ Guarda y espera a que termine la sincronización: en *Browse data › ViaCTG* de
 
 ## 4. Las preguntas
 
+> **Atajo:** con la cuenta de administrador de Metabase ya creada (paso 1), `python3 configurar-metabase.py` (en la raíz
+> del repositorio) hace los pasos 2 a 6: conecta la base si falta, oculta las colecciones sensibles, crea estas ocho
+> preguntas y el dashboard, lo publica para embeber y escribe `METABASE_SECRET_KEY` y `METABASE_DASHBOARD_ID` en el
+> `.env`. Pide tu correo y tu contraseña de Metabase (sin mostrarla ni guardarla) y toma las consultas de esta guía.
+> Luego solo falta `docker compose up -d backend`. Los filtros del paso 5 se agregan a mano.
+
 Cada pregunta es una consulta nativa: *+ New › Native query*, elige la base **ViaCTG** y la colección **reportes**, y
 pega el pipeline de agregación. Los campos son los del documento `Reporte` del backend: `estado`, `prioridad`,
 `categoriaId` (guarda el **nombre** de la categoría, normalizado al catálogo), `barrioOsm`, `latitud`, `longitud`,
