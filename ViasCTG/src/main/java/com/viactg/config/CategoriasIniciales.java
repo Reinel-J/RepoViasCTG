@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,6 +18,8 @@ import java.util.List;
  * el formulario de reportes tenga sugerencias desde el primer arranque. SEED_CATEGORIAS=false lo desactiva.
  */
 @Component
+// Antes de DatosDemo, que usa el catálogo y el administrador.
+@Order(0)
 public class CategoriasIniciales implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(CategoriasIniciales.class);
 

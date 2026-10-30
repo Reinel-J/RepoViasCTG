@@ -8,10 +8,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /** Garantiza un administrador al arrancar si se definen ADMIN_EMAIL y ADMIN_PASSWORD. */
 @Component
+// Antes de DatosDemo, que usa el catálogo y el administrador.
+@Order(0)
 public class AdminInicial implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(AdminInicial.class);
     private final UsuarioService usuarioService;

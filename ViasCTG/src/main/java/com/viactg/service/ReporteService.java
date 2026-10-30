@@ -422,13 +422,17 @@ public class ReporteService {
     }
 
     private void validarTransicion(EstadoReporte actual, EstadoReporte nuevo) {
-        boolean valida = switch (actual) {
+        if (!esTransicionValida(actual, nuevo)) throw new BusinessRuleException("Transición de estado no permitida: " + actual + " a " + nuevo);
+    }
+
+    /** Flujo de estados de un reporte; también lo usan los datos de demostración (config/DatosDemo). */
+    public static boolean esTransicionValida(EstadoReporte actual, EstadoReporte nuevo) {
+        return switch (actual) {
             case PENDIENTE -> nuevo == EstadoReporte.EN_REVISION || nuevo == EstadoReporte.RECHAZADO;
             case EN_REVISION -> nuevo == EstadoReporte.EN_PROCESO || nuevo == EstadoReporte.RECHAZADO;
             case EN_PROCESO -> nuevo == EstadoReporte.RESUELTO || nuevo == EstadoReporte.RECHAZADO;
             case RESUELTO, RECHAZADO -> false;
         };
-        if (!valida) throw new BusinessRuleException("Transición de estado no permitida: " + actual + " a " + nuevo);
     }
 
     /** Cifras públicas de la portada. */
