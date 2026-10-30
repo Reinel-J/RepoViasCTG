@@ -44,6 +44,12 @@ services:
       # como el cierre de ${...}.
       TRUSTED_PROXIES: '${TRUSTED_PROXIES:-172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+}'
       CIERRE_COMUNITARIO: ${CIERRE_COMUNITARIO:-false}
+      # Dashboard de Metabase en el panel (docs/metabase.md). La clave de embebido nunca sale del backend.
+      METABASE_SITE_URL: ${METABASE_SITE_URL:-http://localhost:3000}
+      METABASE_SECRET_KEY: ${METABASE_SECRET_KEY:-}
+      METABASE_DASHBOARD_ID: ${METABASE_DASHBOARD_ID:-}
+      METABASE_TOKEN_MINUTOS: ${METABASE_TOKEN_MINUTOS:-10}
+      SEED_DEMO: ${SEED_DEMO:-false}
     # Solo desde este PC (Swagger, Postman, npm run dev): el sitio llega al backend por el nginx del frontend. Así nadie
     # de la red local puede hablarle directo y hacerse pasar por un proxy de confianza con un X-Forwarded-For falso.
     ports:
@@ -73,6 +79,37 @@ services:
     depends_on:
       - backend
 
+  # Metabase (edición open source) para el dashboard del panel de administración; lee la misma base viasctg_db.
+  # Se configura desde su interfaz siguiendo docs/metabase.md.
+  metabase:
+    image: metabase/metabase:v0.64.4.3
+    restart: unless-stopped
+    environment:
+      # Base interna de Metabase (usuarios, preguntas, dashboards) en un archivo H2 dentro del volumen metabase_data.
+      # En producción se recomienda PostgreSQL (MB_DB_TYPE=postgres y MB_DB_HOST, MB_DB_DBNAME, MB_DB_USER, MB_DB_PASS).
+      MB_DB_TYPE: h2
+      MB_DB_FILE: /metabase-data/metabase.db
+      MB_SITE_URL: ${METABASE_SITE_URL:-http://localhost:3000}
+      # Embebido estático firmado (en esta versión, «guest embeds»): el backend firma la URL del dashboard.
+      MB_ENABLE_EMBEDDING_STATIC: "true"
+      MB_REPORT_TIMEZONE: America/Bogota
+      MB_ANON_TRACKING_ENABLED: "false"
+    # El iframe del panel lo carga el navegador, así que Metabase debe ser alcanzable en este puerto.
+    ports:
+      - "3000:3000"
+    volumes:
+      - metabase_data:/metabase-data
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "-s", "-o", "/dev/null", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      # El primer arranque crea la base interna y tarda un par de minutos.
+      start_period: 120s
+
   # Túnel rápido de Cloudflare para mostrar la demo desde internet sin abrir puertos ni contratar un servidor.
   # Solo arranca con el perfil: docker compose --profile tunel up -d. La dirección pública (https://….trycloudflare.com)
   # aparece en: docker compose logs tunel. Cambia cada vez que el túnel se reinicia y deja de funcionar al apagar el PC.
@@ -88,3 +125,4 @@ services:
 volumes:
   mongo_data:
   uploads_data:
+  metabase_data:
