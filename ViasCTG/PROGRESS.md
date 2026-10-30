@@ -74,6 +74,11 @@
   encabezado de notificaciones de moderadores lo menciona y el resultado de «Mantener abierto» sale en la tarjeta.
 - Pruebas HTTP de todos los controladores con `@WebMvcTest` y la seguridad real (paquete `controller` de los tests):
   rutas públicas, 401 sin sesión, 403 por rol, tokens inválidos o revocados, validaciones y códigos de error.
+- Dashboard de Metabase (30 de octubre de 2026): servicio `metabase` (v0.64.4.3, LTS) en docker compose con base interna
+  H2 en un volumen; `GET /api/admin/dashboard` (moderador y admin) firma con HS256 la URL de embebido estático y responde
+  503 sin configuración; pestaña Dashboard en el panel con renovación automática de la URL y auto-refresco cada minuto;
+  datos de demostración (`SEED_DEMO`, 200 reportes marcados con `[DEMO]`); guía `docs/metabase.md` con las ocho
+  preguntas, verificadas contra la pestaña Estadísticas y mongosh.
 
 ## Pendiente recomendado
 
@@ -98,6 +103,9 @@
   Swagger y bajaría el nivel de log; `test` fijaría un `JWT_SECRET` de prueba y apagaría Nominatim; `local`
   conservaría los valores actuales.
 - Decidir si el modelo vuelve a relacionar reportes con el catálogo de barrios/calles (hoy usa el barrio de OSM).
+- Autenticación de MongoDB con un usuario de solo lectura para Metabase, limitado a las colecciones del dashboard
+  (hoy Metabase se conecta sin credenciales y una consulta nativa puede leer cualquier colección; ver `docs/metabase.md`).
+- PostgreSQL como base interna de Metabase en producción (hoy es un archivo H2 en el volumen `metabase_data`).
 
 ### Hallazgos de las pruebas de caja negra (18 de octubre de 2026)
 

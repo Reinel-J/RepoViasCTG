@@ -198,6 +198,7 @@ así que se puede enlazar directamente.
 | Resumen | Moderador y admin | Totales, pendientes, activos con prioridad alta, % atendido, antigüedad del pendiente más viejo y distribución por estado y prioridad. Los indicadores enlazan a Reportes filtrado |
 | Reportes | Moderador y admin | Todos los reportes con filtro por estado, búsqueda y paginación; mover al siguiente estado (`PENDIENTE → EN_REVISION → EN_PROCESO → RESUELTO`, o `RECHAZADO`) fijando prioridad y comentario; ver el historial; etiqueta «Comunidad: ya arreglado / sigue igual» según los votos |
 | Estadísticas | Moderador y admin | Días promedio hasta la primera respuesta y hasta resolver, % resuelto, columnas de creados y resueltos por mes (con tooltip y vista de tabla), categorías con más reportes y mapa de densidad de daños activos |
+| Dashboard | Moderador y admin | Dashboard de Metabase en un iframe con la URL firmada de `GET /admin/dashboard`; pide otra antes de que venza y con «Actualizar»; si la API responde error (por ejemplo 503 sin configurar) muestra su mensaje. «Abrir en Metabase» solo para admin. Guía: `../docs/metabase.md` |
 | Usuarios | Admin | Buscar y filtrar por rol, cambiar el rol y activar/desactivar cuentas (no sobre uno mismo) |
 | Barrios | Admin | Crear, editar y eliminar barrios; agregar y quitar calles |
 | Categorías | Admin | Crear, editar, activar y desactivar (no se eliminan) |
@@ -221,7 +222,8 @@ la pestaña Reportes.
 ## Pendiente
 
 - Paginación del lado del servidor (el listado y el mapa aún descargan todos los reportes).
-- Pruebas de componentes y de extremo a extremo (hoy hay pruebas unitarias con Vitest).
+- Pruebas de extremo a extremo (hoy hay pruebas unitarias con Vitest y de componentes con Testing Library, como
+  `DashboardAdmin.test.tsx`, que corren en jsdom con `// @vitest-environment jsdom`).
 - El token JWT se guarda en `localStorage`, expuesto a XSS; agregar una Content-Security-Policy en nginx y
   considerar cookies `HttpOnly`.
 - En móvil, la tarjeta para confirmar un reporte queda al final, debajo de los comentarios.

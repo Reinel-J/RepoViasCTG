@@ -14,7 +14,7 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
-Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque otra persona pudo registrar antes ese correo; un administrador existente conserva su contraseña; esa cuenta queda con el correo verificado), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `CIERRE_COMUNITARIO` (`false` por defecto; `true` permite que los votos cierren un reporte en proceso, ver «¿Ya lo arreglaron?») con `CIERRE_COMUNITARIO_MINIMO` (`3`), `CIERRE_COMUNITARIO_PROPORCION` (`0.75`) y `CIERRE_COMUNITARIO_GRACIA_HORAS` (`72`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión si el catálogo está vacío) `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`) y `TRUSTED_PROXIES` (IP del proxy inverso cuyo `X-Forwarded-For` se acepta, como expresión regular; vacía por defecto: no se confía en ninguno).
+Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque otra persona pudo registrar antes ese correo; un administrador existente conserva su contraseña; esa cuenta queda con el correo verificado), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `CIERRE_COMUNITARIO` (`false` por defecto; `true` permite que los votos cierren un reporte en proceso, ver «¿Ya lo arreglaron?») con `CIERRE_COMUNITARIO_MINIMO` (`3`), `CIERRE_COMUNITARIO_PROPORCION` (`0.75`) y `CIERRE_COMUNITARIO_GRACIA_HORAS` (`72`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión si el catálogo está vacío) `SEED_DEMO` (`false` por defecto; `true` crea datos de demostración si hay menos de 20 reportes), `METABASE_SITE_URL`, `METABASE_SECRET_KEY`, `METABASE_DASHBOARD_ID` y `METABASE_TOKEN_MINUTOS` (dashboard de Metabase del panel; ver `../docs/metabase.md`), `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`) y `TRUSTED_PROXIES` (IP del proxy inverso cuyo `X-Forwarded-For` se acepta, como expresión regular; vacía por defecto: no se confía en ninguno).
 
 No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`, y los de consulta `reportes(estado, fechaCreacion)`, `reportes.fechaCreacion`, `reportes(usuarioId, fechaCreacion)`, `comentarios(reporteId, fecha)`, `notificaciones(usuarioId, fecha)` y `notificaciones(usuarioId, leida)`.
 
@@ -125,7 +125,7 @@ activos en celdas de ~110 m (coordenadas redondeadas a 3 decimales).
 | Registro y login | Público |
 | Consultar reportes, su resumen, posibles duplicados y votos de seguimiento, barrios y categorías; geocodificación inversa; `/uploads/**`; `/actuator/health` | Público |
 | Crear/editar reportes, comentar, confirmar, votar «¿ya lo arreglaron?», consultar comentarios/confirmaciones y datos propios | Usuario autenticado |
-| Cambiar estado e historial de reportes; votos de seguimiento de todos los reportes; estadísticas | `ADMIN` o `MODERADOR` |
+| Cambiar estado e historial de reportes; votos de seguimiento de todos los reportes; estadísticas; URL firmada del dashboard de Metabase | `ADMIN` o `MODERADOR` |
 | Ejecutar los recordatorios de seguimiento en el momento | `ADMIN` |
 | Administrar barrios, calles y categorías; listar usuarios, cambiar su rol y activarlos/desactivarlos | `ADMIN` |
 
@@ -161,6 +161,7 @@ Toda respuesta de error tiene el mismo cuerpo, con el mensaje en español y pens
 | 409 | Regla de negocio (transición no permitida, máximo de fotos, duplicados…) |
 | 413 | Archivo de más de 5 MB |
 | 429 | Demasiados intentos (login, registro, recuperación, reportes, comentarios o geocodificación) |
+| 503 | Función que depende de un servicio sin configurar (el dashboard de Metabase sin URL, clave o id) |
 | 500 | Error no controlado (el detalle solo va al log) |
 
 Cada restricción de los DTO declara su `message`; al agregar una nueva hay que escribirlo, porque el texto por
@@ -177,6 +178,7 @@ defecto de Bean Validation sale en inglés.
 | Geocodificación | `GET /api/geocoding/inverso` |
 | Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial`, `GET /api/admin/reportes/seguimiento`, `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) |
 | Estadísticas | `GET /api/admin/estadisticas` |
+| Dashboard (Metabase) | `GET /api/admin/dashboard` (`{url, expiraEn}`: URL de embebido firmada con HS256; `503` sin configuración) |
 | Barrios y calles | `GET/POST /api/barrios`, `GET/PUT/DELETE /api/barrios/{id}`, `POST /api/barrios/{id}/calles`, `DELETE /api/barrios/{id}/calles/{calleId}` |
 | Categorías | `GET/POST /api/categorias`, `GET/PUT /api/categorias/{id}`, `PATCH /api/categorias/{id}/estado` |
 | Confirmaciones | `GET/POST /api/reportes/{reporteId}/confirmaciones`, `DELETE /api/reportes/{reporteId}/confirmaciones/me` |
