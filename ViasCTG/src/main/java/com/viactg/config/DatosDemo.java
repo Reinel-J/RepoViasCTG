@@ -25,6 +25,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -47,7 +49,10 @@ public class DatosDemo implements CommandLineRunner {
     static final String DOMINIO = "@demo.viasctg.local";
     static final int TOTAL_REPORTES = 200;
     static final int UMBRAL_REPORTES = 20;
-    static final int DIAS_MAXIMOS = 330;
+    // Los reportes caen en los mismos 12 meses de la gráfica mensual (EstadisticasService): desde el día 1 del mes de
+    // hace 11 meses, hora de Colombia.
+    static final ZoneId ZONA = ZoneId.of("America/Bogota");
+    static final int MESES = 12;
     private static final int CIUDADANOS = 5;
     private static final List<EstadoReporte> FLUJO = List.of(EstadoReporte.PENDIENTE, EstadoReporte.EN_REVISION,
             EstadoReporte.EN_PROCESO, EstadoReporte.RESUELTO);
@@ -136,7 +141,7 @@ public class DatosDemo implements CommandLineRunner {
             String nombre = "Ciudadano demo " + numero;
             usuarioRepository.findByEmail(email).ifPresentOrElse(existente -> ids.add(existente.getId()), () -> nuevos.add(
                     Usuario.builder().nombre(nombre).email(email).passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
-                            .rol(Rol.CIUDADANO).activo(true).emailVerificado(true).fechaRegistro(ahora.minus(Duration.ofDays(DIAS_MAXIMOS + 30)))
+                            .rol(Rol.CIUDADANO).activo(true).emailVerificado(true).fechaRegistro(ahora.minus(Duration.ofDays(400)))
                             .versionToken(0).build()));
         }
         if (!nuevos.isEmpty()) {
@@ -149,20 +154,26 @@ public class DatosDemo implements CommandLineRunner {
         List<EstadoReporte> estados = new ArrayList<>();
         PORCENTAJES.forEach((estado, porcentaje) -> estados.addAll(Collections.nCopies(TOTAL_REPORTES * porcentaje / 100, estado)));
         Collections.shuffle(estados, random);
+        // Medio día de margen para no caer justo en el borde de la ventana.
+        double diasVentana = Duration.between(inicioVentana(ahora), ahora).toMinutes() / (24 * 60.0) - 0.5;
         List<Reporte> reportes = new ArrayList<>(estados.size());
         for (EstadoReporte estado : estados) {
-            reportes.add(generarReporte(random, ahora, estado, categorias, ciudadanos, adminId));
+            reportes.add(generarReporte(random, ahora, diasVentana, estado, categorias, ciudadanos, adminId));
         }
         return reportes;
     }
 
-    private Reporte generarReporte(Random random, Instant ahora, EstadoReporte estadoFinal, List<String> categorias,
+    static Instant inicioVentana(Instant ahora) {
+        return YearMonth.from(ahora.atZone(ZONA)).minusMonths(MESES - 1).atDay(1).atStartOfDay(ZONA).toInstant();
+    }
+
+    private Reporte generarReporte(Random random, Instant ahora, double diasVentana, EstadoReporte estadoFinal, List<String> categorias,
                                    List<String> ciudadanos, String adminId) {
         Zona zona = elegirZona(random);
         double[] punto = puntoEn(random, zona);
         String categoria = elegirCategoria(random, categorias);
         List<EstadoReporte> secuencia = secuenciaHasta(random, estadoFinal);
-        Instant creado = ahora.minus(Duration.ofMinutes((long) (edadEnDias(random, estadoFinal) * 24 * 60)));
+        Instant creado = ahora.minus(Duration.ofMinutes((long) (edadEnDias(random, estadoFinal, diasVentana) * 24 * 60)));
         List<HistorialEstado> historial = historial(random, ahora, creado, secuencia, adminId);
         Instant actualizado = historial.isEmpty() ? creado : historial.get(historial.size() - 1).getFecha();
         return Reporte.builder()
@@ -224,15 +235,16 @@ public class DatosDemo implements CommandLineRunner {
     }
 
     // Los pendientes son recientes y los resueltos pueden venir de cualquier mes del último año.
-    private static double edadEnDias(Random random, EstadoReporte estado) {
+    private static double edadEnDias(Random random, EstadoReporte estado, double diasVentana) {
         double[] rango = switch (estado) {
             case PENDIENTE -> new double[]{0.05, 40};
             case EN_REVISION -> new double[]{1, 90};
             case EN_PROCESO -> new double[]{3, 200};
-            case RESUELTO -> new double[]{5, DIAS_MAXIMOS};
-            case RECHAZADO -> new double[]{1, DIAS_MAXIMOS};
+            case RESUELTO -> new double[]{5, diasVentana};
+            case RECHAZADO -> new double[]{1, diasVentana};
         };
-        return rango[0] + random.nextDouble() * (rango[1] - rango[0]);
+        double maximo = Math.min(rango[1], diasVentana);
+        return rango[0] + random.nextDouble() * (maximo - rango[0]);
     }
 
     /** Un cambio por cada paso de la secuencia, con fechas crecientes entre la creación y ahora. */

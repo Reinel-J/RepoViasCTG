@@ -159,7 +159,8 @@ class DatosDemoTests {
 
         assertThat(reportesGenerados()).allSatisfy(reporte -> {
             List<HistorialEstado> historial = reporte.getHistorialEstados();
-            assertThat(reporte.getFechaCreacion()).isBetween(ahora.minus(Duration.ofDays(365)), ahora);
+            // Dentro de los 12 meses de la gráfica mensual de Estadísticas y del dashboard.
+            assertThat(reporte.getFechaCreacion()).isBetween(DatosDemo.inicioVentana(ahora), ahora);
             EstadoReporte estado = EstadoReporte.PENDIENTE;
             Instant anterior = reporte.getFechaCreacion();
             for (HistorialEstado cambio : historial) {
@@ -182,6 +183,14 @@ class DatosDemoTests {
         assertThat(porEstado.get(EstadoReporte.PENDIENTE)).allSatisfy(reporte -> assertThat(reporte.getHistorialEstados()).isEmpty())
                 .extracting(reporte -> reporte.getPrioridad().name()).containsOnly("MEDIA");
         assertThat(porEstado.get(EstadoReporte.RESUELTO).stream().map(Reporte::getPrioridad).collect(Collectors.toSet())).hasSize(3);
+    }
+
+    @Test
+    void losReportesCubrenDesdeElPrimerMesDeLaVentana() {
+        Instant inicio = DatosDemo.inicioVentana(Instant.now());
+
+        assertThat(reportesGenerados()).extracting(Reporte::getFechaCreacion)
+                .anySatisfy(fecha -> assertThat(fecha).isBefore(inicio.plus(Duration.ofDays(31))));
     }
 
     @Test
