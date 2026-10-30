@@ -1,0 +1,8 @@
+﻿id,nombre,descripcion,activa
+6ae4fc999573523c57f12bac,Daño en alcantarillado,"Alcantarilla o sumidero destapado, roto o colapsado",SI
+6ae4fc999573523c57f12bad,Derrumbe,Material caído o deslizamiento de tierra sobre la vía,SI
+6ae4fc999573523c57f12ba8,Hueco,Hueco o bache en la capa de rodadura,SI
+6ae4fc999573523c57f12bab,Hundimiento,Hundimiento o deformación del pavimento,SI
+6ae4fc999573523c57f12baa,Inundación,Vía encharcada o inundada que dificulta el paso,SI
+6ae4fc999573523c57f12bae,Obstáculo en la vía,"Escombros, objetos o vehículos que bloquean el paso",SI
+6ae4fc999573523c57f12ba9,Vía sin pavimentar,Calle destapada o sin capa asfáltica,SI

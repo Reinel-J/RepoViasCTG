@@ -49,6 +49,10 @@ Atajo: después de crear la cuenta de administrador en el asistente de Metabase,
 resto (conexión, colecciones ocultas, preguntas, dashboard publicado y las dos variables en el `.env`); pide la contraseña
 de Metabase sin mostrarla.
 
+También hay una versión en Power BI de los mismos ocho indicadores: [docs/powerbi.md](docs/powerbi.md) (modelo,
+medidas DAX y cifras esperadas), con los datos demo en `docs/powerbi/datos-demo/` y `python3 exportar-powerbi.py` para
+exportar a CSV los datos reales (a `powerbi-datos/`, que git ignora).
+
 ### Variables nuevas
 
 | Variable | Por defecto | Para qué |

@@ -1,0 +1,323 @@
+﻿reporte_id,orden,estado_anterior,estado_nuevo,fecha,comentario
+6ae4fc9a9573523c57f12c4f,1,PENDIENTE,EN_REVISION,2025-11-07 13:53:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c4f,2,EN_REVISION,EN_PROCESO,2025-11-22 11:09:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c4f,3,EN_PROCESO,RESUELTO,2025-11-28 10:21:49,Reparación terminada.
+6ae4fc9a9573523c57f12c30,1,PENDIENTE,EN_REVISION,2025-11-11 16:17:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c30,2,EN_REVISION,EN_PROCESO,2025-11-23 04:36:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c30,3,EN_PROCESO,RESUELTO,2025-12-10 15:09:49,Reparación terminada.
+6ae4fc9a9573523c57f12c46,1,PENDIENTE,EN_REVISION,2025-11-18 01:41:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c46,2,EN_REVISION,EN_PROCESO,2025-12-02 11:15:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c46,3,EN_PROCESO,RESUELTO,2025-12-31 05:25:49,Reparación terminada.
+6ae4fc9a9573523c57f12c23,1,PENDIENTE,RECHAZADO,2025-11-18 07:43:49,No se encontró el daño en la ubicación indicada.
+6ae4fc9a9573523c57f12c02,1,PENDIENTE,EN_REVISION,2025-11-18 21:24:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c02,2,EN_REVISION,EN_PROCESO,2025-11-20 06:11:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c02,3,EN_PROCESO,RESUELTO,2025-12-17 03:35:49,Reparación terminada.
+6ae4fc9a9573523c57f12c15,1,PENDIENTE,EN_REVISION,2025-11-23 02:26:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c15,2,EN_REVISION,EN_PROCESO,2025-11-30 18:14:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c15,3,EN_PROCESO,RESUELTO,2025-12-15 23:50:49,Reparación terminada.
+6ae4fc9a9573523c57f12c21,1,PENDIENTE,EN_REVISION,2025-11-28 22:04:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c21,2,EN_REVISION,EN_PROCESO,2025-12-06 18:02:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c21,3,EN_PROCESO,RESUELTO,2025-12-17 14:10:49,Reparación terminada.
+6ae4fc9a9573523c57f12c7b,1,PENDIENTE,RECHAZADO,2025-12-06 06:28:49,No se encontró el daño en la ubicación indicada.
+6ae4fc9a9573523c57f12c09,1,PENDIENTE,EN_REVISION,2025-12-12 09:17:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c09,2,EN_REVISION,RECHAZADO,2025-12-13 14:41:49,Reporte duplicado de otro caso abierto.
+6ae4fc9a9573523c57f12c69,1,PENDIENTE,EN_REVISION,2025-12-23 14:46:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c69,2,EN_REVISION,RECHAZADO,2025-12-24 13:44:49,No corresponde a la vía pública.
+6ae4fc999573523c57f12bba,1,PENDIENTE,EN_REVISION,2026-01-04 20:11:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bba,2,EN_REVISION,EN_PROCESO,2026-01-14 21:06:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bba,3,EN_PROCESO,RESUELTO,2026-02-11 16:28:49,Reparación terminada.
+6ae4fc9a9573523c57f12bf3,1,PENDIENTE,EN_REVISION,2026-01-07 04:17:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bf3,2,EN_REVISION,EN_PROCESO,2026-01-15 17:12:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bf3,3,EN_PROCESO,RESUELTO,2026-01-28 16:17:49,Reparación terminada.
+6ae4fc999573523c57f12be0,1,PENDIENTE,EN_REVISION,2026-01-08 05:42:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be0,2,EN_REVISION,EN_PROCESO,2026-01-10 00:08:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12be0,3,EN_PROCESO,RESUELTO,2026-01-14 16:18:49,Reparación terminada.
+6ae4fc9a9573523c57f12bff,1,PENDIENTE,EN_REVISION,2026-01-14 12:53:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bff,2,EN_REVISION,EN_PROCESO,2026-01-28 19:08:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bff,3,EN_PROCESO,RESUELTO,2026-02-16 01:36:49,Reparación terminada.
+6ae4fc9a9573523c57f12bf1,1,PENDIENTE,EN_REVISION,2026-01-12 18:56:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bf1,2,EN_REVISION,EN_PROCESO,2026-01-17 15:14:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bf1,3,EN_PROCESO,RESUELTO,2026-01-27 04:24:49,Reparación terminada.
+6ae4fc9a9573523c57f12c76,1,PENDIENTE,EN_REVISION,2026-01-17 07:05:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c76,2,EN_REVISION,EN_PROCESO,2026-01-29 21:48:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c76,3,EN_PROCESO,RESUELTO,2026-02-27 03:01:49,Reparación terminada.
+6ae4fc9a9573523c57f12bfc,1,PENDIENTE,EN_REVISION,2026-01-22 21:38:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bfc,2,EN_REVISION,EN_PROCESO,2026-02-01 19:59:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bfc,3,EN_PROCESO,RESUELTO,2026-02-28 21:02:49,Reparación terminada.
+6ae4fc9a9573523c57f12c77,1,PENDIENTE,EN_REVISION,2026-01-29 08:30:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c77,2,EN_REVISION,EN_PROCESO,2026-02-12 06:18:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c77,3,EN_PROCESO,RESUELTO,2026-02-19 02:13:49,Reparación terminada.
+6ae4fc9a9573523c57f12c26,1,PENDIENTE,EN_REVISION,2026-01-28 08:50:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c26,2,EN_REVISION,EN_PROCESO,2026-01-31 00:16:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c26,3,EN_PROCESO,RESUELTO,2026-02-27 22:55:49,Reparación terminada.
+6ae4fc9a9573523c57f12c64,1,PENDIENTE,EN_REVISION,2026-02-01 04:02:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c64,2,EN_REVISION,RECHAZADO,2026-02-01 21:59:49,Reporte duplicado de otro caso abierto.
+6ae4fc9a9573523c57f12bf5,1,PENDIENTE,EN_REVISION,2026-02-06 20:56:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bf5,2,EN_REVISION,EN_PROCESO,2026-02-17 18:58:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bf5,3,EN_PROCESO,RESUELTO,2026-02-22 21:56:49,Reparación terminada.
+6ae4fc9a9573523c57f12c39,1,PENDIENTE,EN_REVISION,2026-02-17 07:11:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c39,2,EN_REVISION,EN_PROCESO,2026-02-20 12:23:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c39,3,EN_PROCESO,RESUELTO,2026-03-02 17:30:49,Reparación terminada.
+6ae4fc9a9573523c57f12c10,1,PENDIENTE,EN_REVISION,2026-02-21 19:10:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c10,2,EN_REVISION,EN_PROCESO,2026-02-28 21:34:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c10,3,EN_PROCESO,RESUELTO,2026-03-26 20:21:49,Reparación terminada.
+6ae4fc999573523c57f12be6,1,PENDIENTE,EN_REVISION,2026-02-25 20:41:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be6,2,EN_REVISION,EN_PROCESO,2026-03-12 18:01:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12be6,3,EN_PROCESO,RESUELTO,2026-04-02 12:52:49,Reparación terminada.
+6ae4fc9a9573523c57f12c44,1,PENDIENTE,RECHAZADO,2026-02-26 02:51:49,No se encontró el daño en la ubicación indicada.
+6ae4fc999573523c57f12bc0,1,PENDIENTE,EN_REVISION,2026-03-03 09:40:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bc0,2,EN_REVISION,EN_PROCESO,2026-03-10 16:13:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bc0,3,EN_PROCESO,RESUELTO,2026-03-15 05:23:49,Reparación terminada.
+6ae4fc999573523c57f12bb5,1,PENDIENTE,EN_REVISION,2026-03-03 22:36:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bb5,2,EN_REVISION,EN_PROCESO,2026-03-11 05:16:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bb5,3,EN_PROCESO,RESUELTO,2026-03-31 19:54:49,Reparación terminada.
+6ae4fc9a9573523c57f12bf4,1,PENDIENTE,RECHAZADO,2026-03-10 13:20:49,Reporte duplicado de otro caso abierto.
+6ae4fc9a9573523c57f12c42,1,PENDIENTE,RECHAZADO,2026-03-08 22:47:49,Reporte duplicado de otro caso abierto.
+6ae4fc999573523c57f12bb7,1,PENDIENTE,EN_REVISION,2026-03-14 17:23:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bb7,2,EN_REVISION,EN_PROCESO,2026-03-15 18:30:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bb7,3,EN_PROCESO,RECHAZADO,2026-03-18 08:58:49,Reporte duplicado de otro caso abierto.
+6ae4fc9a9573523c57f12c5f,1,PENDIENTE,EN_REVISION,2026-03-16 18:50:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c5f,2,EN_REVISION,EN_PROCESO,2026-03-31 02:27:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c5f,3,EN_PROCESO,RESUELTO,2026-04-11 06:05:49,Reparación terminada.
+6ae4fc9a9573523c57f12c47,1,PENDIENTE,EN_REVISION,2026-03-27 04:11:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c47,2,EN_REVISION,EN_PROCESO,2026-04-10 01:04:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c47,3,EN_PROCESO,RESUELTO,2026-04-18 06:44:49,Reparación terminada.
+6ae4fc9a9573523c57f12c3b,1,PENDIENTE,EN_REVISION,2026-04-07 20:10:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c3b,2,EN_REVISION,EN_PROCESO,2026-04-11 11:56:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c3b,3,EN_PROCESO,RESUELTO,2026-04-30 16:01:49,Reparación terminada.
+6ae4fc9a9573523c57f12c20,1,PENDIENTE,RECHAZADO,2026-04-10 15:12:49,Reporte duplicado de otro caso abierto.
+6ae4fc9a9573523c57f12c0f,1,PENDIENTE,EN_REVISION,2026-04-09 12:44:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c0f,2,EN_REVISION,EN_PROCESO,2026-04-15 23:18:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c0f,3,EN_PROCESO,RESUELTO,2026-05-03 04:14:49,Reparación terminada.
+6ae4fc9a9573523c57f12c53,1,PENDIENTE,EN_REVISION,2026-04-09 02:14:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c53,2,EN_REVISION,EN_PROCESO,2026-04-17 16:02:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c53,3,EN_PROCESO,RECHAZADO,2026-04-20 22:43:49,No se encontró el daño en la ubicación indicada.
+6ae4fc999573523c57f12bbf,1,PENDIENTE,EN_REVISION,2026-04-21 10:25:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bbf,2,EN_REVISION,EN_PROCESO,2026-04-23 03:22:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bb9,1,PENDIENTE,EN_REVISION,2026-04-27 16:49:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bb9,2,EN_REVISION,EN_PROCESO,2026-05-02 09:02:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c60,1,PENDIENTE,EN_REVISION,2026-04-26 12:06:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c60,2,EN_REVISION,EN_PROCESO,2026-04-28 03:37:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c0a,1,PENDIENTE,RECHAZADO,2026-05-05 20:28:49,No corresponde a la vía pública.
+6ae4fc999573523c57f12bbb,1,PENDIENTE,EN_REVISION,2026-05-05 11:55:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bbb,2,EN_REVISION,EN_PROCESO,2026-05-10 02:16:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c1e,1,PENDIENTE,EN_REVISION,2026-05-06 05:52:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c1e,2,EN_REVISION,EN_PROCESO,2026-05-11 19:23:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c25,1,PENDIENTE,EN_REVISION,2026-05-08 12:23:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c25,2,EN_REVISION,EN_PROCESO,2026-05-22 03:53:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bfb,1,PENDIENTE,EN_REVISION,2026-05-11 03:27:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bfb,2,EN_REVISION,EN_PROCESO,2026-05-25 06:08:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bdb,1,PENDIENTE,EN_REVISION,2026-05-12 21:21:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bdb,2,EN_REVISION,EN_PROCESO,2026-05-16 13:40:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bdb,3,EN_PROCESO,RESUELTO,2026-06-11 14:32:49,Reparación terminada.
+6ae4fc9a9573523c57f12c56,1,PENDIENTE,EN_REVISION,2026-05-21 11:55:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c56,2,EN_REVISION,EN_PROCESO,2026-06-02 04:47:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bd9,1,PENDIENTE,RECHAZADO,2026-05-22 15:57:49,No corresponde a la vía pública.
+6ae4fc999573523c57f12bc6,1,PENDIENTE,EN_REVISION,2026-05-23 06:45:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bc6,2,EN_REVISION,EN_PROCESO,2026-06-06 17:27:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c27,1,PENDIENTE,EN_REVISION,2026-05-26 20:16:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c27,2,EN_REVISION,EN_PROCESO,2026-05-27 23:03:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c27,3,EN_PROCESO,RESUELTO,2026-06-25 05:58:49,Reparación terminada.
+6ae4fc9a9573523c57f12c4a,1,PENDIENTE,EN_REVISION,2026-05-25 15:19:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c4a,2,EN_REVISION,EN_PROCESO,2026-05-30 17:23:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c4a,3,EN_PROCESO,RESUELTO,2026-06-20 01:23:49,Reparación terminada.
+6ae4fc9a9573523c57f12c6f,1,PENDIENTE,EN_REVISION,2026-05-26 16:32:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c6f,2,EN_REVISION,EN_PROCESO,2026-06-01 20:03:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c6f,3,EN_PROCESO,RESUELTO,2026-06-15 09:24:49,Reparación terminada.
+6ae4fc9a9573523c57f12c52,1,PENDIENTE,EN_REVISION,2026-05-29 23:13:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c52,2,EN_REVISION,EN_PROCESO,2026-06-12 16:47:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c52,3,EN_PROCESO,RESUELTO,2026-07-03 17:59:49,Reparación terminada.
+6ae4fc999573523c57f12bc7,1,PENDIENTE,EN_REVISION,2026-05-31 15:02:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bc7,2,EN_REVISION,EN_PROCESO,2026-06-12 15:48:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bc7,3,EN_PROCESO,RESUELTO,2026-06-25 22:56:49,Reparación terminada.
+6ae4fc9a9573523c57f12c1d,1,PENDIENTE,EN_REVISION,2026-05-30 07:14:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c1d,2,EN_REVISION,EN_PROCESO,2026-06-03 16:37:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c50,1,PENDIENTE,EN_REVISION,2026-06-06 08:03:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c50,2,EN_REVISION,EN_PROCESO,2026-06-19 07:19:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12be7,1,PENDIENTE,EN_REVISION,2026-06-04 17:11:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be7,2,EN_REVISION,EN_PROCESO,2026-06-17 23:47:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12be7,3,EN_PROCESO,RESUELTO,2026-07-08 19:08:49,Reparación terminada.
+6ae4fc9a9573523c57f12c1c,1,PENDIENTE,EN_REVISION,2026-06-07 06:41:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c1c,2,EN_REVISION,EN_PROCESO,2026-06-21 00:27:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c1c,3,EN_PROCESO,RESUELTO,2026-07-07 06:37:49,Reparación terminada.
+6ae4fc9a9573523c57f12c04,1,PENDIENTE,EN_REVISION,2026-06-06 12:39:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c04,2,EN_REVISION,EN_PROCESO,2026-06-13 13:06:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c04,3,EN_PROCESO,RESUELTO,2026-07-07 13:45:49,Reparación terminada.
+6ae4fc9a9573523c57f12c73,1,PENDIENTE,EN_REVISION,2026-06-10 03:15:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c73,2,EN_REVISION,EN_PROCESO,2026-06-14 21:03:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12be4,1,PENDIENTE,EN_REVISION,2026-06-07 19:03:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be4,2,EN_REVISION,EN_PROCESO,2026-06-17 17:45:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bf9,1,PENDIENTE,EN_REVISION,2026-06-11 03:51:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bf9,2,EN_REVISION,EN_PROCESO,2026-06-17 01:47:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c11,1,PENDIENTE,EN_REVISION,2026-06-11 09:22:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c11,2,EN_REVISION,EN_PROCESO,2026-06-17 09:46:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c11,3,EN_PROCESO,RESUELTO,2026-07-11 10:06:49,Reparación terminada.
+6ae4fc9a9573523c57f12c1f,1,PENDIENTE,EN_REVISION,2026-06-12 10:00:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c1f,2,EN_REVISION,EN_PROCESO,2026-06-26 08:24:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c43,1,PENDIENTE,EN_REVISION,2026-06-16 10:24:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c43,2,EN_REVISION,EN_PROCESO,2026-06-21 08:38:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12be2,1,PENDIENTE,EN_REVISION,2026-06-14 22:58:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be2,2,EN_REVISION,EN_PROCESO,2026-06-27 10:53:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c5c,1,PENDIENTE,EN_REVISION,2026-06-21 03:22:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c5c,2,EN_REVISION,EN_PROCESO,2026-07-01 04:07:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c5c,3,EN_PROCESO,RESUELTO,2026-07-09 04:09:49,Reparación terminada.
+6ae4fc9a9573523c57f12c13,1,PENDIENTE,EN_REVISION,2026-06-22 23:28:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c13,2,EN_REVISION,EN_PROCESO,2026-07-04 06:09:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bce,1,PENDIENTE,EN_REVISION,2026-06-20 15:55:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bce,2,EN_REVISION,EN_PROCESO,2026-06-30 06:26:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c55,1,PENDIENTE,EN_REVISION,2026-06-23 10:05:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c55,2,EN_REVISION,EN_PROCESO,2026-07-03 17:52:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bb6,1,PENDIENTE,EN_REVISION,2026-06-28 00:49:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bb6,2,EN_REVISION,EN_PROCESO,2026-07-11 14:22:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c03,1,PENDIENTE,EN_REVISION,2026-07-01 10:42:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c03,2,EN_REVISION,EN_PROCESO,2026-07-13 17:50:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c2f,1,PENDIENTE,EN_REVISION,2026-06-29 13:13:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c2f,2,EN_REVISION,RECHAZADO,2026-07-01 02:57:49,No corresponde a la vía pública.
+6ae4fc9a9573523c57f12c34,1,PENDIENTE,EN_REVISION,2026-07-01 12:06:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c34,2,EN_REVISION,EN_PROCESO,2026-07-05 14:19:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c34,3,EN_PROCESO,RESUELTO,2026-07-15 18:01:49,Reparación terminada.
+6ae4fc9a9573523c57f12c75,1,PENDIENTE,EN_REVISION,2026-07-02 16:44:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c75,2,EN_REVISION,EN_PROCESO,2026-07-07 05:34:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c75,3,EN_PROCESO,RESUELTO,2026-07-30 13:18:49,Reparación terminada.
+6ae4fc9a9573523c57f12c2a,1,PENDIENTE,EN_REVISION,2026-07-07 08:20:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c2a,2,EN_REVISION,EN_PROCESO,2026-07-08 17:48:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bd1,1,PENDIENTE,EN_REVISION,2026-07-06 08:55:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bd1,2,EN_REVISION,EN_PROCESO,2026-07-14 11:00:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c49,1,PENDIENTE,EN_REVISION,2026-07-12 04:27:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c49,2,EN_REVISION,EN_PROCESO,2026-07-15 21:29:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c49,3,EN_PROCESO,RESUELTO,2026-07-22 13:09:49,Reparación terminada.
+6ae4fc9a9573523c57f12c24,1,PENDIENTE,EN_REVISION,2026-07-14 15:39:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c24,2,EN_REVISION,EN_PROCESO,2026-07-27 22:49:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c24,3,EN_PROCESO,RESUELTO,2026-08-07 15:25:49,Reparación terminada.
+6ae4fc999573523c57f12beb,1,PENDIENTE,EN_REVISION,2026-07-13 11:46:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12beb,2,EN_REVISION,EN_PROCESO,2026-07-23 06:51:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c6a,1,PENDIENTE,EN_REVISION,2026-07-19 11:46:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c6a,2,EN_REVISION,EN_PROCESO,2026-07-27 03:43:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bcd,1,PENDIENTE,EN_REVISION,2026-07-21 21:17:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bcd,2,EN_REVISION,EN_PROCESO,2026-07-25 04:07:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bb4,1,PENDIENTE,EN_REVISION,2026-08-03 06:12:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bb4,2,EN_REVISION,RECHAZADO,2026-08-04 16:24:49,No se encontró el daño en la ubicación indicada.
+6ae4fc9a9573523c57f12c2e,1,PENDIENTE,EN_REVISION,2026-08-03 21:15:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c1b,1,PENDIENTE,EN_REVISION,2026-08-03 15:59:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c1b,2,EN_REVISION,EN_PROCESO,2026-08-12 07:07:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c1b,3,EN_PROCESO,RESUELTO,2026-08-20 14:53:49,Reparación terminada.
+6ae4fc999573523c57f12bc4,1,PENDIENTE,EN_REVISION,2026-08-06 00:24:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c32,1,PENDIENTE,EN_REVISION,2026-08-07 17:03:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c00,1,PENDIENTE,EN_REVISION,2026-08-10 08:42:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c00,2,EN_REVISION,EN_PROCESO,2026-08-13 05:04:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c00,3,EN_PROCESO,RESUELTO,2026-08-20 14:57:49,Reparación terminada.
+6ae4fc9a9573523c57f12c70,1,PENDIENTE,EN_REVISION,2026-08-12 07:29:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c70,2,EN_REVISION,RECHAZADO,2026-08-16 14:16:49,No se encontró el daño en la ubicación indicada.
+6ae4fc9a9573523c57f12c63,1,PENDIENTE,EN_REVISION,2026-08-11 16:40:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c63,2,EN_REVISION,EN_PROCESO,2026-08-15 11:50:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bd8,1,PENDIENTE,EN_REVISION,2026-08-15 03:36:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bd8,2,EN_REVISION,EN_PROCESO,2026-08-18 14:21:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bd8,3,EN_PROCESO,RESUELTO,2026-09-10 09:21:49,Reparación terminada.
+6ae4fc9a9573523c57f12c45,1,PENDIENTE,EN_REVISION,2026-08-13 03:14:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c45,2,EN_REVISION,EN_PROCESO,2026-08-25 03:14:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c45,3,EN_PROCESO,RESUELTO,2026-09-16 00:46:49,Reparación terminada.
+6ae4fc9a9573523c57f12c5e,1,PENDIENTE,EN_REVISION,2026-08-13 12:23:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c5e,2,EN_REVISION,EN_PROCESO,2026-08-25 16:21:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bc5,1,PENDIENTE,EN_REVISION,2026-08-16 02:16:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c12,1,PENDIENTE,EN_REVISION,2026-08-15 14:41:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c12,2,EN_REVISION,EN_PROCESO,2026-08-21 03:57:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c12,3,EN_PROCESO,RESUELTO,2026-08-31 04:47:49,Reparación terminada.
+6ae4fc9a9573523c57f12c3c,1,PENDIENTE,EN_REVISION,2026-08-15 09:27:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c74,1,PENDIENTE,EN_REVISION,2026-08-16 17:24:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bfa,1,PENDIENTE,EN_REVISION,2026-08-19 05:09:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bfa,2,EN_REVISION,EN_PROCESO,2026-08-26 20:54:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bfa,3,EN_PROCESO,RESUELTO,2026-09-06 18:23:49,Reparación terminada.
+6ae4fc9a9573523c57f12c06,1,PENDIENTE,RECHAZADO,2026-08-20 09:11:49,Reporte duplicado de otro caso abierto.
+6ae4fc999573523c57f12bc2,1,PENDIENTE,EN_REVISION,2026-08-19 16:12:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bc2,2,EN_REVISION,EN_PROCESO,2026-08-27 04:42:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bc2,3,EN_PROCESO,RESUELTO,2026-09-17 14:40:49,Reparación terminada.
+6ae4fc9a9573523c57f12c6c,1,PENDIENTE,EN_REVISION,2026-08-23 19:31:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c54,1,PENDIENTE,EN_REVISION,2026-08-25 06:15:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c54,2,EN_REVISION,EN_PROCESO,2026-08-27 12:27:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bd5,1,PENDIENTE,RECHAZADO,2026-08-26 23:39:49,No corresponde a la vía pública.
+6ae4fc9a9573523c57f12c0e,1,PENDIENTE,EN_REVISION,2026-08-25 13:35:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c0e,2,EN_REVISION,EN_PROCESO,2026-08-31 00:18:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c62,1,PENDIENTE,EN_REVISION,2026-08-26 12:31:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bd6,1,PENDIENTE,EN_REVISION,2026-08-28 09:18:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bda,1,PENDIENTE,EN_REVISION,2026-09-01 18:53:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bda,2,EN_REVISION,EN_PROCESO,2026-09-11 08:52:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bda,3,EN_PROCESO,RESUELTO,2026-09-15 02:44:49,Reparación terminada.
+6ae4fc9a9573523c57f12c16,1,PENDIENTE,EN_REVISION,2026-08-30 15:14:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c5a,1,PENDIENTE,EN_REVISION,2026-09-03 03:45:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bd3,1,PENDIENTE,EN_REVISION,2026-09-05 23:58:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bd3,2,EN_REVISION,EN_PROCESO,2026-09-09 18:56:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bd3,3,EN_PROCESO,RESUELTO,2026-09-23 09:33:49,Reparación terminada.
+6ae4fc9a9573523c57f12c05,1,PENDIENTE,EN_REVISION,2026-09-07 06:15:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c05,2,EN_REVISION,EN_PROCESO,2026-09-15 15:40:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c78,1,PENDIENTE,EN_REVISION,2026-09-04 02:04:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c78,2,EN_REVISION,EN_PROCESO,2026-09-14 16:08:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bdd,1,PENDIENTE,EN_REVISION,2026-09-07 05:37:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bdd,2,EN_REVISION,EN_PROCESO,2026-09-12 13:22:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bdd,3,EN_PROCESO,RESUELTO,2026-10-04 01:40:49,Reparación terminada.
+6ae4fc9a9573523c57f12c28,1,PENDIENTE,EN_REVISION,2026-09-07 05:10:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c37,1,PENDIENTE,EN_REVISION,2026-09-08 03:00:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c37,2,EN_REVISION,EN_PROCESO,2026-09-14 09:17:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c37,3,EN_PROCESO,RESUELTO,2026-09-18 11:13:49,Reparación terminada.
+6ae4fc9a9573523c57f12c07,1,PENDIENTE,RECHAZADO,2026-09-07 14:44:49,No se encontró el daño en la ubicación indicada.
+6ae4fc9a9573523c57f12c3e,1,PENDIENTE,EN_REVISION,2026-09-08 07:12:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c18,1,PENDIENTE,EN_REVISION,2026-09-10 08:33:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c36,1,PENDIENTE,EN_REVISION,2026-09-11 16:59:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c36,2,EN_REVISION,EN_PROCESO,2026-09-22 09:42:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c36,3,EN_PROCESO,RECHAZADO,2026-09-24 08:34:49,No se encontró el daño en la ubicación indicada.
+6ae4fc999573523c57f12bb8,1,PENDIENTE,EN_REVISION,2026-09-13 22:06:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bb8,2,EN_REVISION,EN_PROCESO,2026-09-27 01:05:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bb8,3,EN_PROCESO,RESUELTO,2026-10-04 18:40:49,Reparación terminada.
+6ae4fc9a9573523c57f12c1a,1,PENDIENTE,EN_REVISION,2026-09-15 18:47:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bed,1,PENDIENTE,EN_REVISION,2026-09-18 10:29:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bf2,1,PENDIENTE,EN_REVISION,2026-09-20 07:36:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c35,1,PENDIENTE,EN_REVISION,2026-09-24 07:35:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bc1,1,PENDIENTE,EN_REVISION,2026-09-25 08:11:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bc1,2,EN_REVISION,EN_PROCESO,2026-10-07 12:49:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bc1,3,EN_PROCESO,RESUELTO,2026-10-26 19:01:49,Reparación terminada.
+6ae4fc999573523c57f12bbc,1,PENDIENTE,EN_REVISION,2026-09-27 19:48:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be3,1,PENDIENTE,EN_REVISION,2026-09-29 23:21:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c6d,1,PENDIENTE,EN_REVISION,2026-09-30 04:03:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bfe,1,PENDIENTE,EN_REVISION,2026-10-02 15:22:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bcf,1,PENDIENTE,EN_REVISION,2026-10-04 07:30:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c4c,1,PENDIENTE,EN_REVISION,2026-10-02 10:16:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c4c,2,EN_REVISION,EN_PROCESO,2026-10-10 10:25:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bc8,1,PENDIENTE,EN_REVISION,2026-10-04 16:07:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c2b,1,PENDIENTE,EN_REVISION,2026-10-04 22:16:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c2b,2,EN_REVISION,EN_PROCESO,2026-10-07 16:11:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c2b,3,EN_PROCESO,RESUELTO,2026-10-28 00:46:49,Reparación terminada.
+6ae4fc9a9573523c57f12c51,1,PENDIENTE,EN_REVISION,2026-10-08 04:05:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be1,1,PENDIENTE,EN_REVISION,2026-10-09 01:01:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be1,2,EN_REVISION,EN_PROCESO,2026-10-22 20:11:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12be5,1,PENDIENTE,EN_REVISION,2026-10-08 19:35:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12be5,2,EN_REVISION,EN_PROCESO,2026-10-10 06:25:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c31,1,PENDIENTE,EN_REVISION,2026-10-07 17:16:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c31,2,EN_REVISION,EN_PROCESO,2026-10-10 03:45:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c31,3,EN_PROCESO,RESUELTO,2026-10-16 09:10:49,Reparación terminada.
+6ae4fc9a9573523c57f12c3f,1,PENDIENTE,EN_REVISION,2026-10-10 07:44:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c3f,2,EN_REVISION,EN_PROCESO,2026-10-19 07:39:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c3f,3,EN_PROCESO,RESUELTO,2026-10-28 12:50:49,Reparación terminada.
+6ae4fc9a9573523c57f12c71,1,PENDIENTE,EN_REVISION,2026-10-13 08:28:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bef,1,PENDIENTE,EN_REVISION,2026-10-12 12:51:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c3d,1,PENDIENTE,EN_REVISION,2026-10-12 04:50:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c3d,2,EN_REVISION,EN_PROCESO,2026-10-17 23:26:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c67,1,PENDIENTE,EN_REVISION,2026-10-12 05:15:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bcc,1,PENDIENTE,EN_REVISION,2026-10-14 14:04:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bcc,2,EN_REVISION,EN_PROCESO,2026-10-22 04:20:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c33,1,PENDIENTE,EN_REVISION,2026-10-18 19:17:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bf8,1,PENDIENTE,EN_REVISION,2026-10-16 20:35:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12bf8,2,EN_REVISION,EN_PROCESO,2026-10-26 21:50:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12bf8,3,EN_PROCESO,RESUELTO,2026-10-29 05:08:49,Reparación terminada.
+6ae4fc999573523c57f12bde,1,PENDIENTE,EN_REVISION,2026-10-17 11:32:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bde,2,EN_REVISION,EN_PROCESO,2026-10-21 12:14:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc999573523c57f12bde,3,EN_PROCESO,RESUELTO,2026-10-29 07:25:49,Reparación terminada.
+6ae4fc999573523c57f12bbd,1,PENDIENTE,EN_REVISION,2026-10-18 11:24:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bbe,1,PENDIENTE,EN_REVISION,2026-10-22 04:43:49,Recibido: lo verificamos en terreno.
+6ae4fc999573523c57f12bbe,2,EN_REVISION,EN_PROCESO,2026-10-29 13:42:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c65,1,PENDIENTE,EN_REVISION,2026-10-22 08:15:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c65,2,EN_REVISION,EN_PROCESO,2026-10-25 03:15:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c65,3,EN_PROCESO,RESUELTO,2026-10-29 15:43:49,Reparación terminada.
+6ae4fc9a9573523c57f12c41,1,PENDIENTE,EN_REVISION,2026-10-24 17:21:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c41,2,EN_REVISION,EN_PROCESO,2026-10-29 23:20:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c57,1,PENDIENTE,EN_REVISION,2026-10-25 05:28:49,Recibido: lo verificamos en terreno.
+6ae4fc9a9573523c57f12c57,2,EN_REVISION,EN_PROCESO,2026-10-26 09:56:49,Programado con la cuadrilla de mantenimiento vial.
+6ae4fc9a9573523c57f12c57,3,EN_PROCESO,RESUELTO,2026-10-30 01:17:49,Reparación terminada.
