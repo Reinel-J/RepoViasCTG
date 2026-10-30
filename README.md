@@ -32,6 +32,8 @@ El panel de administración tiene una pestaña **Dashboard** (moderador y admin)
 (`resource.dashboard`, `params` vacío, vence en `METABASE_TOKEN_MINUTOS`) firmado con la clave de embebido de Metabase,
 que nunca sale del backend. El panel pide otra URL un minuto antes de que venza y el dashboard se actualiza solo cada
 minuto (`#refresh=60`). Sin configuración, la API responde `503` «El dashboard no está configurado».
+El botón **Descargar estadísticas (.csv)** de esa pestaña baja las cifras de la pestaña Estadísticas en un solo CSV
+(una cifra por fila: resumen, estados, meses y categorías), y cada tarjeta del dashboard también se descarga desde su menú.
 
 ### Cómo levantarlo
 
