@@ -190,6 +190,9 @@ button.admin-stat:hover { border-color: var(--coral); }
 .stats-table table { width: 100%; margin-top: 10px; border-collapse: collapse; color: var(--ink); }
 .stats-table th, .stats-table td { padding: 7px; border-bottom: 1px solid var(--line); text-align: left; }
 .stats-categories { align-content: start; }
+.dashboard-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.dashboard-toolbar a { font-size: 12px; font-weight: 700; color: var(--teal); }
+.dashboard-frame { display: block; width: 100%; height: 80vh; border: 1px solid var(--line); border-radius: 3px 18px 3px 3px; background: var(--white); }
 .stats-hbar { display: grid; grid-template-columns: 100px 1fr auto; gap: 9px; align-items: center; font-size: 12px; }
 .stats-hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stats-hbar-track { height: 8px; overflow: hidden; border-radius: 99px; background: var(--sand); }

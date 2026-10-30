@@ -1,6 +1,7 @@
 import client from './client'
 import type {
   CambioEstadoRequest,
+  DashboardResponse,
   EstadisticasResponse,
   EstadoReporte,
   HistorialEstadoResponse,
@@ -34,6 +35,12 @@ export async function historial(reporteId: string): Promise<HistorialEstadoRespo
 
 export async function estadisticas(): Promise<EstadisticasResponse> {
   const response = await client.get<EstadisticasResponse>('/admin/estadisticas')
+  return response.data
+}
+
+// URL firmada del dashboard de Metabase; 503 si el backend no lo tiene configurado.
+export async function obtenerDashboard(): Promise<DashboardResponse> {
+  const response = await client.get<DashboardResponse>('/admin/dashboard')
   return response.data
 }
 

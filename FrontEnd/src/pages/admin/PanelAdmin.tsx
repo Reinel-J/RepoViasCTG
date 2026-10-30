@@ -5,17 +5,19 @@ import { useAuth } from "../../context/useAuth"
 import { plural } from "../../utils/texto"
 import { BarriosAdmin } from "./BarriosAdmin"
 import { CategoriasAdmin } from "./CategoriasAdmin"
+import { DashboardAdmin } from "./DashboardAdmin"
 import { EstadisticasAdmin } from "./EstadisticasAdmin"
 import { ReportesAdmin } from "./ReportesAdmin"
 import { ResumenAdmin } from "./ResumenAdmin"
 import { UsuariosAdmin } from "./UsuariosAdmin"
 
-type Seccion = "resumen" | "reportes" | "estadisticas" | "usuarios" | "barrios" | "categorias"
+type Seccion = "resumen" | "reportes" | "estadisticas" | "dashboard" | "usuarios" | "barrios" | "categorias"
 
 const SECCIONES: { id: Seccion; etiqueta: string; soloAdmin: boolean }[] = [
   { id: "resumen", etiqueta: "Resumen", soloAdmin: false },
   { id: "reportes", etiqueta: "Reportes", soloAdmin: false },
   { id: "estadisticas", etiqueta: "Estadísticas", soloAdmin: false },
+  { id: "dashboard", etiqueta: "Dashboard", soloAdmin: false },
   { id: "usuarios", etiqueta: "Usuarios", soloAdmin: true },
   { id: "barrios", etiqueta: "Barrios", soloAdmin: true },
   { id: "categorias", etiqueta: "Categorías", soloAdmin: true },
@@ -72,6 +74,7 @@ export function PanelAdmin() {
       {actual === "resumen" && <ResumenAdmin onVerReportes={(estado) => irA(estado ? { seccion: "reportes", estado } : { seccion: "reportes" })} />}
       {actual === "reportes" && <ReportesAdmin estadoInicial={params.get("estado")} />}
       {actual === "estadisticas" && <EstadisticasAdmin />}
+      {actual === "dashboard" && <DashboardAdmin esAdmin={esAdmin} />}
       {actual === "usuarios" && <UsuariosAdmin usuarioActualId={session?.usuarioId} />}
       {actual === "barrios" && <BarriosAdmin />}
       {actual === "categorias" && <CategoriasAdmin />}

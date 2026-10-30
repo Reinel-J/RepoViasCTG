@@ -145,6 +145,12 @@ export interface EstadisticasResponse {
   densidad: { latitud: number; longitud: number; total: number }[]
 }
 
+// URL firmada del dashboard de Metabase para el iframe del panel; deja de valer en expiraEn.
+export interface DashboardResponse {
+  url: string
+  expiraEn: string
+}
+
 export interface CalleResponse {
   id: string
   nombre: string
