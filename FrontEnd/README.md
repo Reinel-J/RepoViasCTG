@@ -206,6 +206,7 @@ así que se puede enlazar directamente.
 | Usuarios | Admin | Buscar y filtrar por rol, cambiar el rol y activar/desactivar cuentas (no sobre uno mismo) |
 | Barrios | Admin | Crear, editar y eliminar barrios; agregar y quitar calles |
 | Categorías | Admin | Crear, editar, activar y desactivar (no se eliminan) |
+| Auditoría | Admin | Consultar acciones administrativas por entidad, acción y rango de fechas; incluye usuarios, reportes, barrios, categorías y tareas de seguimiento |
 
 Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coincidir con
 `ReporteService.validarTransicion` del backend. Las acciones destructivas piden confirmación con el diálogo

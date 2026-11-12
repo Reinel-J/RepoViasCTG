@@ -226,6 +226,18 @@ class BarrioServiceTests {
     }
 
     @Test
+    void eliminarConActorRegistraLaAuditoriaSoloDespuesDeBorrar() {
+        AuditoriaService auditoria = mock(AuditoriaService.class);
+        BarrioService servicioAuditado = new BarrioService(barrioRepository, mongoTemplate, auditoria);
+        Barrio barrio = barrioExistente();
+
+        servicioAuditado.eliminar("b1", "admin");
+
+        verify(barrioRepository).delete(barrio);
+        verify(auditoria).registrar("admin", "BARRIO_ELIMINADO", "BARRIO", "b1", "Getsemaní");
+    }
+
+    @Test
     void eliminarUnBarrioInexistenteFallaYNoBorra() {
         when(barrioRepository.findById("x")).thenReturn(Optional.empty());
 

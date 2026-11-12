@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +25,13 @@ import java.util.UUID;
 public class BarrioService {
     private final BarrioRepository barrioRepository;
     private final MongoTemplate mongoTemplate;
+    private final AuditoriaService auditoriaService;
 
-    public BarrioService(BarrioRepository barrioRepository, MongoTemplate mongoTemplate) {
+    public BarrioService(BarrioRepository barrioRepository, MongoTemplate mongoTemplate) { this(barrioRepository, mongoTemplate, null); }
+    @Autowired public BarrioService(BarrioRepository barrioRepository, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
         this.barrioRepository = barrioRepository;
         this.mongoTemplate = mongoTemplate;
+        this.auditoriaService = auditoriaService;
     }
 
     public Barrio crear(BarrioRequest request) {
@@ -36,6 +40,7 @@ public class BarrioService {
         return barrioRepository.save(Barrio.builder().nombre(nombre).nombreClave(CategoriaService.claveComparacion(nombre))
                 .localidad(request.localidad().trim()).calles(mapearCalles(request.calles())).build());
     }
+    public Barrio crear(BarrioRequest request, String actorId) { Barrio creado = crear(request); auditar(actorId, "BARRIO_CREADO", creado.getId(), creado.getNombre()); return creado; }
 
     public List<Barrio> listar() { return barrioRepository.findAll(); }
 
@@ -57,11 +62,13 @@ public class BarrioService {
         return modificar(Query.query(Criteria.where("_id").is(id)), new Update().set("nombre", nombre)
                 .set("nombreClave", CategoriaService.claveComparacion(nombre)).set("localidad", request.localidad().trim()), id);
     }
+    public Barrio actualizar(String id, BarrioRequest request, String actorId) { Barrio actualizado = actualizar(id, request); auditar(actorId, "BARRIO_EDITADO", id, actualizado.getNombre()); return actualizado; }
 
     public Barrio agregarCalle(String barrioId, CalleRequest request) {
         Calle calle = new Calle(UUID.randomUUID().toString(), request.nombre().trim(), request.codigoPostal().trim());
         return modificar(Query.query(Criteria.where("_id").is(barrioId)), new Update().push("calles", calle), barrioId);
     }
+    public Barrio agregarCalle(String id, CalleRequest request, String actorId) { Barrio actualizado = agregarCalle(id, request); auditar(actorId, "BARRIO_CALLE_AGREGADA", id, request.nombre().trim()); return actualizado; }
 
     public Barrio eliminarCalle(String barrioId, String calleId) {
         Query conLaCalle = Query.query(Criteria.where("_id").is(barrioId).and("calles.id").is(calleId));
@@ -72,6 +79,8 @@ public class BarrioService {
         buscarPorId(barrioId); // 404 del barrio si no existe; si existe, la que falta es la calle.
         throw new ResourceNotFoundException("Calle no encontrada: " + calleId);
     }
+    public Barrio eliminarCalle(String id, String calleId, String actorId) { Barrio actualizado = eliminarCalle(id, calleId); auditar(actorId, "BARRIO_CALLE_ELIMINADA", id, calleId); return actualizado; }
+    private void auditar(String actorId, String accion, String id, String detalle) { if (auditoriaService != null) auditoriaService.registrar(actorId, accion, "BARRIO", id, detalle); }
 
     public boolean existeCalle(String calleId) {
         return barrioRepository.findByCallesId(calleId).isPresent();
@@ -79,6 +88,12 @@ public class BarrioService {
 
     public void eliminar(String id) {
         barrioRepository.delete(buscarPorId(id));
+    }
+
+    public void eliminar(String id, String actorId) {
+        Barrio barrio = buscarPorId(id);
+        barrioRepository.delete(barrio);
+        auditar(actorId, "BARRIO_ELIMINADO", id, barrio.getNombre());
     }
 
     // Actualización parcial atómica: otra petición simultánea sobre el mismo barrio no pierde sus cambios.

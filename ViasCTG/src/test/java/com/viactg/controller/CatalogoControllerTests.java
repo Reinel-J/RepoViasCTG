@@ -41,7 +41,7 @@ class CatalogoControllerTests extends ControllerTestBase {
     @Test
     void crearBarrioDevuelve201ConSusCalles() throws Exception {
         BarrioRequest request = new BarrioRequest("Manga", "Histórica", List.of(new CalleRequest("Calle Real", "130001")));
-        when(barrioService.crear(request)).thenReturn(Barrio.builder().id("b1").nombre("Manga").localidad("Histórica")
+        when(barrioService.crear(request, "admin")).thenReturn(Barrio.builder().id("b1").nombre("Manga").localidad("Histórica")
                 .calles(List.of(new Calle("c1", "Calle Real", "130001"))).build());
 
         mvc.perform(post("/api/barrios").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN)).contentType(MediaType.APPLICATION_JSON)
@@ -49,6 +49,7 @@ class CatalogoControllerTests extends ControllerTestBase {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("b1"))
                 .andExpect(jsonPath("$.calles[0].id").value("c1"));
+        verify(barrioService).crear(request, "admin");
     }
 
     @Test
@@ -63,7 +64,7 @@ class CatalogoControllerTests extends ControllerTestBase {
 
     @Test
     void editarUnBarrioConCallesEnElCuerpoDevuelve400() throws Exception {
-        when(barrioService.actualizar(eq("b1"), any())).thenThrow(new InvalidRequestException(
+        when(barrioService.actualizar(eq("b1"), any(), eq("admin"))).thenThrow(new InvalidRequestException(
                 "Las calles no se modifican al editar el barrio: agrégalas o quítalas con POST /api/barrios/{id}/calles"));
 
         mvc.perform(put("/api/barrios/b1").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN)).contentType(MediaType.APPLICATION_JSON)
@@ -74,7 +75,7 @@ class CatalogoControllerTests extends ControllerTestBase {
 
     @Test
     void eliminarUnBarrioEnUsoDevuelve409() throws Exception {
-        doThrow(new BusinessRuleException("No se puede eliminar un barrio con calles")).when(barrioService).eliminar("b1");
+        doThrow(new BusinessRuleException("No se puede eliminar un barrio con calles")).when(barrioService).eliminar("b1", "admin");
 
         mvc.perform(delete("/api/barrios/b1").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN)))
                 .andExpect(status().isConflict())
@@ -95,7 +96,7 @@ class CatalogoControllerTests extends ControllerTestBase {
 
     @Test
     void unaCategoriaRepetidaDevuelve409SinExponerElMensajeDelDriver() throws Exception {
-        when(categoriaService.crear(any())).thenThrow(new DuplicateKeyException("E11000 duplicate key error collection: viasctg_db.categorias index: nombre_1"));
+        when(categoriaService.crear(any(), eq("admin"))).thenThrow(new DuplicateKeyException("E11000 duplicate key error collection: viasctg_db.categorias index: nombre_1"));
 
         mvc.perform(post("/api/categorias").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"nombre\":\"Hueco\"}"))

@@ -2,6 +2,8 @@ package com.viactg.controller;
 
 import com.viactg.exception.BusinessRuleException;
 import com.viactg.dto.CambioEstadoLoteResponse;
+import com.viactg.dto.PaginaResponse;
+import com.viactg.dto.RegistroAuditoriaResponse;
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.HistorialEstado;
 import com.viactg.model.PrioridadReporte;
@@ -29,6 +31,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AdminControllerTests extends ControllerTestBase {
+
+    @Test
+    void auditoriaEsSoloParaAdminYPermiteFiltrar() throws Exception {
+        RegistroAuditoriaResponse registro = new RegistroAuditoriaResponse("a1", Instant.parse("2026-11-12T15:00:00Z"),
+                "admin", "Usuario admin", "BARRIO_CREADO", "BARRIO", "b1", "Manga");
+        when(auditoriaService.listar("BARRIO", "BARRIO_CREADO", null, null, null, 0, 50))
+                .thenReturn(new PaginaResponse<>(List.of(registro), 0, 50, 1, 1));
+
+        mvc.perform(get("/api/admin/auditoria").header(HttpHeaders.AUTHORIZATION, bearer(Rol.MODERADOR)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/auditoria").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN))
+                        .param("entidad", "BARRIO").param("accion", "BARRIO_CREADO"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contenido[0].accion").value("BARRIO_CREADO"));
+
+        verify(auditoriaService).listar("BARRIO", "BARRIO_CREADO", null, null, null, 0, 50);
+    }
 
     @Test
     void pendientesListaSoloLosReportesPendientes() throws Exception {
@@ -75,6 +94,20 @@ class AdminControllerTests extends ControllerTestBase {
                 .andExpect(jsonPath("$.actualizados[0]").value("r1"))
                 .andExpect(jsonPath("$.fallidos[0].id").value("r2"))
                 .andExpect(jsonPath("$.fallidos[0].motivo").value("Reporte no encontrado: r2"));
+    }
+
+    @Test
+    void ejecutarTareaDiariaYMantenerAbiertoQuedanAuditados() throws Exception {
+        when(seguimientoService.ejecutarTareaDiaria(any())).thenReturn(new SeguimientoService.Ejecucion(4, 2));
+        when(seguimientoService.mantenerAbierto("r1")).thenReturn(new SeguimientoService.Resumen("r1", 3, 0, null, null, null));
+
+        mvc.perform(post("/api/admin/reportes/seguimiento/recordatorios").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN)))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/admin/reportes/r1/mantener-abierto").header(HttpHeaders.AUTHORIZATION, bearer(Rol.MODERADOR)))
+                .andExpect(status().isOk());
+
+        verify(auditoriaService).registrar("admin", "SEGUIMIENTO_TAREA_EJECUTADA", "SISTEMA", "seguimiento", "4 recordatorios, 2 cierres comunitarios");
+        verify(auditoriaService).registrar("moderador", "REPORTE_MANTENIDO_ABIERTO", "REPORTE", "r1", "Se descartó la propuesta de cierre comunitario");
     }
 
     @Test

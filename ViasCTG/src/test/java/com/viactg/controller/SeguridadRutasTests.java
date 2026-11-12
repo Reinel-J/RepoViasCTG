@@ -60,15 +60,15 @@ class SeguridadRutasTests extends ControllerTestBase {
         when(metabaseService.urlDashboard()).thenReturn(new DashboardResponse("http://localhost:3000/embed/dashboard/t", Instant.now()));
         Barrio barrio = Barrio.builder().id("b1").nombre("Manga").localidad("Histórica").build();
         when(barrioService.buscarPorId("b1")).thenReturn(barrio);
-        when(barrioService.crear(any())).thenReturn(barrio);
-        when(barrioService.actualizar(eq("b1"), any())).thenReturn(barrio);
-        when(barrioService.agregarCalle(eq("b1"), any())).thenReturn(barrio);
-        when(barrioService.eliminarCalle("b1", "c1")).thenReturn(barrio);
+        when(barrioService.crear(any(), anyString())).thenReturn(barrio);
+        when(barrioService.actualizar(eq("b1"), any(), anyString())).thenReturn(barrio);
+        when(barrioService.agregarCalle(eq("b1"), any(), anyString())).thenReturn(barrio);
+        when(barrioService.eliminarCalle(eq("b1"), eq("c1"), anyString())).thenReturn(barrio);
         Categoria categoria = Categoria.builder().id("c1").nombre("Hueco").activa(true).build();
         when(categoriaService.buscarPorId("c1")).thenReturn(categoria);
-        when(categoriaService.crear(any())).thenReturn(categoria);
-        when(categoriaService.actualizar(eq("c1"), any())).thenReturn(categoria);
-        when(categoriaService.cambiarEstado(eq("c1"), anyBoolean())).thenReturn(categoria);
+        when(categoriaService.crear(any(), anyString())).thenReturn(categoria);
+        when(categoriaService.actualizar(eq("c1"), any(), anyString())).thenReturn(categoria);
+        when(categoriaService.cambiarEstado(eq("c1"), anyBoolean(), anyString())).thenReturn(categoria);
         when(usuarioService.cambiarRol(eq("u1"), any(), anyString())).thenReturn(usuario(Rol.CIUDADANO));
         when(usuarioService.cambiarActivo(eq("u1"), anyBoolean(), anyString())).thenReturn(usuario(Rol.CIUDADANO));
     }

@@ -54,4 +54,17 @@ class CategoriaServiceTests {
         assertThat(CategoriaService.claveComparacion(" Daño  en Alcantarillado ")).isEqualTo("dano en alcantarillado");
         assertThat(List.of(CategoriaService.claveComparacion("Hueco"))).containsExactly("hueco");
     }
+
+    @Test
+    void cambiarEstadoConActorRegistraLaAccionDeAuditoria() {
+        AuditoriaService auditoria = mock(AuditoriaService.class);
+        CategoriaService servicioAuditado = new CategoriaService(categoriaRepository, auditoria);
+        Categoria categoria = Categoria.builder().id("c1").nombre("Hueco").activa(true).build();
+        when(categoriaRepository.findById("c1")).thenReturn(java.util.Optional.of(categoria));
+        when(categoriaRepository.save(categoria)).thenReturn(categoria);
+
+        servicioAuditado.cambiarEstado("c1", false, "admin");
+
+        verify(auditoria).registrar("admin", "CATEGORIA_DESACTIVADA", "CATEGORIA", "c1", "Hueco");
+    }
 }
