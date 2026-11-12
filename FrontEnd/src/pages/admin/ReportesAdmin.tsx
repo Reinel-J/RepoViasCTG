@@ -65,6 +65,11 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
   const [borradores, setBorradores] = useState<Record<string, Borrador>>({})
   const [historiales, setHistoriales] = useState<Record<string, HistorialEstadoResponse[]>>({})
   const [seguimientos, setSeguimientos] = useState<Record<string, SeguimientoResumenResponse>>({})
+  const [seleccionados, setSeleccionados] = useState<string[]>([])
+  const [estadoLote, setEstadoLote] = useState<EstadoReporte | "">("")
+  const [prioridadLote, setPrioridadLote] = useState<PrioridadReporte | "">("")
+  const [comentarioLote, setComentarioLote] = useState("")
+  const [resultadoLote, setResultadoLote] = useState<{ actualizados: number, fallidos: { id: string, motivo: string }[] } | null>(null)
 
   // Si falla, el panel sigue funcionando: solo no se muestran las señales de la comunidad.
   useEffect(() => {
@@ -102,6 +107,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
     setAviso("")
     setPagina(1)
     setEstado(nuevo)
+    setSeleccionados([])
   }
 
   function cambiarOrden(nuevo: OrdenReportes) {
@@ -111,6 +117,22 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
     } catch {
       // Algunos navegadores bloquean el almacenamiento; el orden sigue funcionando durante esta sesión.
     }
+  }
+
+  function alternarSeleccion(id: string) {
+    setSeleccionados((actuales) => actuales.includes(id) ? actuales.filter((actual) => actual !== id) : [...actuales, id])
+  }
+
+  async function aplicarLote() {
+    if (!estadoLote) return
+    if (estadoLote === "RECHAZADO" && !await confirmar({ titulo: "¿Rechazar estos reportes?", mensaje: "Es un estado final: los reportes ya no se podrán mover a otro estado. Se notificará a sus autores.", aceptar: "Rechazar reportes", peligro: true })) return
+    try {
+      const resultado = await adminApi.cambiarEstadoLote({ ids: seleccionados, nuevoEstado: estadoLote, comentario: comentarioLote.trim() || undefined, prioridad: prioridadLote || undefined })
+      setResultadoLote({ actualizados: resultado.actualizados.length, fallidos: resultado.fallidos })
+      setSeleccionados(resultado.fallidos.map(({ id }) => id))
+      setEstadoLote(""); setPrioridadLote(""); setComentarioLote("")
+      setVersion((actual) => actual + 1)
+    } catch (exception) { setAviso(mensajeError(exception, "No fue posible actualizar los reportes.")) }
   }
 
   function borrador(id: string): Borrador {
@@ -179,6 +201,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
     <section className="admin-section">
       <Dialogo dialogo={dialogo} />
       <div className="toolbar">
+        <label><input type="checkbox" aria-label="Seleccionar los de esta página" checked={visibles.length > 0 && visibles.every(({ id }) => seleccionados.includes(id))} onChange={() => setSeleccionados(visibles.every(({ id }) => seleccionados.includes(id)) ? [] : visibles.map(({ id }) => id))} /> Seleccionar los de esta página</label>
         <label>Estado
           <select value={estado} onChange={(event) => cambiarFiltro(event.target.value as EstadoReporte | "")}>
             <option value="">Todos</option>
@@ -186,7 +209,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
           </select>
         </label>
         <label>Buscar
-          <input type="search" value={busqueda} onChange={(event) => { setBusqueda(event.target.value); setPagina(1) }} placeholder="Descripción, categoría o dirección" />
+          <input type="search" value={busqueda} onChange={(event) => { setBusqueda(event.target.value); setPagina(1); setSeleccionados([]) }} placeholder="Descripción, categoría o dirección" />
         </label>
         <label>Ordenar por
           <select value={orden} onChange={(event) => cambiarOrden(event.target.value as OrdenReportes)}>
@@ -200,6 +223,8 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
       {cargando && !datos && <div className="loading">Cargando reportes…</div>}
       {error && <p className="alert error" role="alert">{error}</p>}
       {aviso && <p className="alert success" role="status">{aviso}</p>}
+      {resultadoLote && <div className="alert success" role="status">{plural(resultadoLote.actualizados, "reporte")} actualizado{resultadoLote.actualizados === 1 ? "" : "s"}.{resultadoLote.fallidos.length > 0 && <> {plural(resultadoLote.fallidos.length, "reporte")} no se {resultadoLote.fallidos.length === 1 ? "pudo" : "pudieron"} actualizar.<ul>{resultadoLote.fallidos.map(({ id, motivo }) => <li key={id}>{id}: {motivo}</li>)}</ul></>}</div>}
+      {seleccionados.length > 0 && <div className="admin-batch" role="region" aria-label="Acciones en lote"><strong>{plural(seleccionados.length, "reporte")} seleccionado{seleccionados.length === 1 ? "" : "s"}</strong><select aria-label="Nuevo estado" value={estadoLote} onChange={(event) => setEstadoLote(event.target.value as EstadoReporte | "")}><option value="">Nuevo estado</option>{ESTADOS.map((opcion) => <option key={opcion} value={opcion}>{ETIQUETA_ESTADO[opcion]}</option>)}</select><select aria-label="Prioridad" value={prioridadLote} onChange={(event) => setPrioridadLote(event.target.value as PrioridadReporte | "")}><option value="">Prioridad (sin cambiar)</option>{PRIORIDADES.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}</select><input maxLength={500} value={comentarioLote} onChange={(event) => setComentarioLote(event.target.value)} placeholder="Comentario opcional" /><button className="button button-dark button-small" disabled={!estadoLote} onClick={aplicarLote}>Aplicar</button><button className="button button-ghost button-small" onClick={() => setSeleccionados([])}>Cancelar</button></div>}
       {!cargando && !error && visibles.length === 0 && <div className="empty-state"><Icon name="check" className="empty-icon" /><h2>No hay reportes</h2><p>No hay reportes que coincidan con este filtro.</p></div>}
       <div className={cargando ? "admin-list is-loading" : "admin-list"} aria-busy={cargando}>
         {visibles.map((reporte) => {
@@ -208,6 +233,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
           return (
             <article key={reporte.id} className="admin-report">
               <div className="admin-report-main">
+                <label><input type="checkbox" aria-label={`Seleccionar reporte ${reporte.descripcion}`} checked={seleccionados.includes(reporte.id)} onChange={() => alternarSeleccion(reporte.id)} /> Seleccionar</label>
                 <div className="admin-report-tags">
                   <StatusBadge status={reporte.estado} />
                   <span className={`priority priority-${reporte.prioridad.toLowerCase()}`}>{reporte.prioridad}</span>
@@ -262,9 +288,9 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
       </div>
       {totalPaginas > 1 && (
         <nav className="pagination" aria-label="Paginación">
-          <button className="button button-ghost button-small" disabled={pagina <= 1} onClick={() => setPagina(pagina - 1)}>← Anterior</button>
+          <button className="button button-ghost button-small" disabled={pagina <= 1} onClick={() => { setPagina(pagina - 1); setSeleccionados([]) }}>← Anterior</button>
           <span>Página {pagina} de {totalPaginas}</span>
-          <button className="button button-ghost button-small" disabled={pagina >= totalPaginas} onClick={() => setPagina(pagina + 1)}>Siguiente →</button>
+          <button className="button button-ghost button-small" disabled={pagina >= totalPaginas} onClick={() => { setPagina(pagina + 1); setSeleccionados([]) }}>Siguiente →</button>
         </nav>
       )}
     </section>

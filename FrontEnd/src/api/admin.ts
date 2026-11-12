@@ -1,6 +1,8 @@
 import client from './client'
 import type {
   CambioEstadoRequest,
+  CambioEstadoLoteRequest,
+  CambioEstadoLoteResponse,
   DashboardResponse,
   EstadisticasResponse,
   EstadoReporte,
@@ -14,6 +16,11 @@ import type {
 
 export async function listarPendientes(): Promise<ReporteResponse[]> {
   const response = await client.get<ReporteResponse[]>('/admin/reportes/pendientes')
+  return response.data
+}
+
+export async function cambiarEstadoLote(request: CambioEstadoLoteRequest): Promise<CambioEstadoLoteResponse> {
+  const response = await client.post<CambioEstadoLoteResponse>('/admin/reportes/estado-lote', request)
   return response.data
 }
 

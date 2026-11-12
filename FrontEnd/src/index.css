@@ -98,6 +98,8 @@
 .toolbar label, .admin-report-actions label, .admin-inline-form label { display: grid; gap: 5px; color: var(--ink-soft); font-size: 12px; font-weight: 700; }
 .toolbar input, .toolbar select, .admin-report-actions input, .admin-report-actions select, .admin-inline-form input, .admin-table select { min-height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 3px 9px 3px 9px; outline: 0; background: var(--cream); color: var(--ink); font: 500 13px var(--sans); }
 .toolbar .muted { margin-left: auto; }
+.admin-batch { position: sticky; bottom: 12px; z-index: 3; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; padding: 12px; background: var(--ink); color: var(--white); border-radius: 8px; }
+.admin-batch select, .admin-batch input { min-height: 36px; padding: 0 8px; }
 .muted, .admin-note { color: var(--ink-soft); font-size: 13px; }
 .admin-note { margin: 0; }
 .admin-utility { margin: -10px 0 20px; display: flex; align-items: center; gap: 10px; }

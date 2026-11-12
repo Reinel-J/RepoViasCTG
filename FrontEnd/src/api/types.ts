@@ -60,6 +60,8 @@ export interface CambioEstadoRequest {
   comentario?: string
   prioridad?: PrioridadReporte
 }
+export interface CambioEstadoLoteRequest extends CambioEstadoRequest { ids: string[] }
+export interface CambioEstadoLoteResponse { actualizados: string[]; fallidos: { id: string; motivo: string }[] }
 
 export interface HistorialEstadoResponse {
   id: string
