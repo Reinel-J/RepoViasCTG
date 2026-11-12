@@ -62,6 +62,7 @@ export interface CambioEstadoRequest {
 }
 export interface CambioEstadoLoteRequest extends CambioEstadoRequest { ids: string[] }
 export interface CambioEstadoLoteResponse { actualizados: string[]; fallidos: { id: string; motivo: string }[] }
+export interface RegistroAuditoriaResponse { id: string; fecha: string; actorId: string; actorNombre: string; accion: string; entidad: string; entidadId: string; detalle: string }
 
 export interface HistorialEstadoResponse {
   id: string

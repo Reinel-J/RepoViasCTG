@@ -12,10 +12,17 @@ import type {
   Rol,
   SeguimientoResumenResponse,
   UsuarioResponse,
+  PaginaResponse,
+  RegistroAuditoriaResponse,
 } from './types'
 
 export async function listarPendientes(): Promise<ReporteResponse[]> {
   const response = await client.get<ReporteResponse[]>('/admin/reportes/pendientes')
+  return response.data
+}
+
+export async function auditoria(params: { entidad?: string; accion?: string; desde?: string; hasta?: string; pagina?: number; tamano?: number }): Promise<PaginaResponse<RegistroAuditoriaResponse>> {
+  const response = await client.get<PaginaResponse<RegistroAuditoriaResponse>>('/admin/auditoria', { params })
   return response.data
 }
 
