@@ -54,6 +54,7 @@ public class SecurityConfig {
                         // el cuerpo, así que sin permiso la respuesta es 403 y no los errores de validación (400) de
                         // un formulario que no se le deja usar. Mantener en sincronía con los @PreAuthorize.
                         .requestMatchers("/api/admin/reportes/seguimiento/recordatorios").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/auditoria/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MODERADOR")
                         .requestMatchers(HttpMethod.GET, "/api/usuarios").hasRole("ADMIN")
                         .requestMatchers("/api/usuarios/*/rol", "/api/usuarios/*/activo").hasRole("ADMIN")

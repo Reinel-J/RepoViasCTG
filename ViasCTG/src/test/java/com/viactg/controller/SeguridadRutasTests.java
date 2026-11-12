@@ -132,6 +132,7 @@ class SeguridadRutasTests extends ControllerTestBase {
         String categoria = "{\"nombre\":\"Hueco\"}";
         return Stream.of(
                 Arguments.of(HttpMethod.POST, "/api/admin/reportes/seguimiento/recordatorios", null),
+                Arguments.of(HttpMethod.GET, "/api/admin/auditoria", null),
                 Arguments.of(HttpMethod.POST, "/api/barrios", barrio),
                 Arguments.of(HttpMethod.PUT, "/api/barrios/b1", barrio),
                 Arguments.of(HttpMethod.POST, "/api/barrios/b1/calles", "{\"nombre\":\"Calle Real\",\"codigoPostal\":\"130001\"}"),

@@ -19,6 +19,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -44,11 +45,17 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final MongoTemplate mongoTemplate;
+    private final AuditoriaService auditoriaService;
 
     public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, MongoTemplate mongoTemplate) {
+        this(usuarioRepository, passwordEncoder, mongoTemplate, null);
+    }
+    @Autowired
+    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.mongoTemplate = mongoTemplate;
+        this.auditoriaService = auditoriaService;
     }
 
     /** Forma canónica del correo (independiente del idioma del servidor). */
@@ -111,14 +118,19 @@ public class UsuarioService {
         if (id.equals(solicitanteId)) {
             throw new BusinessRuleException("No puedes cambiar tu propio rol");
         }
-        return actualizarCampos(id, new Update().set("rol", rol));
+        Rol anterior = buscarPorId(id).getRol();
+        Usuario actualizado = actualizarCampos(id, new Update().set("rol", rol));
+        auditar(solicitanteId, "USUARIO_ROL_CAMBIADO", id, anterior + " → " + actualizado.getRol());
+        return actualizado;
     }
 
     public Usuario cambiarActivo(String id, boolean activo, String solicitanteId) {
         if (id.equals(solicitanteId)) {
             throw new BusinessRuleException("No puedes desactivar tu propia cuenta");
         }
-        return actualizarCampos(id, new Update().set("activo", activo));
+        Usuario actualizado = actualizarCampos(id, new Update().set("activo", activo));
+        auditar(solicitanteId, "USUARIO_ESTADO_CAMBIADO", id, activo ? "Cuenta activada" : "Cuenta desactivada");
+        return actualizado;
     }
 
     /** Guarda una contraseña nueva e invalida todos los JWT emitidos antes (sube la versión del token). */
@@ -193,6 +205,9 @@ public class UsuarioService {
             throw new ResourceNotFoundException("Usuario no encontrado: " + id);
         }
         return actualizado;
+    }
+    private void auditar(String actorId, String accion, String entidadId, String detalle) {
+        if (auditoriaService != null) auditoriaService.registrar(actorId, accion, "USUARIO", entidadId, detalle);
     }
 
     private static String limpiarTelefono(String telefono) {

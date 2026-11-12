@@ -19,6 +19,7 @@ import com.viactg.security.MongoUserDetailsService;
 import com.viactg.security.UsuarioPrincipal;
 import com.viactg.service.AreaServicio;
 import com.viactg.service.AuthService;
+import com.viactg.service.AuditoriaService;
 import com.viactg.service.BarrioService;
 import com.viactg.service.CategoriaService;
 import com.viactg.service.ComentarioService;
@@ -64,6 +65,7 @@ abstract class ControllerTestBase {
     @MockBean protected LimitadorIntentos limitador;
     @MockBean protected AreaServicio areaServicio;
     @MockBean protected AuthService authService;
+    @MockBean protected AuditoriaService auditoriaService;
     @MockBean protected BarrioService barrioService;
     @MockBean protected CategoriaService categoriaService;
     @MockBean protected ComentarioService comentarioService;

@@ -28,6 +28,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -86,6 +87,7 @@ public class ReporteService {
     private final ConfirmacionRepository confirmacionRepository;
     private final LimitadorIntentos limitador;
     private final AreaServicio areaServicio;
+    private final AuditoriaService auditoriaService;
     private final Path uploadsDirectory;
     // Un solo hilo: Nominatim limita a 1 petición/s y así no se bloquea la petición HTTP del usuario.
     private final ExecutorService geocodingExecutor = Executors.newSingleThreadExecutor(runnable -> {
@@ -99,6 +101,14 @@ public class ReporteService {
                           NotificacionService notificacionService, CategoriaService categoriaService,
                           ConfirmacionRepository confirmacionRepository, LimitadorIntentos limitador,
                           AreaServicio areaServicio, @Value("${app.uploads.dir:uploads}") String uploadsDirectory) {
+        this(reporteRepository, usuarioRepository, usuarioService, mongoTemplate, geocodingService, notificacionService, categoriaService, confirmacionRepository, limitador, areaServicio, uploadsDirectory, null);
+    }
+    @Autowired
+    public ReporteService(ReporteRepository reporteRepository, UsuarioRepository usuarioRepository,
+                          UsuarioService usuarioService, MongoTemplate mongoTemplate, GeocodingService geocodingService,
+                          NotificacionService notificacionService, CategoriaService categoriaService,
+                          ConfirmacionRepository confirmacionRepository, LimitadorIntentos limitador,
+                          AreaServicio areaServicio, @Value("${app.uploads.dir:uploads}") String uploadsDirectory, AuditoriaService auditoriaService) {
         this.reporteRepository = reporteRepository;
         this.usuarioRepository = usuarioRepository;
         this.usuarioService = usuarioService;
@@ -110,6 +120,7 @@ public class ReporteService {
         this.limitador = limitador;
         this.areaServicio = areaServicio;
         this.uploadsDirectory = Path.of(uploadsDirectory);
+        this.auditoriaService = auditoriaService;
     }
 
     public Reporte crear(ReporteCrearRequest request, String usuarioId) {
@@ -347,7 +358,10 @@ public class ReporteService {
         }
         Reporte reporte = buscarPorId(reporteId);
         validarTransicion(reporte.getEstado(), nuevoEstado);
-        return aplicarCambioEstado(reporte, nuevoEstado, adminId, comentario, prioridad);
+        Reporte actualizado = aplicarCambioEstado(reporte, nuevoEstado, adminId, comentario, prioridad);
+        if (auditoriaService != null) auditoriaService.registrar(adminId, "REPORTE_ESTADO_CAMBIADO", "REPORTE", reporteId,
+                reporte.getEstado() + " → " + nuevoEstado);
+        return actualizado;
     }
 
     /**

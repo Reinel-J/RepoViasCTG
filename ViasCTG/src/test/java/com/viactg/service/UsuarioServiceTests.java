@@ -57,6 +57,7 @@ class UsuarioServiceTests {
 
     @Test
     void cambiarRolSoloModificaElCampoRol() {
+        when(usuarioRepository.findById("u-1")).thenReturn(Optional.of(Usuario.builder().id("u-1").rol(Rol.CIUDADANO).build()));
         devolverAlActualizar(Usuario.builder().id("u-1").rol(Rol.MODERADOR).activo(true).build());
 
         assertThat(service.cambiarRol("u-1", Rol.MODERADOR, "admin-1").getRol()).isEqualTo(Rol.MODERADOR);
