@@ -1,6 +1,8 @@
 package com.viactg.controller;
 
 import com.viactg.dto.CambioEstadoRequest;
+import com.viactg.dto.CambioEstadoLoteRequest;
+import com.viactg.dto.CambioEstadoLoteResponse;
 import com.viactg.dto.HistorialEstadoResponse;
 import com.viactg.dto.RecordatoriosResponse;
 import com.viactg.dto.ReporteResponse;
@@ -29,6 +31,11 @@ public class AdminController {
     @PatchMapping("/{id}/estado")
     public ReporteResponse cambiarEstado(@PathVariable String id, @AuthenticationPrincipal UsuarioPrincipal principal, @Valid @RequestBody CambioEstadoRequest request) {
         return reporteMapper.toResponse(reporteService.cambiarEstadoReporte(id, request.nuevoEstado(), principal.getId(), request.comentario(), request.prioridad()));
+    }
+    @PostMapping("/estado-lote") @PreAuthorize("hasAnyRole('ADMIN', 'MODERADOR')")
+    public CambioEstadoLoteResponse cambiarEstadoLote(@AuthenticationPrincipal UsuarioPrincipal principal,
+                                                      @Valid @RequestBody CambioEstadoLoteRequest request) {
+        return reporteService.cambiarEstadoLote(request, principal.getId());
     }
     @GetMapping("/{id}/historial") public List<HistorialEstadoResponse> historial(@PathVariable String id) { return reporteService.historial(id).stream().map(reporteMapper::toHistorialResponse).toList(); }
     @GetMapping("/seguimiento") public List<SeguimientoResumenResponse> seguimientos() { return seguimientoService.resumenes().stream().map(SeguimientoController::aRespuesta).toList(); }

@@ -1,6 +1,7 @@
 package com.viactg.controller;
 
 import com.viactg.exception.BusinessRuleException;
+import com.viactg.dto.CambioEstadoLoteResponse;
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.HistorialEstado;
 import com.viactg.model.PrioridadReporte;
@@ -60,6 +61,33 @@ class AdminControllerTests extends ControllerTestBase {
                 .andExpect(status().isOk());
 
         verify(reporteService).cambiarEstadoReporte(eq("r1"), eq(EstadoReporte.RECHAZADO), eq("admin"), isNull(), isNull());
+    }
+
+    @Test
+    void cambiarEstadoLoteDevuelveActualizadosYFallidos() throws Exception {
+        when(reporteService.cambiarEstadoLote(any(), eq("moderador"))).thenReturn(new CambioEstadoLoteResponse(
+                List.of("r1"), List.of(new CambioEstadoLoteResponse.Fallo("r2", "Reporte no encontrado: r2"))));
+
+        mvc.perform(post("/api/admin/reportes/estado-lote").header(HttpHeaders.AUTHORIZATION, bearer(Rol.MODERADOR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"r1\",\"r2\"],\"nuevoEstado\":\"EN_REVISION\",\"comentario\":\"Asignado\",\"prioridad\":\"ALTA\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.actualizados[0]").value("r1"))
+                .andExpect(jsonPath("$.fallidos[0].id").value("r2"))
+                .andExpect(jsonPath("$.fallidos[0].motivo").value("Reporte no encontrado: r2"));
+    }
+
+    @Test
+    void cambiarEstadoLoteValidaIdsYEstado() throws Exception {
+        mvc.perform(post("/api/admin/reportes/estado-lote").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"ids\":[]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors.ids").value("Selecciona al menos un reporte"))
+                .andExpect(jsonPath("$.validationErrors.nuevoEstado").value("El nuevo estado es obligatorio"));
+        mvc.perform(post("/api/admin/reportes/estado-lote").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"ids\":[" + "\"r\",".repeat(50) + "\"r\"],\"nuevoEstado\":\"EN_REVISION\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors.ids").value("Puedes actualizar como máximo 50 reportes a la vez"));
     }
 
     @Test

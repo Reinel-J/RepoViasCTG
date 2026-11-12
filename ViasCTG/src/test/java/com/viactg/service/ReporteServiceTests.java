@@ -1,8 +1,11 @@
 package com.viactg.service;
 
 import com.viactg.dto.ReporteActualizarRequest;
+import com.viactg.dto.CambioEstadoLoteRequest;
+import com.viactg.dto.CambioEstadoLoteResponse;
 import com.viactg.dto.ReporteCrearRequest;
 import com.viactg.exception.BusinessRuleException;
+import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.exception.TooManyRequestsException;
 import com.viactg.model.Confirmacion;
 import com.viactg.model.EstadoReporte;
@@ -41,6 +44,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 class ReporteServiceTests {
     private final ReporteRepository reporteRepository = mock(ReporteRepository.class);
@@ -66,6 +72,37 @@ class ReporteServiceTests {
         return Reporte.builder().id(id).usuarioId(autor).descripcion("Hueco grande frente al colegio")
                 .latitud(10.391).longitud(-75.479).estado(EstadoReporte.PENDIENTE)
                 .fechaCreacion(Instant.now()).fechaActualizacion(Instant.now()).build();
+    }
+
+    @Test
+    void cambiarEstadoLoteProcesaCadaIdUnaVezYConservaComentarioYPrioridad() {
+        ReporteService servicio = spy(crearServicio());
+        doReturn(pendiente("r1", "u1")).when(servicio).cambiarEstadoReporte("r1", EstadoReporte.EN_REVISION, "admin", "Asignado", com.viactg.model.PrioridadReporte.ALTA);
+        doReturn(pendiente("r2", "u2")).when(servicio).cambiarEstadoReporte("r2", EstadoReporte.EN_REVISION, "admin", "Asignado", com.viactg.model.PrioridadReporte.ALTA);
+
+        CambioEstadoLoteResponse resultado = servicio.cambiarEstadoLote(new CambioEstadoLoteRequest(
+                List.of("r1", " ", "r1", "r2"), EstadoReporte.EN_REVISION, "Asignado", com.viactg.model.PrioridadReporte.ALTA), "admin");
+
+        assertThat(resultado.actualizados()).containsExactly("r1", "r2");
+        assertThat(resultado.fallidos()).isEmpty();
+        verify(servicio).cambiarEstadoReporte("r1", EstadoReporte.EN_REVISION, "admin", "Asignado", com.viactg.model.PrioridadReporte.ALTA);
+        verify(servicio).cambiarEstadoReporte("r2", EstadoReporte.EN_REVISION, "admin", "Asignado", com.viactg.model.PrioridadReporte.ALTA);
+    }
+
+    @Test
+    void cambiarEstadoLoteContinuaCuandoUnReporteNoExisteONoPermiteLaTransicion() {
+        ReporteService servicio = spy(crearServicio());
+        doReturn(pendiente("r1", "u1")).when(servicio).cambiarEstadoReporte("r1", EstadoReporte.RECHAZADO, "admin", null, null);
+        doThrow(new ResourceNotFoundException("Reporte no encontrado: nada")).when(servicio).cambiarEstadoReporte("nada", EstadoReporte.RECHAZADO, "admin", null, null);
+        doThrow(new BusinessRuleException("No se puede pasar de RESUELTO a RECHAZADO")).when(servicio).cambiarEstadoReporte("r3", EstadoReporte.RECHAZADO, "admin", null, null);
+
+        CambioEstadoLoteResponse resultado = servicio.cambiarEstadoLote(new CambioEstadoLoteRequest(
+                List.of("r1", "nada", "r3"), EstadoReporte.RECHAZADO, null, null), "admin");
+
+        assertThat(resultado.actualizados()).containsExactly("r1");
+        assertThat(resultado.fallidos()).extracting(CambioEstadoLoteResponse.Fallo::id).containsExactly("nada", "r3");
+        assertThat(resultado.fallidos()).extracting(CambioEstadoLoteResponse.Fallo::motivo)
+                .containsExactly("Reporte no encontrado: nada", "No se puede pasar de RESUELTO a RECHAZADO");
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.viactg.service;
 
 import com.viactg.dto.OpcionesFiltroResponse;
+import com.viactg.dto.CambioEstadoLoteRequest;
+import com.viactg.dto.CambioEstadoLoteResponse;
 import com.viactg.dto.ReporteActualizarRequest;
 import com.viactg.dto.ReporteCrearRequest;
 import com.viactg.exception.BusinessRuleException;
@@ -42,6 +44,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.LinkedHashSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -345,6 +348,30 @@ public class ReporteService {
         Reporte reporte = buscarPorId(reporteId);
         validarTransicion(reporte.getEstado(), nuevoEstado);
         return aplicarCambioEstado(reporte, nuevoEstado, adminId, comentario, prioridad);
+    }
+
+    /**
+     * Cambia cada reporte de forma independiente. Un error no revierte los anteriores ni impide procesar los demás;
+     * el moderador recibe el motivo para decidir qué hacer con los que quedaron pendientes.
+     */
+    public CambioEstadoLoteResponse cambiarEstadoLote(CambioEstadoLoteRequest request, String adminId) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        for (String id : request.ids()) {
+            if (id != null && !id.isBlank()) ids.add(id.trim());
+        }
+        List<String> actualizados = new ArrayList<>();
+        List<CambioEstadoLoteResponse.Fallo> fallidos = new ArrayList<>();
+        for (String id : ids) {
+            try {
+                cambiarEstadoReporte(id, request.nuevoEstado(), adminId, request.comentario(), request.prioridad());
+                actualizados.add(id);
+            } catch (RuntimeException exception) {
+                String motivo = exception.getMessage();
+                fallidos.add(new CambioEstadoLoteResponse.Fallo(id,
+                        motivo == null || motivo.isBlank() ? "No fue posible actualizar el reporte" : motivo));
+            }
+        }
+        return new CambioEstadoLoteResponse(actualizados, fallidos);
     }
 
     /**

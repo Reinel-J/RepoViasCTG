@@ -119,6 +119,7 @@ class SeguridadRutasTests extends ControllerTestBase {
         return Stream.of(
                 Arguments.of(HttpMethod.GET, "/api/admin/reportes/pendientes", null),
                 Arguments.of(HttpMethod.PATCH, "/api/admin/reportes/r1/estado", "{\"nuevoEstado\":\"EN_REVISION\"}"),
+                Arguments.of(HttpMethod.POST, "/api/admin/reportes/estado-lote", "{\"ids\":[\"r1\"],\"nuevoEstado\":\"EN_REVISION\"}"),
                 Arguments.of(HttpMethod.GET, "/api/admin/reportes/r1/historial", null),
                 Arguments.of(HttpMethod.GET, "/api/admin/reportes/seguimiento", null),
                 Arguments.of(HttpMethod.POST, "/api/admin/reportes/r1/mantener-abierto", null),
