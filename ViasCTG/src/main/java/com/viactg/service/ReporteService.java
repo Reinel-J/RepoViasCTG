@@ -1,5 +1,6 @@
 package com.viactg.service;
 
+import com.viactg.dto.OpcionesFiltroResponse;
 import com.viactg.dto.ReporteActualizarRequest;
 import com.viactg.dto.ReporteCrearRequest;
 import com.viactg.exception.BusinessRuleException;
@@ -30,10 +31,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Collator;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -58,6 +61,17 @@ public class ReporteService {
     // Protección contra spam: un ciudadano puede reportar varios daños de un recorrido, pero no cientos.
     static final int MAX_REPORTES_POR_HORA = 10;
     private static final Sort MAS_RECIENTES = Sort.by(Sort.Direction.DESC, "fechaCreacion");
+    private static final Sort MAS_RECIENTES_ESTABLE = Sort.by(Sort.Direction.DESC, "fechaCreacion", "_id");
+    private static final List<String> CAMPOS_BUSQUEDA = List.of("categoriaId", "descripcion", "direccionOsm", "barrioOsm");
+    static final int MAX_REPORTES_MAPA = 5000;
+
+    /** Filtros del listado público; cualquiera puede ser null (o vacío, en los de texto) para no filtrar por él. */
+    public record FiltroReportes(EstadoReporte estado, String categoria, String barrio, String texto) {
+    }
+
+    /** Los reportes de una página y cuántos cumplen el filtro en total. */
+    public record Pagina(List<Reporte> contenido, long total) {
+    }
 
     private final ReporteRepository reporteRepository;
     private final UsuarioRepository usuarioRepository;
@@ -125,16 +139,75 @@ public class ReporteService {
         });
     }
 
-    /** Del más reciente al más antiguo; {@code limite} null devuelve todos. */
-    public List<Reporte> listar(EstadoReporte estado, Integer limite) {
-        Query query = new Query().with(MAS_RECIENTES);
+    /**
+     * Una página del listado público, del más reciente al más antiguo. Los filtros de categoría y barrio comparan el
+     * valor completo y la búsqueda de texto busca en categoría, descripción, dirección y barrio; ninguno distingue
+     * mayúsculas ni tildes. El {@code _id} desempata reportes creados en el mismo instante, para que ninguno se
+     * repita ni se salte entre una página y la siguiente.
+     */
+    public Pagina listar(FiltroReportes filtro, int pagina, int tamano) {
+        Query query = consultaFiltrada(filtro);
+        long total = mongoTemplate.count(query, Reporte.class);
+        long desde = (long) pagina * tamano;
+        if (desde >= total) return new Pagina(List.of(), total);
+        query.with(MAS_RECIENTES_ESTABLE).skip(desde).limit(tamano);
+        return new Pagina(mongoTemplate.find(query, Reporte.class), total);
+    }
+
+    private static Query consultaFiltrada(FiltroReportes filtro) {
+        Query query = new Query();
+        if (filtro.estado() != null) query.addCriteria(Criteria.where("estado").is(filtro.estado()));
+        if (tieneTexto(filtro.categoria())) {
+            query.addCriteria(Criteria.where("categoriaId").regex(PatronTexto.igual(filtro.categoria()), "i"));
+        }
+        if (tieneTexto(filtro.barrio())) {
+            query.addCriteria(Criteria.where("barrioOsm").regex(PatronTexto.igual(filtro.barrio()), "i"));
+        }
+        if (tieneTexto(filtro.texto())) {
+            String patron = PatronTexto.contiene(filtro.texto());
+            query.addCriteria(new Criteria().orOperator(CAMPOS_BUSQUEDA.stream()
+                    .map(campo -> Criteria.where(campo).regex(patron, "i")).toList()));
+        }
+        return query;
+    }
+
+    private static boolean tieneTexto(String texto) {
+        return texto != null && !texto.isBlank();
+    }
+
+    /**
+     * Reportes para el mapa público, del más reciente al más antiguo, con solo los campos que dibuja el mapa y su
+     * primera foto. Como mucho {@link #MAX_REPORTES_MAPA}.
+     */
+    public List<Reporte> listarParaMapa(EstadoReporte estado) {
+        Query query = new Query().with(MAS_RECIENTES_ESTABLE).limit(MAX_REPORTES_MAPA);
         if (estado != null) query.addCriteria(Criteria.where("estado").is(estado));
-        if (limite != null) query.limit(limite);
+        query.fields().include("latitud", "longitud", "estado", "categoriaId", "descripcion", "direccionOsm", "barrioOsm")
+                .slice("fotos", 1);
         return mongoTemplate.find(query, Reporte.class);
     }
 
+    /** Opciones de los filtros de categoría y barrio: las que tiene algún reporte, sin repetir variantes de escritura. */
+    public OpcionesFiltroResponse opcionesFiltro() {
+        return new OpcionesFiltroResponse(valoresDistintos("categoriaId"), valoresDistintos("barrioOsm"));
+    }
+
+    private List<String> valoresDistintos(String campo) {
+        Map<String, String> unicos = new HashMap<>();
+        for (String valor : mongoTemplate.findDistinct(new Query(), campo, Reporte.class, String.class)) {
+            if (!tieneTexto(valor)) continue;
+            String limpio = valor.trim();
+            unicos.putIfAbsent(CategoriaService.claveComparacion(limpio), limpio);
+        }
+        Collator orden = Collator.getInstance(Locale.forLanguageTag("es"));
+        return unicos.values().stream().sorted(orden).toList();
+    }
+
+    /** Todos los reportes (de un estado, si se indica), del más reciente al más antiguo. */
     public List<Reporte> listar(EstadoReporte estado) {
-        return listar(estado, null);
+        Query query = new Query().with(MAS_RECIENTES);
+        if (estado != null) query.addCriteria(Criteria.where("estado").is(estado));
+        return mongoTemplate.find(query, Reporte.class);
     }
 
     /** Reportes creados por el usuario, del más reciente al más antiguo; {@code estado} null devuelve todos. */
@@ -303,7 +376,7 @@ public class ReporteService {
         notificarCambioEstado(actualizado, nuevoEstado);
         return actualizado;
     }
-
+//Se notifica el cambio de una notififacion
     private void notificarCambioEstado(Reporte reporte, EstadoReporte nuevoEstado) {
         try {
             notificacionService.crear(reporte.getUsuarioId(), reporte.getId(),

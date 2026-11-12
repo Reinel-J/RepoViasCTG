@@ -1,6 +1,7 @@
 package com.viactg.mapper;
 
 import com.viactg.dto.HistorialEstadoResponse;
+import com.viactg.dto.ReporteMapaResponse;
 import com.viactg.dto.ReporteResponse;
 import com.viactg.model.HistorialEstado;
 import com.viactg.model.Reporte;
@@ -17,6 +18,12 @@ public class ReporteMapper {
                 reporte.getLongitud(), reporte.getEstado(), reporte.getPrioridad(), reporte.getFechaCreacion(),
                 reporte.getFechaActualizacion(), reporte.getHistorialEstados() == null ? List.of()
                         : reporte.getHistorialEstados().stream().map(this::toHistorialResponse).toList());
+    }
+
+    public ReporteMapaResponse toMapaResponse(Reporte reporte) {
+        String foto = reporte.getFotos() == null || reporte.getFotos().isEmpty() ? null : reporte.getFotos().get(0);
+        return new ReporteMapaResponse(reporte.getId(), reporte.getLatitud(), reporte.getLongitud(), reporte.getEstado(),
+                reporte.getCategoriaId(), reporte.getDescripcion(), reporte.getDireccionOsm(), reporte.getBarrioOsm(), foto);
     }
 
     public HistorialEstadoResponse toHistorialResponse(HistorialEstado historial) {

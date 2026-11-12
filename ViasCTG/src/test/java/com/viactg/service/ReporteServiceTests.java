@@ -96,15 +96,77 @@ class ReporteServiceTests {
     }
 
     @Test
-    void listarOrdenaDelMasRecienteAlMasAntiguoYAplicaElLimite() {
-        crearServicio().listar(EstadoReporte.RESUELTO, 3);
+    void listarCuentaLosQueCumplenElFiltroYPideSoloLaPaginaDelMasRecienteAlMasAntiguo() {
+        Reporte esperado = pendiente("r-1", "u-1");
+        when(mongoTemplate.count(any(Query.class), eq(Reporte.class))).thenReturn(45L);
+        when(mongoTemplate.find(any(Query.class), eq(Reporte.class))).thenReturn(List.of(esperado));
+
+        ReporteService.Pagina pagina = crearServicio().listar(
+                new ReporteService.FiltroReportes(EstadoReporte.RESUELTO, null, " ", null), 2, 20);
 
         ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).find(queryCaptor.capture(), eq(Reporte.class));
         Query consulta = queryCaptor.getValue();
-        assertThat(consulta.getSortObject()).isEqualTo(new Document("fechaCreacion", -1));
-        assertThat(consulta.getQueryObject().get("estado")).isEqualTo(EstadoReporte.RESUELTO);
-        assertThat(consulta.getLimit()).isEqualTo(3);
+        assertThat(pagina.contenido()).containsExactly(esperado);
+        assertThat(pagina.total()).isEqualTo(45);
+        assertThat(consulta.getSortObject()).isEqualTo(new Document("fechaCreacion", -1).append("_id", -1));
+        // Un barrio en blanco no filtra.
+        assertThat(consulta.getQueryObject()).isEqualTo(new Document("estado", EstadoReporte.RESUELTO));
+        assertThat(consulta.getSkip()).isEqualTo(40);
+        assertThat(consulta.getLimit()).isEqualTo(20);
+    }
+
+    @Test
+    void listarMasAllaDeLaUltimaPaginaNoConsultaLosReportes() {
+        when(mongoTemplate.count(any(Query.class), eq(Reporte.class))).thenReturn(20L);
+
+        ReporteService.Pagina pagina = crearServicio().listar(new ReporteService.FiltroReportes(null, null, null, null), 1, 20);
+
+        assertThat(pagina.contenido()).isEmpty();
+        assertThat(pagina.total()).isEqualTo(20);
+        verify(mongoTemplate, never()).find(any(Query.class), eq(Reporte.class));
+    }
+
+    @Test
+    void listarFiltraCategoriaYBarrioCompletosYBuscaElTextoEnCuatroCampos() {
+        when(mongoTemplate.count(any(Query.class), eq(Reporte.class))).thenReturn(1L);
+
+        crearServicio().listar(new ReporteService.FiltroReportes(null, "hueco", "Manga", "colegio"), 0, 20);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).count(queryCaptor.capture(), eq(Reporte.class));
+        String consulta = queryCaptor.getValue().getQueryObject().toJson();
+        assertThat(consulta).contains("categoriaId", "barrioOsm", "$or", "descripcion", "direccionOsm", "\"options\": \"i\"");
+        assertThat(queryCaptor.getValue().getQueryObject().get("$or", List.class)).hasSize(4);
+    }
+
+    @Test
+    void elMapaPideSoloLosCamposQueDibujaYLaPrimeraFoto() {
+        crearServicio().listarParaMapa(null);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(Reporte.class));
+        Query consulta = queryCaptor.getValue();
+        assertThat(consulta.getQueryObject()).isEmpty();
+        assertThat(consulta.getLimit()).isEqualTo(ReporteService.MAX_REPORTES_MAPA);
+        assertThat(consulta.getFieldsObject()).containsEntry("fotos", new Document("$slice", 1))
+                .containsKeys("latitud", "longitud", "estado", "categoriaId", "descripcion", "direccionOsm", "barrioOsm")
+                .doesNotContainKeys("usuarioId", "historialEstados");
+    }
+
+    @Test
+    void lasOpcionesDeFiltroQuitanVaciosYVariantesYQuedanEnOrdenAlfabetico() {
+        when(mongoTemplate.findDistinct(any(Query.class), eq("categoriaId"), eq(Reporte.class), eq(String.class)))
+                .thenReturn(List.of("Señal", "hueco ", "Hueco", "Árbol caído"));
+        List<String> barrios = new ArrayList<>(List.of("Manga", "  "));
+        barrios.add(null);
+        when(mongoTemplate.findDistinct(any(Query.class), eq("barrioOsm"), eq(Reporte.class), eq(String.class))).thenReturn(barrios);
+
+        var opciones = crearServicio().opcionesFiltro();
+
+        assertThat(opciones.categorias()).hasSize(3).startsWith("Árbol caído").endsWith("Señal");
+        assertThat(opciones.categorias().get(1)).isIn("hueco", "Hueco");
+        assertThat(opciones.barrios()).containsExactly("Manga");
     }
 
     @Test

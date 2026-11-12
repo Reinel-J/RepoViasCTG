@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { NavLink, useNavigate } from "react-router"
-import { cargarReportes, fotoReporte, type Reporte } from "../../api/reporteVista"
+import { cargarPagina, fotoReporte, type Reporte } from "../../api/reporteVista"
 import * as reportesApi from "../../api/reportes"
 import type { EstadoReporte, ResumenReportesResponse } from "../../api/types"
 import { useAuth } from "../../context/useAuth"
@@ -49,8 +49,8 @@ export function Home() {
   }, [])
   useEffect(() => {
     let vigente = true
-    cargarReportes(ESTADOS_FILTRO[filtro], 3)
-      .then((datos) => { if (vigente) { setReportes(datos); setError("") } })
+    cargarPagina({ estado: ESTADOS_FILTRO[filtro], tamano: 3 })
+      .then((pagina) => { if (vigente) { setReportes(pagina.contenido); setError("") } })
       .catch((exception) => { if (vigente) setError(exception instanceof Error ? exception.message : "No fue posible cargar los reportes.") })
       .finally(() => { if (vigente) setCargado(true) })
     return () => { vigente = false }

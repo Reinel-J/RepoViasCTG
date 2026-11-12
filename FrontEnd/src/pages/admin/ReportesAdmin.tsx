@@ -2,14 +2,17 @@ import { useEffect, useState } from "react"
 import { Link } from "react-router"
 import * as adminApi from "../../api/admin"
 import * as reportesApi from "../../api/reportes"
-import type { EstadoReporte, HistorialEstadoResponse, PrioridadReporte, ReporteResponse, SeguimientoResumenResponse } from "../../api/types"
+import type { EstadoReporte, HistorialEstadoResponse, PaginaResponse, PrioridadReporte, ReporteResponse, SeguimientoResumenResponse } from "../../api/types"
 import { Icon, StatusBadge } from "../../app/components/UI"
 import { Dialogo } from "../../components/Dialogo"
 import { useDialogo } from "../../components/useDialogo"
 import { plural } from "../../utils/texto"
+import { useValorDiferido } from "../../utils/useValorDiferido"
 import { ACCION_ESTADO, ESTADOS, ETIQUETA_ESTADO, PRIORIDADES, SIGUIENTES, mensajeError } from "./estados"
 
 const POR_PAGINA = 10
+
+type CargaPagina = { clave: string } & ({ pagina: PaginaResponse<ReporteResponse> } | { error: string })
 
 function sinClave<T>(registro: Record<string, T>, clave: string) {
   return Object.fromEntries(Object.entries(registro).filter(([actual]) => actual !== clave))
@@ -40,12 +43,11 @@ function SenalComunidad({ seguimiento }: { seguimiento?: SeguimientoResumenRespo
 }
 
 export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null }) {
-  const [reportes, setReportes] = useState<ReporteResponse[]>([])
   const [estado, setEstado] = useState<EstadoReporte | "">(ESTADOS.includes(estadoInicial as EstadoReporte) ? estadoInicial as EstadoReporte : "")
   const [busqueda, setBusqueda] = useState("")
   const [pagina, setPagina] = useState(1)
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState("")
+  // Sube para volver a pedir la misma página (por ejemplo, cuando un reporte sale del filtro y hay que rellenarla).
+  const [version, setVersion] = useState(0)
   const [aviso, setAviso] = useState("")
   const [resultado, setResultado] = useState<Resultado | null>(null)
   const { dialogo, confirmar } = useDialogo()
@@ -61,16 +63,33 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
       .catch(() => setSeguimientos({}))
   }, [])
 
+  // La búsqueda y la paginación las resuelve el servidor; al servidor se le pregunta cuando se deja de escribir.
+  const textoBuscado = useValorDiferido(busqueda.trim())
+  const filtro = JSON.stringify({ estado: estado || undefined, q: textoBuscado, pagina: pagina - 1, tamano: POR_PAGINA })
+  const clave = `${filtro}#${version}`
+  const [carga, setCarga] = useState<CargaPagina | null>(null)
   useEffect(() => {
-    reportesApi.listar(estado || undefined)
-      .then((lista) => setReportes([...lista].sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion))))
-      .catch((exception) => setError(mensajeError(exception, "No fue posible cargar los reportes.")))
-      .finally(() => setCargando(false))
-  }, [estado])
+    let vigente = true
+    reportesApi.listar(JSON.parse(filtro))
+      .then((respuesta) => { if (vigente) setCarga({ clave, pagina: respuesta }) })
+      .catch((exception) => { if (vigente) setCarga({ clave, error: mensajeError(exception, "No fue posible cargar los reportes.") }) })
+    return () => { vigente = false }
+  }, [clave, filtro])
+  const cargando = carga?.clave !== clave
+  const datos = carga && "pagina" in carga ? carga.pagina : null
+  const error = !cargando && carga && "error" in carga ? carga.error : ""
+  const visibles = datos?.contenido ?? []
+  const total = datos?.totalElementos ?? 0
+  const totalPaginas = Math.max(1, datos?.totalPaginas ?? 1)
+
+  function reemplazar(actualizado: ReporteResponse) {
+    setCarga((actual) => actual && "pagina" in actual
+      ? { ...actual, pagina: { ...actual.pagina, contenido: actual.pagina.contenido.map((item) => (item.id === actualizado.id ? actualizado : item)) } }
+      : actual)
+  }
 
   function cambiarFiltro(nuevo: EstadoReporte | "") {
-    setCargando(true)
-    setError("")
+    setAviso("")
     setPagina(1)
     setEstado(nuevo)
   }
@@ -92,9 +111,10 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
     try {
       const actualizado = await adminApi.cambiarEstado(reporte.id, nuevoEstado, comentario.trim() || undefined, prioridad)
       const saleDelFiltro = Boolean(estado) && actualizado.estado !== estado
-      setReportes((actuales) => saleDelFiltro
-        ? actuales.filter((item) => item.id !== reporte.id)
-        : actuales.map((item) => (item.id === reporte.id ? actualizado : item)))
+      // Si sale del filtro se vuelve a pedir la página para rellenarla; si era el último de una página, la anterior.
+      if (!saleDelFiltro) reemplazar(actualizado)
+      else if (visibles.length === 1 && pagina > 1) setPagina(pagina - 1)
+      else setVersion((actual) => actual + 1)
       setBorradores((actuales) => ({ ...actuales, [reporte.id]: { comentario: "" } }))
       setHistoriales((actuales) => sinClave(actuales, reporte.id))
       const texto = `Reporte movido a «${ETIQUETA_ESTADO[nuevoEstado]}». Se notificó a su autor.`
@@ -136,14 +156,6 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
     }
   }
 
-  const texto = busqueda.trim().toLowerCase()
-  const filtrados = texto
-    ? reportes.filter((reporte) => [reporte.descripcion, reporte.categoriaId, reporte.direccionOsm ?? ""].some((campo) => campo.toLowerCase().includes(texto)))
-    : reportes
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
-  const paginaActual = Math.min(pagina, totalPaginas)
-  const visibles = filtrados.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA)
-
   return (
     <section className="admin-section">
       <Dialogo dialogo={dialogo} />
@@ -157,13 +169,13 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
         <label>Buscar
           <input type="search" value={busqueda} onChange={(event) => { setBusqueda(event.target.value); setPagina(1) }} placeholder="Descripción, categoría o dirección" />
         </label>
-        <span className="muted">{plural(filtrados.length, "reporte")}</span>
+        <span className="muted">{cargando ? "Cargando…" : plural(total, "reporte")}</span>
       </div>
-      {cargando && <div className="loading">Cargando reportes…</div>}
+      {cargando && !datos && <div className="loading">Cargando reportes…</div>}
       {error && <p className="alert error" role="alert">{error}</p>}
       {aviso && <p className="alert success" role="status">{aviso}</p>}
-      {!cargando && filtrados.length === 0 && <div className="empty-state"><Icon name="check" className="empty-icon" /><h2>No hay reportes</h2><p>No hay reportes que coincidan con este filtro.</p></div>}
-      <div className="admin-list">
+      {!cargando && !error && visibles.length === 0 && <div className="empty-state"><Icon name="check" className="empty-icon" /><h2>No hay reportes</h2><p>No hay reportes que coincidan con este filtro.</p></div>}
+      <div className={cargando ? "admin-list is-loading" : "admin-list"} aria-busy={cargando}>
         {visibles.map((reporte) => {
           const siguientes = SIGUIENTES[reporte.estado]
           const ocupado = procesandoId === reporte.id
@@ -224,9 +236,9 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
       </div>
       {totalPaginas > 1 && (
         <nav className="pagination" aria-label="Paginación">
-          <button className="button button-ghost button-small" disabled={paginaActual === 1} onClick={() => setPagina(paginaActual - 1)}>← Anterior</button>
-          <span>Página {paginaActual} de {totalPaginas}</span>
-          <button className="button button-ghost button-small" disabled={paginaActual === totalPaginas} onClick={() => setPagina(paginaActual + 1)}>Siguiente →</button>
+          <button className="button button-ghost button-small" disabled={pagina <= 1} onClick={() => setPagina(pagina - 1)}>← Anterior</button>
+          <span>Página {pagina} de {totalPaginas}</span>
+          <button className="button button-ghost button-small" disabled={pagina >= totalPaginas} onClick={() => setPagina(pagina + 1)}>Siguiente →</button>
         </nav>
       )}
     </section>

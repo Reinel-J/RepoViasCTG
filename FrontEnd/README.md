@@ -165,8 +165,12 @@ Notas de comportamiento:
   llegar con `direccionOsm` en `null`; mientras tanto se muestran las coordenadas.
 - Al cambiar la contraseña el backend devuelve un token nuevo y `renovarSesion` lo guarda, así que la sesión actual sigue abierta y las demás se cierran.
 - Los comentarios muestran el nombre real del autor (`usuarioNombre`, que entrega el backend).
-- La lista filtra en el cliente sobre la respuesta completa de `GET /api/reportes` y no pagina;
-  conviene pasar a paginación del lado del servidor si crece el volumen.
+- La lista (`/reportes`) pide páginas de 12 a `GET /api/reportes`: el servidor aplica el estado, la categoría, el
+  barrio y la búsqueda (sin tildes ni mayúsculas). Los filtros y la página van en la URL (`?pagina=` empieza en 1);
+  cambiar un filtro vuelve a la primera página y la búsqueda consulta 300 ms después de la última tecla
+  (`utils/useValorDiferido.ts`). Las opciones de los selectores salen de `GET /api/reportes/filtros`.
+- El mapa usa `GET /api/reportes/mapa` (puntos livianos, hasta 5000) y filtra en el cliente; la pestaña Reportes del
+  panel también pagina en el servidor (10 por página) y el Resumen sale de `GET /admin/estadisticas`.
 - Las notificaciones las genera el backend cuando un moderador cambia el estado de un reporte.
 - La campana de la cabecera (`components/CampanaNotificaciones.tsx`, en la portada y en `PortalShell`) muestra
   las no leídas (tope «9+») con `GET /notificaciones/sin-leer`: consulta al montarse, al cambiar de página, al
@@ -214,14 +218,15 @@ la pestaña Reportes.
 - Los mapas (Leaflet y su CSS) se cargan con `import()` dinámico desde `src/components/MapasDiferidos.tsx`:
   la portada, el listado y el login no los descargan. No importes `MapaReportes`, `MapaSeleccionPunto` ni
   `MapaDensidad` directamente desde una pantalla; usa los de `MapasDiferidos`.
-- La portada usa `GET /reportes/resumen` y `GET /reportes?limite=3` en lugar de descargar todos los reportes.
+- La portada usa `GET /reportes/resumen` y `GET /reportes?tamano=3` en lugar de descargar todos los reportes; la
+  lista y el panel piden páginas y el mapa, puntos sin historial ni autor.
 - `src/utils/imagenes.ts` reduce las fotos a 1600 px y las vuelve a codificar en JPEG antes de subirlas, lo
   que además elimina sus metadatos EXIF (ubicación GPS, modelo del teléfono).
 - nginx comprime con gzip y cachea un año los assets con hash.
 
 ## Pendiente
 
-- Paginación del lado del servidor (el listado y el mapa aún descargan todos los reportes).
+- Mapa por zona visible (bbox) en lugar de hasta 5000 puntos; paginación de comentarios y notificaciones.
 - Pruebas de extremo a extremo (hoy hay pruebas unitarias con Vitest y de componentes con Testing Library, como
   `DashboardAdmin.test.tsx`, que corren en jsdom con `// @vitest-environment jsdom`).
 - El token JWT se guarda en `localStorage`, expuesto a XSS; agregar una Content-Security-Policy en nginx y

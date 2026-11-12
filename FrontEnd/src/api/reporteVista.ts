@@ -1,6 +1,6 @@
 import * as reportesApi from './reportes'
 import { empiezaPalabra } from '../utils/texto'
-import type { EstadoReporte, HistorialEstadoResponse, PrioridadReporte, ReporteResponse } from './types'
+import type { EstadoReporte, HistorialEstadoResponse, PaginaResponse, PrioridadReporte, ReporteResponse } from './types'
 
 // Reporte tal como lo consumen las pantallas públicas: el DTO del backend más los textos y clases ya resueltos.
 export interface Reporte {
@@ -86,9 +86,10 @@ function normalizar(reporte: ReporteResponse): Reporte {
   }
 }
 
-// Del más reciente al más antiguo (así los ordena el backend).
-export async function cargarReportes(estado?: EstadoReporte, limite?: number): Promise<Reporte[]> {
-  return (await reportesApi.listar(estado, limite)).map(normalizar)
+// Una página de reportes del más reciente al más antiguo (así los ordena el backend).
+export async function cargarPagina(filtro: reportesApi.FiltroReportes = {}): Promise<PaginaResponse<Reporte>> {
+  const pagina = await reportesApi.listar(filtro)
+  return { ...pagina, contenido: pagina.contenido.map(normalizar) }
 }
 
 export async function cargarMisReportes(): Promise<Reporte[]> {

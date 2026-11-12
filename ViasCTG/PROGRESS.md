@@ -79,6 +79,13 @@
   503 sin configuración; pestaña Dashboard en el panel con renovación automática de la URL y auto-refresco cada minuto;
   datos de demostración (`SEED_DEMO`, 200 reportes marcados con `[DEMO]`); guía `docs/metabase.md` con las ocho
   preguntas, verificadas contra la pestaña Estadísticas y mongosh.
+- Paginación de `GET /api/reportes` (1 de noviembre de 2026): `{contenido, pagina, tamano, totalElementos,
+  totalPaginas}` con `pagina` desde 0 y `tamano` hasta 100, orden estable por `fechaCreacion` y `_id` (índice
+  `fecha_id`) y filtros en el servidor (`estado`, `categoria`, `barrio`, `q`) sin tildes ni mayúsculas mediante
+  expresiones regulares escapadas (`PatronTexto`). Reemplaza el parámetro `limite`. Nuevos `GET /api/reportes/mapa`
+  (puntos livianos, hasta 5000) y `GET /api/reportes/filtros` (opciones de los selectores); las estadísticas suman
+  `prioridadActivos` y `pendienteMasAntiguo` para el Resumen del panel. En el frontend, la lista, la portada y la
+  pestaña Reportes piden páginas; ninguna pantalla descarga ya todos los reportes completos.
 
 ## Pendiente recomendado
 
@@ -86,7 +93,8 @@
   (3.3.13 es solo el último parche de 3.3). Implica Spring Framework 7, Jackson 3 y springdoc 3.
 - Pruebas de integración con MongoDB desechable (Testcontainers) para índices, consultas geoespaciales y
   actualizaciones atómicas.
-- Paginación en `GET /api/reportes`, comentarios y notificaciones (el listado y el mapa aún descargan todos).
+- Paginación de comentarios, notificaciones y `GET /api/admin/reportes/pendientes`; el mapa trae hasta 5000 puntos
+  (más adelante, por zona visible).
 - Quitar también en el servidor los metadatos EXIF de las fotos (hoy lo hace el navegador antes de subirlas).
 - Content-Security-Policy en nginx y, a mediano plazo, sesión en cookie `HttpOnly` en lugar de `localStorage`.
 - No exponer los id internos de usuarios en respuestas públicas: `GET /confirmaciones` (bastan el conteo y

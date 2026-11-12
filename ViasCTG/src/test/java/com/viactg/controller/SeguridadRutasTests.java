@@ -1,6 +1,7 @@
 package com.viactg.controller;
 
 import com.viactg.dto.DashboardResponse;
+import com.viactg.dto.OpcionesFiltroResponse;
 import com.viactg.model.Barrio;
 import com.viactg.model.Categoria;
 import com.viactg.model.Rol;
@@ -22,12 +23,14 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -48,6 +51,8 @@ class SeguridadRutasTests extends ControllerTestBase {
     void respuestasDeLosServicios() {
         when(reporteService.buscarPorId("r1")).thenReturn(reporte("r1", "ciudadano"));
         when(reporteService.calcularResumen(any())).thenReturn(new ReporteService.Resumen(0, Map.of(), 0, 0));
+        when(reporteService.listar(any(), anyInt(), anyInt())).thenReturn(new ReporteService.Pagina(List.of(), 0));
+        when(reporteService.opcionesFiltro()).thenReturn(new OpcionesFiltroResponse(List.of(), List.of()));
         when(reporteService.cambiarEstadoReporte(eq("r1"), any(), anyString(), any(), any())).thenReturn(reporte("r1", "ciudadano"));
         when(seguimientoService.resumen(eq("r1"), any())).thenReturn(new SeguimientoService.Resumen("r1", 0, 0, null, null, null));
         when(seguimientoService.mantenerAbierto("r1")).thenReturn(new SeguimientoService.Resumen("r1", 0, 0, null, null, null));
@@ -69,7 +74,8 @@ class SeguridadRutasTests extends ControllerTestBase {
     }
 
     static Stream<String> rutasPublicas() {
-        return Stream.of("/api/reportes", "/api/reportes?estado=PENDIENTE&limite=5", "/api/reportes/resumen",
+        return Stream.of("/api/reportes", "/api/reportes?estado=PENDIENTE&pagina=1&tamano=5", "/api/reportes/resumen",
+                "/api/reportes/mapa", "/api/reportes/filtros",
                 "/api/reportes/r1", "/api/reportes/cercanos?lat=10.42&lng=-75.54",
                 "/api/reportes/posibles-duplicados?lat=10.42&lng=-75.54", "/api/reportes/r1/comentarios",
                 "/api/reportes/r1/confirmaciones", "/api/reportes/r1/seguimiento", "/api/barrios", "/api/barrios/b1",

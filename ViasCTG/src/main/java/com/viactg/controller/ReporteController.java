@@ -1,8 +1,11 @@
 package com.viactg.controller;
 
+import com.viactg.dto.OpcionesFiltroResponse;
+import com.viactg.dto.PaginaResponse;
 import com.viactg.dto.PosibleDuplicadoResponse;
 import com.viactg.dto.ReporteActualizarRequest;
 import com.viactg.dto.ReporteCrearRequest;
+import com.viactg.dto.ReporteMapaResponse;
 import com.viactg.dto.ReporteResponse;
 import com.viactg.dto.ResumenReportesResponse;
 import com.viactg.mapper.ReporteMapper;
@@ -16,6 +19,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -34,12 +38,33 @@ public class ReporteController {
     private final ReporteMapper reporteMapper;
     public ReporteController(ReporteService reporteService, DuplicadoService duplicadoService, ReporteMapper reporteMapper) { this.reporteService = reporteService; this.duplicadoService = duplicadoService; this.reporteMapper = reporteMapper; }
 
-    // Del más reciente al más antiguo. "limite" devuelve solo los N más recientes (por ejemplo, para la portada).
+    // Una página del listado, del más reciente al más antiguo; "pagina" empieza en 0. Categoría y barrio comparan el
+    // valor completo y "q" busca en categoría, descripción, dirección y barrio, sin distinguir mayúsculas ni tildes.
     @GetMapping
-    public List<ReporteResponse> listar(@RequestParam(required = false) EstadoReporte estado,
-                                        @RequestParam(required = false) @Min(value = 1, message = "El límite debe ser al menos 1")
-                                        @Max(value = 100, message = "El límite no puede superar 100") Integer limite) {
-        return reporteService.listar(estado, limite).stream().map(reporteMapper::toResponse).toList();
+    public PaginaResponse<ReporteResponse> listar(
+            @RequestParam(required = false) EstadoReporte estado,
+            @RequestParam(required = false) @Size(max = 100, message = "La categoría no puede superar 100 caracteres") String categoria,
+            @RequestParam(required = false) @Size(max = 100, message = "El barrio no puede superar 100 caracteres") String barrio,
+            @RequestParam(required = false) @Size(max = 100, message = "La búsqueda no puede superar 100 caracteres") String q,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "La página no puede ser negativa") int pagina,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "El tamaño de página debe ser al menos 1")
+            @Max(value = 100, message = "El tamaño de página no puede superar 100") int tamano) {
+        ReporteService.Pagina resultado = reporteService.listar(new ReporteService.FiltroReportes(estado, categoria, barrio, q), pagina, tamano);
+        int totalPaginas = (int) ((resultado.total() + tamano - 1) / tamano);
+        return new PaginaResponse<>(resultado.contenido().stream().map(reporteMapper::toResponse).toList(), pagina, tamano,
+                resultado.total(), totalPaginas);
+    }
+
+    // Todos los puntos del mapa (hasta 5000, los más recientes) con solo los datos que dibuja.
+    @GetMapping("/mapa")
+    public List<ReporteMapaResponse> mapa(@RequestParam(required = false) EstadoReporte estado) {
+        return reporteService.listarParaMapa(estado).stream().map(reporteMapper::toMapaResponse).toList();
+    }
+
+    // Opciones de los selectores de categoría y barrio del listado y del mapa.
+    @GetMapping("/filtros")
+    public OpcionesFiltroResponse filtros() {
+        return reporteService.opcionesFiltro();
     }
 
     // Solo los reportes del usuario autenticado (SecurityConfig exige sesión para esta ruta).

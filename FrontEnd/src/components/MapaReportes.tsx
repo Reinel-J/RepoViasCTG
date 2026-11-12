@@ -4,13 +4,16 @@ import type { LeafletEventHandlerFnMap, Marker as MarcadorLeaflet } from 'leafle
 import { NavLink } from 'react-router'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import { imagenCategoria, textoEstado, urlFoto } from '../api/reporteVista'
-import type { ReporteResponse } from '../api/types'
+import type { ReporteMapaResponse } from '../api/types'
 import { ATRIBUCION_OSM, CARTAGENA, TESELAS_OSM } from './mapaBase'
 import { pinEstado } from './pinMapa'
 import { ZoomConRueda } from './ZoomConRueda'
 
+// Lo que el mapa dibuja de cada reporte: el mapa público pasa los de GET /reportes/mapa y el detalle, el suyo.
+export type PuntoMapa = Pick<ReporteMapaResponse, 'id' | 'latitud' | 'longitud' | 'estado' | 'categoriaId' | 'descripcion' | 'direccionOsm' | 'foto'>
+
 interface MapaReportesProps {
-  reportes: ReporteResponse[]
+  reportes: PuntoMapa[]
   // En el detalle de un reporte el enlace llevaría a la misma página.
   enlaces?: boolean
 }
@@ -32,7 +35,7 @@ function resumirDescripcion(descripcion: string) {
 // También vuelve a encuadrar cuando cambia el tamaño del mapa (ventana más angosta, la hoja de estilos de Leaflet
 // que llega después, el contenedor que termina de medirse), mientras la persona no lo haya movido: Leaflet solo
 // escucha el cambio de tamaño de la ventana y, con el tamaño viejo, el marcador del detalle quedaba descentrado.
-function AjustarVista({ reportes }: { reportes: ReporteResponse[] }) {
+function AjustarVista({ reportes }: { reportes: PuntoMapa[] }) {
   const map = useMap()
   const puntos = reportes.map((reporte) => `${reporte.latitud},${reporte.longitud}`).join(';')
 
@@ -136,7 +139,7 @@ function MarcadoresReportes({ reportes, enlaces }: Required<MapaReportesProps>) 
   }
 
   return reportes.map((reporte) => {
-    const foto = reporte.fotos?.[0]
+    const foto = reporte.foto
     return (
       <Marker
         key={reporte.id}

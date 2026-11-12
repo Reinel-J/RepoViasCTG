@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react"
 import { Navigate, NavLink, useLocation, useNavigate, useParams, useSearchParams, type NavigateFunction } from "react-router"
-import { cargarMisReportes, cargarReporte, cargarReportes, fotoReporte, fotosReporte, motivoNoEditable, textoEstado, type Reporte } from "../../api/reporteVista"
+import { cargarMisReportes, cargarPagina, cargarReporte, fotoReporte, fotosReporte, motivoNoEditable, textoEstado, type Reporte } from "../../api/reporteVista"
 import * as authApi from "../../api/auth"
 import * as categoriasApi from "../../api/categorias"
 import * as comentariosApi from "../../api/comentarios"
@@ -10,7 +10,7 @@ import * as notificacionesApi from "../../api/notificaciones"
 import * as reportesApi from "../../api/reportes"
 import * as seguimientoApi from "../../api/seguimiento"
 import * as usuariosApi from "../../api/usuarios"
-import type { ComentarioResponse, ConfirmacionResponse, EstadoReporte, NotificacionResponse, PosibleDuplicadoResponse, ProgresoCierre, ReporteResponse, SeguimientoResumenResponse, UsuarioResponse } from "../../api/types"
+import type { ComentarioResponse, ConfirmacionResponse, EstadoReporte, NotificacionResponse, OpcionesFiltroResponse, PaginaResponse, PosibleDuplicadoResponse, ProgresoCierre, ReporteMapaResponse, ReporteResponse, SeguimientoResumenResponse, UsuarioResponse } from "../../api/types"
 import { useAuth } from "../../context/useAuth"
 import { CampanaNotificaciones } from "../../components/CampanaNotificaciones"
 import { Dialogo } from "../../components/Dialogo"
@@ -22,7 +22,8 @@ import { PanelAdmin } from "../../pages/admin/PanelAdmin"
 import { enlaceWhatsApp, textoCompartir } from "../../utils/compartir"
 import { prepararFoto } from "../../utils/imagenes"
 import { rutaSegura } from "../../utils/navegacion"
-import { coincideBusqueda, coincideFiltro, plural, valoresUnicos } from "../../utils/texto"
+import { coincideFiltro, plural, valoresUnicos } from "../../utils/texto"
+import { useValorDiferido } from "../../utils/useValorDiferido"
 
 type IconName = "arrow" | "bell" | "camera" | "chat" | "check" | "clock" | "filter" | "link" | "location" | "map" | "menu" | "plus" | "search" | "share" | "user"
 
@@ -113,23 +114,6 @@ function PortalShell({ children, title, eyebrow, action = true, compacto = false
   )
 }
 
-function useReportes() {
-  const [datos, setDatos] = useState<Reporte[]>([])
-  const [conectado, setConectado] = useState(false)
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState("")
-  useEffect(() => {
-    cargarReportes().then((respuesta) => {
-      setDatos(respuesta)
-      setConectado(true)
-    }).catch((exception) => {
-      setConectado(false)
-      setError(mensajeDe(exception, "No fue posible cargar los reportes."))
-    }).finally(() => setCargando(false))
-  }, [])
-  return { datos, conectado, cargando, error }
-}
-
 function ReportCard({ reporte, editable = false }: { reporte: Reporte; editable?: boolean }) {
   const foto = fotoReporte(reporte)
   return (
@@ -152,62 +136,107 @@ function ReportCard({ reporte, editable = false }: { reporte: Reporte; editable?
   )
 }
 
-const ESTADOS_LISTA = ["PENDIENTE", "EN_REVISION", "EN_PROCESO", "RESUELTO", "RECHAZADO"]
+const ESTADOS_LISTA: EstadoReporte[] = ["PENDIENTE", "EN_REVISION", "EN_PROCESO", "RESUELTO", "RECHAZADO"]
+const REPORTES_POR_PAGINA = 12
+const SIN_OPCIONES: OpcionesFiltroResponse = { categorias: [], barrios: [] }
+
+// Resultado de la última consulta y la clave de los filtros con que se pidió: si la clave ya no es la actual, se está
+// cargando otra página (así no hace falta marcar "cargando" dentro de un efecto).
+type ResultadoLista = { clave: string } & ({ pagina: PaginaResponse<Reporte> } | { error: string })
 
 export function Reportes() {
-  const { datos, conectado, cargando, error } = useReportes()
-  // Los filtros viven en la URL (?estado=&categoria=&barrio=&q=): sobreviven al volver atrás desde un reporte y
-  // se pueden compartir. Se reemplaza la entrada del historial para que cada tecla no sea un paso de "atrás".
+  // Los filtros y la página viven en la URL (?estado=&categoria=&barrio=&q=&pagina=): sobreviven al volver atrás desde
+  // un reporte y se pueden compartir. Cambiar un filtro reemplaza la entrada del historial (cada tecla no es un paso
+  // de "atrás") y vuelve a la primera página; cambiar de página sí agrega una entrada.
   const [params, setParams] = useSearchParams()
   const estadoPedido = params.get("estado") ?? ""
-  const estado = ESTADOS_LISTA.includes(estadoPedido) ? estadoPedido : "TODOS"
+  const estado = ESTADOS_LISTA.find((opcion) => opcion === estadoPedido)
   const categoria = params.get("categoria") ?? ""
   const barrio = params.get("barrio") ?? ""
+  const paginaPedida = Number.parseInt(params.get("pagina") ?? "", 10)
+  const pagina = Number.isSafeInteger(paginaPedida) && paginaPedida > 1 ? paginaPedida : 1
   // El texto del buscador vive en el estado y se copia a la URL: leído de la URL, la actualización llega un instante
-  // después y, al escribir rápido, cada tecla pisaba a la anterior ("hueco" quedaba en "o").
+  // después y, al escribir rápido, cada tecla pisaba a la anterior ("hueco" quedaba en "o"). Al servidor se le
+  // pregunta cuando la persona deja de escribir.
   const [busqueda, setBusqueda] = useState(() => params.get("q") ?? "")
-  const hayFiltros = estado !== "TODOS" || Boolean(categoria || barrio || busqueda.trim())
+  const textoBuscado = useValorDiferido(busqueda.trim())
+  const hayFiltros = Boolean(estado || categoria || barrio || busqueda.trim())
   const buscador = useRef<HTMLInputElement>(null)
+  const seccion = useRef<HTMLElement>(null)
   const enfocarBusqueda = Boolean((useLocation().state as { buscar?: boolean } | null)?.buscar)
   useEffect(() => { if (enfocarBusqueda) buscador.current?.focus() }, [enfocarBusqueda])
 
-  function filtrar(clave: string, valor: string) {
+  const [opciones, setOpciones] = useState<OpcionesFiltroResponse>(SIN_OPCIONES)
+  useEffect(() => {
+    reportesApi.filtros().then(setOpciones).catch(() => setOpciones(SIN_OPCIONES))
+  }, [])
+
+  // La búsqueda, los filtros de categoría y barrio y la paginación los resuelve el servidor (sin tildes ni mayúsculas).
+  const clave = JSON.stringify({ estado, categoria, barrio, q: textoBuscado, pagina: pagina - 1, tamano: REPORTES_POR_PAGINA })
+  const [resultado, setResultado] = useState<ResultadoLista | null>(null)
+  useEffect(() => {
+    let vigente = true
+    cargarPagina(JSON.parse(clave))
+      .then((respuesta) => { if (vigente) setResultado({ clave, pagina: respuesta }) })
+      .catch((exception) => { if (vigente) setResultado({ clave, error: mensajeDe(exception, "No fue posible cargar los reportes.") }) })
+    return () => { vigente = false }
+  }, [clave])
+  const cargando = resultado?.clave !== clave
+  // Mientras llega la página nueva se sigue mostrando la anterior, atenuada, en lugar de vaciar la lista.
+  const datos = resultado && "pagina" in resultado ? resultado.pagina : null
+  const error = !cargando && resultado && "error" in resultado ? resultado.error : ""
+  const visibles = datos?.contenido ?? []
+  const total = datos?.totalElementos ?? 0
+  const totalPaginas = datos?.totalPaginas ?? 0
+
+  function filtrar(nombre: string, valor: string) {
     setParams((actuales) => {
       const nuevos = new URLSearchParams(actuales)
-      if (valor && valor !== "TODOS") nuevos.set(clave, valor)
-      else nuevos.delete(clave)
+      if (valor) nuevos.set(nombre, valor)
+      else nuevos.delete(nombre)
+      nuevos.delete("pagina")
       return nuevos
     }, { replace: true })
   }
-  const categorias = useMemo(() => valoresUnicos(datos.map((reporte) => reporte.categoria)), [datos])
-  const barrios = useMemo(() => valoresUnicos(datos.map((reporte) => reporte.barrio)), [datos])
-  // La búsqueda no distingue mayúsculas ni tildes ("inundacion" encuentra "Inundación").
-  const visibles = useMemo(() => datos.filter((reporte) =>
-    (estado === "TODOS" || reporte.estadoRaw === estado) &&
-    coincideFiltro(categoria, reporte.categoria) &&
-    coincideFiltro(barrio, reporte.barrio) &&
-    coincideBusqueda(busqueda, reporte.categoria, reporte.lugar, reporte.barrio, reporte.descripcion)
-  ), [datos, estado, categoria, barrio, busqueda])
+
+  function irAPagina(numero: number) {
+    setParams((actuales) => {
+      const nuevos = new URLSearchParams(actuales)
+      if (numero > 1) nuevos.set("pagina", String(numero))
+      else nuevos.delete("pagina")
+      return nuevos
+    })
+    seccion.current?.scrollIntoView({ block: "start" })
+  }
 
   return (
     <PortalShell eyebrow="La voz de los barrios" title="Reportes ciudadanos">
-      <section className="listing-section">
+      <section className="listing-section" ref={seccion}>
         <div className="listing-toolbar">
-          <div className="search-field"><Icon name="search" size={18} /><input ref={buscador} type="search" aria-label="Buscar reportes" value={busqueda} onChange={(e) => { setBusqueda(e.target.value); filtrar("q", e.target.value) }} placeholder="Buscar por barrio, calle, categoría o descripción" /></div>
-          <div className="select-field"><Icon name="filter" size={17} /><select aria-label="Filtrar por estado" value={estado} onChange={(e) => filtrar("estado", e.target.value)}><option value="TODOS">Todos los estados</option><option value="PENDIENTE">Pendientes</option><option value="EN_REVISION">En revisión</option><option value="EN_PROCESO">En proceso</option><option value="RESUELTO">Resueltos</option><option value="RECHAZADO">Rechazados</option></select></div>
+          <div className="search-field"><Icon name="search" size={18} /><input ref={buscador} type="search" aria-label="Buscar reportes" value={busqueda} maxLength={100} onChange={(e) => { setBusqueda(e.target.value); filtrar("q", e.target.value.trim() ? e.target.value : "") }} placeholder="Buscar por barrio, calle, categoría o descripción" /></div>
+          <div className="select-field"><Icon name="filter" size={17} /><select aria-label="Filtrar por estado" value={estado ?? "TODOS"} onChange={(e) => filtrar("estado", e.target.value === "TODOS" ? "" : e.target.value)}><option value="TODOS">Todos los estados</option><option value="PENDIENTE">Pendientes</option><option value="EN_REVISION">En revisión</option><option value="EN_PROCESO">En proceso</option><option value="RESUELTO">Resueltos</option><option value="RECHAZADO">Rechazados</option></select></div>
           <NavLink className="primary-button compact" to="/reportes/nuevo"><Icon name="plus" /> Nuevo reporte</NavLink>
-          {(categorias.length > 1 || barrios.length > 0) && (
+          {(opciones.categorias.length > 1 || opciones.barrios.length > 0) && (
             <div className="listing-filters">
-              {categorias.length > 1 && <div className="select-field"><select aria-label="Filtrar por categoría" value={categoria} onChange={(e) => filtrar("categoria", e.target.value)}><option value="">Todas las categorías</option>{categorias.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}</select></div>}
-              {barrios.length > 0 && <div className="select-field"><select aria-label="Filtrar por barrio" value={barrio} onChange={(e) => filtrar("barrio", e.target.value)}><option value="">Todos los barrios</option>{barrios.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}</select></div>}
+              {opciones.categorias.length > 1 && <div className="select-field"><select aria-label="Filtrar por categoría" value={categoria} onChange={(e) => filtrar("categoria", e.target.value)}><option value="">Todas las categorías</option>{opciones.categorias.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}</select></div>}
+              {opciones.barrios.length > 0 && <div className="select-field"><select aria-label="Filtrar por barrio" value={barrio} onChange={(e) => filtrar("barrio", e.target.value)}><option value="">Todos los barrios</option>{opciones.barrios.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}</select></div>}
             </div>
           )}
         </div>
-        <div className="connection-note"><span className={conectado ? "live-dot" : "demo-dot"} />{cargando ? "Cargando reportes…" : !conectado ? "Sin conexión con el servidor" : hayFiltros ? `Mostrando ${visibles.length} de ${plural(datos.length, "reporte")}` : plural(datos.length, "reporte publicado", "reportes publicados")}</div>
-        {cargando && <div className="loading-panel">Cargando reportes…</div>}
+        <div className="connection-note" role="status"><span className={error ? "demo-dot" : "live-dot"} />{cargando ? "Cargando reportes…" : error ? "Sin conexión con el servidor" : hayFiltros ? plural(total, "reporte coincide", "reportes coinciden") : plural(total, "reporte publicado", "reportes publicados")}</div>
+        {cargando && !datos && <div className="loading-panel">Cargando reportes…</div>}
         {error && <div className="alert-panel error-panel">{error}</div>}
-        <div className="report-grid listing-grid">{visibles.map((reporte) => <ReportCard reporte={reporte} key={reporte.id} />)}</div>
-        {!cargando && !error && !visibles.length && <div className="empty-panel"><Icon name="map" size={30} /><h2>No encontramos reportes</h2>{hayFiltros ? <><p>Ningún reporte coincide con estos filtros.</p><button type="button" className="primary-button compact empty-action" onClick={() => { setBusqueda(""); setParams({}, { replace: true }) }}>Limpiar filtros</button></> : <p>Aún no hay reportes publicados. Crea el primero de tu sector.</p>}</div>}
+        <div className={cargando ? "report-grid listing-grid is-loading" : "report-grid listing-grid"} aria-busy={cargando}>{visibles.map((reporte) => <ReportCard reporte={reporte} key={reporte.id} />)}</div>
+        {!cargando && !error && datos && visibles.length === 0 && (total > 0
+          ? <div className="empty-panel"><Icon name="map" size={30} /><h2>Esta página ya no tiene reportes</h2><p>{plural(total, "reporte cabe", "reportes caben")} en {plural(totalPaginas, "página")}.</p><button type="button" className="primary-button compact empty-action" onClick={() => irAPagina(1)}>Ir a la primera página</button></div>
+          : <div className="empty-panel"><Icon name="map" size={30} /><h2>No encontramos reportes</h2>{hayFiltros ? <><p>Ningún reporte coincide con estos filtros.</p><button type="button" className="primary-button compact empty-action" onClick={() => { setBusqueda(""); setParams({}, { replace: true }) }}>Limpiar filtros</button></> : <p>Aún no hay reportes publicados. Crea el primero de tu sector.</p>}</div>)}
+        {totalPaginas > 1 && visibles.length > 0 && (
+          <nav className="pagination listing-pagination" aria-label="Páginas de reportes">
+            <button type="button" className="outline-button" disabled={pagina <= 1} onClick={() => irAPagina(pagina - 1)}>← Anterior</button>
+            <span>Página {pagina} de {totalPaginas}</span>
+            <button type="button" className="outline-button" disabled={pagina >= totalPaginas} onClick={() => irAPagina(pagina + 1)}>Siguiente →</button>
+          </nav>
+        )}
       </section>
     </PortalShell>
   )
@@ -362,10 +391,8 @@ function DetalleReporteVista({ id }: { id: string }) {
             <div className="detail-title-row"><div><span className="section-kicker">Descripción ciudadana</span><h2>{reporte.descripcion}</h2>{esAutor && reporte.estadoRaw === "PENDIENTE" && <NavLink className="edit-report-link" to={`/reportes/${reporte.id}/editar`}>Editar este reporte</NavLink>}</div><span className={`large-status ${reporte.estadoClase}`}>{reporte.estado}</span></div>
             <div className="detail-address"><Icon name="location" /><div><small>Ubicación reportada</small><strong>{reporte.lugar}</strong></div></div>
             <div className="real-map-wrap">{reporte.latitud != null && reporte.longitud != null && <MapaReportes enlaces={false} reportes={[{
-              id: reporte.id, usuarioId: reporte.usuarioId, calleId: null, categoriaId: reporte.categoria, direccionOsm: reporte.direccionOsm,
-              barrioOsm: reporte.barrio, descripcion: reporte.descripcion, fotos: reporte.fotos, latitud: reporte.latitud, longitud: reporte.longitud,
-              estado: reporte.estadoRaw, prioridad: reporte.prioridad, fechaCreacion: reporte.fechaCreacion,
-              fechaActualizacion: reporte.fechaCreacion, historialEstados: reporte.historialEstados,
+              id: reporte.id, categoriaId: reporte.categoria, direccionOsm: reporte.direccionOsm, descripcion: reporte.descripcion,
+              foto: reporte.fotos[0] ?? null, latitud: reporte.latitud, longitud: reporte.longitud, estado: reporte.estadoRaw,
             }]} />}</div>
             <section className="comments-panel">
               <div className="content-heading"><div><h3>Conversación ciudadana</h3><p>{plural(comentarios.length, "comentario")}</p></div></div>
@@ -678,13 +705,13 @@ const ESTADOS_ACTIVOS: EstadoReporte[] = ["PENDIENTE", "EN_REVISION", "EN_PROCES
 const LEYENDA_MAPA: EstadoReporte[] = ["PENDIENTE", "EN_REVISION", "EN_PROCESO", "RESUELTO", "RECHAZADO"]
 
 export function Mapa() {
-  const [carga, setCarga] = useState<{ fase: "cargando" } | { fase: "error"; mensaje: string } | { fase: "cargado"; reportes: ReporteResponse[] }>({ fase: "cargando" })
+  const [carga, setCarga] = useState<{ fase: "cargando" } | { fase: "error"; mensaje: string } | { fase: "cargado"; reportes: ReporteMapaResponse[] }>({ fase: "cargando" })
   // Por defecto, solo los daños abiertos: es lo que le sirve a quien planea su recorrido.
   const [filtro, setFiltro] = useState<FiltroMapa>("ACTIVOS")
   const [categoria, setCategoria] = useState("")
   const [barrio, setBarrio] = useState("")
   useEffect(() => {
-    reportesApi.listar()
+    reportesApi.mapa()
       .then((reportes) => setCarga({ fase: "cargado", reportes }))
       .catch((exception) => setCarga({ fase: "error", mensaje: mensajeDe(exception, "No fue posible cargar el mapa.") }))
   }, [])

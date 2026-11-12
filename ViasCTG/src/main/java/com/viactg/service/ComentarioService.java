@@ -73,4 +73,6 @@ public class ComentarioService {
         return comentarioRepository.findById(comentarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comentario no encontrado: " + comentarioId));
     }
+
+ 
 }

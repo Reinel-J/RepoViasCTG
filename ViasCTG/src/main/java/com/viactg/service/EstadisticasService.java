@@ -2,6 +2,7 @@ package com.viactg.service;
 
 import com.viactg.dto.EstadisticasResponse;
 import com.viactg.model.EstadoReporte;
+import com.viactg.model.PrioridadReporte;
 import com.viactg.model.Reporte;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -94,7 +96,15 @@ public class EstadisticasService {
                                 .append("lng", new Document("$round", List.of("$longitud", 3))))
                                 .append("total", new Document("$sum", 1))),
                         new Document("$sort", new Document("total", -1)),
-                        new Document("$limit", MAXIMO_CELDAS)))));
+                        new Document("$limit", MAXIMO_CELDAS)))
+                .append("prioridadActivos", List.of(
+                        new Document("$match", new Document("estado", new Document("$in", activos))),
+                        // Los reportes empiezan en MEDIA; uno sin el campo cuenta como tal, igual que en el frontend.
+                        new Document("$group", new Document("_id", new Document("$ifNull", List.of("$prioridad", PrioridadReporte.MEDIA.name())))
+                                .append("total", new Document("$sum", 1)))))
+                .append("pendienteMasAntiguo", List.of(
+                        new Document("$match", new Document("estado", EstadoReporte.PENDIENTE.name())),
+                        new Document("$group", new Document("_id", null).append("fecha", new Document("$min", "$fechaCreacion")))))));
     }
 
     static EstadisticasResponse aRespuesta(Document resultado, YearMonth primerMes) {
@@ -128,8 +138,16 @@ public class EstadisticasService {
                 })
                 .toList();
 
+        Map<PrioridadReporte, Long> prioridadActivos = new EnumMap<>(PrioridadReporte.class);
+        for (PrioridadReporte prioridad : PrioridadReporte.values()) prioridadActivos.put(prioridad, 0L);
+        for (Document grupo : lista(resultado, "prioridadActivos")) {
+            prioridadActivos.put(PrioridadReporte.valueOf(grupo.getString("_id")), numero(grupo, "total"));
+        }
+        Instant pendienteMasAntiguo = lista(resultado, "pendienteMasAntiguo").stream().findFirst()
+                .map(grupo -> grupo.getDate("fecha")).map(Date::toInstant).orElse(null);
+
         return new EstadisticasResponse(total, porEstado, porcentajeResuelto, redondear(tiempos.get("diasPrimeraRespuesta")),
-                redondear(tiempos.get("diasResolucion")), meses, categorias, densidad);
+                redondear(tiempos.get("diasResolucion")), meses, categorias, densidad, prioridadActivos, pendienteMasAntiguo);
     }
 
     private static Document mes(String campoFecha) {

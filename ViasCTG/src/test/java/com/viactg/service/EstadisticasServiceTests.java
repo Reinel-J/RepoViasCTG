@@ -2,12 +2,15 @@ package com.viactg.service;
 
 import com.viactg.dto.EstadisticasResponse;
 import com.viactg.model.EstadoReporte;
+import com.viactg.model.PrioridadReporte;
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.YearMonth;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,7 +22,8 @@ class EstadisticasServiceTests {
 
         assertThat(pipeline).hasSize(1);
         Document facet = pipeline.get(0).get("$facet", Document.class);
-        assertThat(facet.keySet()).containsExactly("porEstado", "tiempos", "creadosPorMes", "resueltosPorMes", "categorias", "densidad");
+        assertThat(facet.keySet()).containsExactly("porEstado", "tiempos", "creadosPorMes", "resueltosPorMes", "categorias", "densidad",
+                "prioridadActivos", "pendienteMasAntiguo");
         assertThat(facet.toString()).contains("America/Bogota", "$round", "RESUELTO");
     }
 
@@ -59,6 +63,23 @@ class EstadisticasServiceTests {
         assertThat(respuesta.meses()).hasSize(12).allMatch(mes -> mes.creados() == 0 && mes.resueltos() == 0);
         assertThat(respuesta.categorias()).isEmpty();
         assertThat(respuesta.densidad()).isEmpty();
+        assertThat(respuesta.prioridadActivos()).containsOnly(Map.entry(PrioridadReporte.BAJA, 0L),
+                Map.entry(PrioridadReporte.MEDIA, 0L), Map.entry(PrioridadReporte.ALTA, 0L));
+        assertThat(respuesta.pendienteMasAntiguo()).isNull();
+    }
+
+    @Test
+    void aRespuestaCuentaLaPrioridadDeLosActivosYElPendienteMasAntiguo() {
+        Instant antiguo = Instant.parse("2026-09-01T12:00:00Z");
+        Document resultado = new Document()
+                .append("prioridadActivos", List.of(grupo("ALTA", 4), grupo("MEDIA", 7)))
+                .append("pendienteMasAntiguo", List.of(new Document("_id", null).append("fecha", Date.from(antiguo))));
+
+        EstadisticasResponse respuesta = EstadisticasService.aRespuesta(resultado, YearMonth.of(2025, 11));
+
+        assertThat(respuesta.prioridadActivos()).containsEntry(PrioridadReporte.ALTA, 4L)
+                .containsEntry(PrioridadReporte.MEDIA, 7L).containsEntry(PrioridadReporte.BAJA, 0L);
+        assertThat(respuesta.pendienteMasAntiguo()).isEqualTo(antiguo);
     }
 
     private Document grupo(String id, int total) {

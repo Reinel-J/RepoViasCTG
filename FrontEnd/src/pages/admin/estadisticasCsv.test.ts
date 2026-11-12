@@ -11,6 +11,8 @@ const DATOS: EstadisticasResponse = {
   meses: [{ mes: "2026-09", creados: 29, resueltos: 7 }, { mes: "2026-10", creados: 63, resueltos: 10 }],
   categorias: [{ nombre: "Daño en alcantarillado, sumidero", total: 20, resueltos: 4 }],
   densidad: [{ latitud: 10.42, longitud: -75.55, total: 3 }],
+  prioridadActivos: { BAJA: 10, MEDIA: 90, ALTA: 20 },
+  pendienteMasAntiguo: "2026-09-01T12:00:00Z",
 }
 
 describe("estadisticasACsv", () => {

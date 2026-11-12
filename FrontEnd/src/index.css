@@ -378,6 +378,10 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .live-dot, .demo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(77,155,115,.12); }
 .demo-dot { background: var(--yellow); box-shadow: 0 0 0 4px rgba(245,190,56,.15); }
 .listing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.listing-grid.is-loading, .admin-list.is-loading { opacity: .55; transition: opacity .2s; }
+.listing-pagination { margin-top: 38px; gap: 18px; font-size: 14px; color: rgba(7,59,63,.7); }
+.listing-pagination .outline-button { margin: 0; }
+.listing-pagination .outline-button:disabled { opacity: .35; cursor: default; }
 .listing-grid .card-description { min-height: 38px; margin: 6px 0 0 25px; font-size: 14px; line-height: 1.55; color: rgba(7,59,63,.58); }
 .no-photo { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: rgba(7,59,63,.45); background: var(--sand); font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 .no-photo ~ .card-number { color: rgba(7,59,63,.4); text-shadow: none; }

@@ -1,18 +1,45 @@
 import client from './client'
 import type {
   EstadoReporte,
+  OpcionesFiltroResponse,
+  PaginaResponse,
   PosibleDuplicadoResponse,
   ReporteActualizarRequest,
   ReporteCrearRequest,
+  ReporteMapaResponse,
   ReporteResponse,
   ResumenReportesResponse,
 } from './types'
 
-// Del más reciente al más antiguo; con `limite` devuelve solo los N más recientes.
-export async function listar(estado?: EstadoReporte, limite?: number): Promise<ReporteResponse[]> {
-  const response = await client.get<ReporteResponse[]>('/reportes', {
-    params: { ...(estado ? { estado } : {}), ...(limite ? { limite } : {}) },
-  })
+// Filtros de GET /reportes. Categoría y barrio comparan el valor completo y `q` busca en categoría, descripción,
+// dirección y barrio, sin distinguir mayúsculas ni tildes. `pagina` empieza en 0 y `tamano` va de 1 a 100 (20 por
+// defecto).
+export interface FiltroReportes {
+  estado?: EstadoReporte
+  categoria?: string
+  barrio?: string
+  q?: string
+  pagina?: number
+  tamano?: number
+}
+
+// Una página de reportes, del más reciente al más antiguo. Los filtros vacíos no se envían.
+export async function listar(filtro: FiltroReportes = {}): Promise<PaginaResponse<ReporteResponse>> {
+  const params = Object.fromEntries(Object.entries(filtro).filter(([, valor]) =>
+    valor !== undefined && valor !== null && (typeof valor !== 'string' || valor.trim() !== '')))
+  const response = await client.get<PaginaResponse<ReporteResponse>>('/reportes', { params })
+  return response.data
+}
+
+// Todos los puntos del mapa (hasta 5000, los más recientes) con solo lo que dibuja el mapa.
+export async function mapa(estado?: EstadoReporte): Promise<ReporteMapaResponse[]> {
+  const response = await client.get<ReporteMapaResponse[]>('/reportes/mapa', { params: estado ? { estado } : {} })
+  return response.data
+}
+
+// Categorías y barrios que tiene algún reporte, para los selectores de filtro.
+export async function filtros(): Promise<OpcionesFiltroResponse> {
+  const response = await client.get<OpcionesFiltroResponse>('/reportes/filtros')
   return response.data
 }
 

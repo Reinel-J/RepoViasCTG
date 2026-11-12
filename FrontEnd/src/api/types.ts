@@ -89,6 +89,34 @@ export interface ReporteResponse {
   historialEstados: HistorialEstadoResponse[]
 }
 
+// Una página de GET /reportes. `pagina` empieza en 0; `totalElementos` cuenta todos los que cumplen el filtro.
+export interface PaginaResponse<T> {
+  contenido: T[]
+  pagina: number
+  tamano: number
+  totalElementos: number
+  totalPaginas: number
+}
+
+// Punto del mapa público (GET /reportes/mapa): sin historial ni autor; `foto` es la primera o null.
+export interface ReporteMapaResponse {
+  id: string
+  latitud: number
+  longitud: number
+  estado: EstadoReporte
+  categoriaId: string
+  descripcion: string
+  direccionOsm: string | null
+  barrioOsm: string | null
+  foto: string | null
+}
+
+// Opciones de los selectores de categoría y barrio (GET /reportes/filtros), sin repetidos y en orden alfabético.
+export interface OpcionesFiltroResponse {
+  categorias: string[]
+  barrios: string[]
+}
+
 // Cifras públicas de la portada (GET /reportes/resumen).
 export interface ResumenReportesResponse {
   total: number
@@ -143,6 +171,10 @@ export interface EstadisticasResponse {
   categorias: { nombre: string; total: number; resueltos: number }[]
   // Celdas de ~110 m con los reportes activos que contienen.
   densidad: { latitud: number; longitud: number; total: number }[]
+  // Reportes activos por prioridad.
+  prioridadActivos: Record<PrioridadReporte, number>
+  // Fecha de creación del pendiente más antiguo; null si no hay pendientes.
+  pendienteMasAntiguo: string | null
 }
 
 // URL firmada del dashboard de Metabase para el iframe del panel; deja de valer en expiraEn.

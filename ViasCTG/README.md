@@ -57,6 +57,30 @@ El backend resuelve `direccionOsm` («vía, barrio») y `barrioOsm` con Nominati
 
 `GET /api/geocoding/inverso?lat=..&lng=..` es público y sirve para previsualizar la ubicación: devuelve `{direccionOsm, barrioOsm, dentroDelArea}`. Respeta la política de Nominatim: como máximo una petición por segundo para todo el servidor (con un turno reservado sin bloquear hilos: si la cola supera unos 2 s devuelve la dirección en `null` en lugar de esperar), caché de 5 000 puntos (celdas de ~11 m) y 30 consultas por minuto por IP.
 
+### Listado paginado, mapa y filtros
+
+`GET /api/reportes` (público) devuelve una página, del más reciente al más antiguo:
+
+```text
+GET /api/reportes?estado=PENDIENTE&categoria=Hueco&barrio=Manga&q=colegio&pagina=0&tamano=20
+```
+
+```json
+{"contenido": [/* ReporteResponse */], "pagina": 0, "tamano": 20, "totalElementos": 45, "totalPaginas": 3}
+```
+
+- `pagina` empieza en 0 (por defecto 0) y `tamano` va de 1 a 100 (por defecto 20); una página después de la última
+  devuelve `contenido` vacío con los totales. El `_id` desempata los reportes creados en el mismo instante (índice
+  `fecha_id`), así que ninguno se repite ni se salta entre páginas.
+- `categoria` y `barrio` comparan el valor completo y `q` busca dentro de categoría, descripción, dirección y barrio;
+  ninguno distingue mayúsculas, tildes ni espacios repetidos («inundacion» encuentra «Inundación»). Máximo 100
+  caracteres cada uno. La búsqueda es literal: los caracteres especiales no funcionan como expresión regular.
+- `GET /api/reportes/filtros` devuelve `{categorias, barrios}`: los valores que tiene algún reporte, sin repetir
+  variantes de escritura y en orden alfabético, para los selectores.
+- `GET /api/reportes/mapa?estado=` devuelve todos los puntos del mapa (hasta 5000, los más recientes) con solo
+  `id`, coordenadas, `estado`, `categoriaId`, `descripcion`, `direccionOsm`, `barrioOsm` y `foto` (la primera o
+  `null`), sin historial ni autor.
+
 ### Comentarios y notificaciones
 
 `ComentarioResponse` incluye `usuarioNombre` (nombre del autor, `null` si el usuario ya no existe). Cada vez que un `ADMIN` o `MODERADOR` cambia el estado de un reporte, se crea una notificación para su autor (por ejemplo: «Tu reporte "…" cambió a en revisión»), visible en `GET /api/notificaciones`. Cuando el reporte se resuelve o se rechaza, también se avisa a quienes lo confirmaron. `PATCH /api/notificaciones/leidas` marca todas como leídas y `GET /api/notificaciones/sin-leer` devuelve solo el conteo (`{"total": 3}`), pensado para que el frontend lo consulte cada minuto sin descargar la lista.
@@ -115,8 +139,9 @@ confirmar» en vez de crear un reporte repetido (`DuplicadoService`).
 `GET /api/admin/estadisticas` (`ADMIN` o `MODERADOR`) calcula en una sola agregación `$facet` sobre `reportes`:
 totales por estado, porcentaje resuelto (sin contar rechazados), días promedio hasta la primera respuesta y
 hasta resolver (a partir de `historialEstados`), creados y resueltos por mes en los últimos 12 meses (hora de
-Colombia), las 8 categorías con más reportes (sin distinguir mayúsculas ni espacios) y la densidad de reportes
-activos en celdas de ~110 m (coordenadas redondeadas a 3 decimales).
+Colombia), las 8 categorías con más reportes (sin distinguir mayúsculas ni espacios), la densidad de reportes
+activos en celdas de ~110 m (coordenadas redondeadas a 3 decimales), los activos por prioridad (`prioridadActivos`)
+y la fecha del pendiente más antiguo (`pendienteMasAntiguo`, `null` si no hay pendientes).
 
 ## Seguridad
 
@@ -173,7 +198,7 @@ defecto de Bean Validation sale en inglés.
 | --- | --- |
 | Autenticación | `POST /api/auth/registro` (devuelve el usuario, sin token), `POST /api/auth/verificar` (`{"token"}`, devuelve el JWT), `POST /api/auth/reenviar-verificacion` (`{"email"}`, siempre `202`), `POST /api/auth/login`, `POST /api/auth/recuperar` (`{"email"}`, siempre `202`), `POST /api/auth/restablecer` (`{"token","passwordNueva"}`) |
 | Perfil y usuarios | `GET/PUT /api/usuarios/me`, `PUT /api/usuarios/me/password` (`{"passwordActual","passwordNueva"}`, devuelve un token nuevo), `POST /api/usuarios/me/cerrar-sesiones`; `GET /api/usuarios`, `PATCH /api/usuarios/{id}/rol` (`{"rol":"MODERADOR"}`), `PATCH /api/usuarios/{id}/activo?activo=false` (`ADMIN`) |
-| Reportes | `GET/POST /api/reportes` (del más reciente al más antiguo; `?estado=` y `?limite=` opcionales), `GET /api/reportes/mios` (los del usuario autenticado, del más reciente al más antiguo; `?estado=` opcional; exige sesión aunque los demás GET de reportes sean públicos), `GET /api/reportes/resumen` (cifras de la portada), `GET /api/reportes/cercanos` (radio máximo 50 km), `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
+| Reportes | `GET/POST /api/reportes` (GET paginado, del más reciente al más antiguo; `?estado=`, `?categoria=`, `?barrio=`, `?q=`, `?pagina=` y `?tamano=` opcionales), `GET /api/reportes/mapa` (puntos del mapa), `GET /api/reportes/filtros` (opciones de los selectores), `GET /api/reportes/mios` (los del usuario autenticado, del más reciente al más antiguo; `?estado=` opcional; exige sesión aunque los demás GET de reportes sean públicos), `GET /api/reportes/resumen` (cifras de la portada), `GET /api/reportes/cercanos` (radio máximo 50 km), `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
 | Seguimiento | `GET/POST /api/reportes/{reporteId}/seguimiento` |
 | Geocodificación | `GET /api/geocoding/inverso` |
 | Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial`, `GET /api/admin/reportes/seguimiento`, `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) |

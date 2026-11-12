@@ -1,11 +1,13 @@
 package com.viactg.controller;
 
+import com.viactg.dto.OpcionesFiltroResponse;
 import com.viactg.dto.ReporteActualizarRequest;
 import com.viactg.dto.ReporteCrearRequest;
 import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.ForbiddenOperationException;
 import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.model.EstadoReporte;
+import com.viactg.model.Reporte;
 import com.viactg.model.Rol;
 import com.viactg.service.DuplicadoService;
 import com.viactg.service.ReporteService;
@@ -23,7 +25,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -39,36 +40,79 @@ class ReporteControllerTests extends ControllerTestBase {
             {"categoriaId":"hueco","descripcion":"Hueco profundo frente al colegio","latitud":10.42,"longitud":-75.54}""";
 
     @Test
-    void listarPasaElEstadoYElLimiteAlServicio() throws Exception {
-        when(reporteService.listar(EstadoReporte.EN_PROCESO, 10)).thenReturn(List.of(reporte("r1", "ciudadano")));
+    void listarPasaLosFiltrosYLaPaginaAlServicioYDevuelveLaPagina() throws Exception {
+        ReporteService.FiltroReportes filtro = new ReporteService.FiltroReportes(EstadoReporte.EN_PROCESO, "Hueco", "Manga", "colegio");
+        when(reporteService.listar(filtro, 2, 10)).thenReturn(new ReporteService.Pagina(List.of(reporte("r1", "ciudadano")), 21));
 
-        mvc.perform(get("/api/reportes").param("estado", "EN_PROCESO").param("limite", "10"))
+        mvc.perform(get("/api/reportes").param("estado", "EN_PROCESO").param("categoria", "Hueco").param("barrio", "Manga")
+                        .param("q", "colegio").param("pagina", "2").param("tamano", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value("r1"))
-                .andExpect(jsonPath("$[0].estado").value("PENDIENTE"))
-                .andExpect(jsonPath("$[0].fechaCreacion").value("2026-10-20T15:00:00Z"))
-                .andExpect(jsonPath("$[0].fotos").isEmpty())
-                .andExpect(jsonPath("$[0].ubicacion").doesNotExist());
+                .andExpect(jsonPath("$.contenido[0].id").value("r1"))
+                .andExpect(jsonPath("$.contenido[0].estado").value("PENDIENTE"))
+                .andExpect(jsonPath("$.contenido[0].fechaCreacion").value("2026-10-20T15:00:00Z"))
+                .andExpect(jsonPath("$.contenido[0].fotos").isEmpty())
+                .andExpect(jsonPath("$.contenido[0].ubicacion").doesNotExist())
+                .andExpect(jsonPath("$.pagina").value(2))
+                .andExpect(jsonPath("$.tamano").value(10))
+                .andExpect(jsonPath("$.totalElementos").value(21))
+                .andExpect(jsonPath("$.totalPaginas").value(3));
     }
 
     @Test
-    void sinFiltrosListaTodos() throws Exception {
-        mvc.perform(get("/api/reportes")).andExpect(status().isOk());
+    void sinParametrosPideLaPrimeraPaginaDe20SinFiltros() throws Exception {
+        when(reporteService.listar(any(), eq(0), eq(20))).thenReturn(new ReporteService.Pagina(List.of(), 0));
 
-        verify(reporteService).listar(isNull(), isNull());
+        mvc.perform(get("/api/reportes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contenido").isEmpty())
+                .andExpect(jsonPath("$.totalElementos").value(0))
+                .andExpect(jsonPath("$.totalPaginas").value(0));
+
+        verify(reporteService).listar(new ReporteService.FiltroReportes(null, null, null, null), 0, 20);
     }
 
     @Test
-    void unLimiteFueraDeRangoDevuelve400() throws Exception {
-        mvc.perform(get("/api/reportes").param("limite", "0"))
+    void parametrosDePaginaFueraDeRangoDevuelven400() throws Exception {
+        mvc.perform(get("/api/reportes").param("tamano", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("La solicitud contiene parámetros inválidos"))
-                .andExpect(jsonPath("$.validationErrors['listar.limite']").value("El límite debe ser al menos 1"));
-        mvc.perform(get("/api/reportes").param("limite", "101"))
+                .andExpect(jsonPath("$.validationErrors['listar.tamano']").value("El tamaño de página debe ser al menos 1"));
+        mvc.perform(get("/api/reportes").param("tamano", "101"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.validationErrors['listar.limite']").value("El límite no puede superar 100"));
+                .andExpect(jsonPath("$.validationErrors['listar.tamano']").value("El tamaño de página no puede superar 100"));
+        mvc.perform(get("/api/reportes").param("pagina", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors['listar.pagina']").value("La página no puede ser negativa"));
+        mvc.perform(get("/api/reportes").param("q", "x".repeat(101)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors['listar.q']").value("La búsqueda no puede superar 100 caracteres"));
 
         verifyNoInteractions(reporteService);
+    }
+
+    @Test
+    void elMapaDevuelvePuntosLivianosConLaPrimeraFoto() throws Exception {
+        Reporte conFotos = reporte("r1", "ciudadano");
+        conFotos.setFotos(List.of("/uploads/a.jpg", "/uploads/b.jpg"));
+        when(reporteService.listarParaMapa(EstadoReporte.PENDIENTE)).thenReturn(List.of(conFotos));
+
+        mvc.perform(get("/api/reportes/mapa").param("estado", "PENDIENTE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("r1"))
+                .andExpect(jsonPath("$[0].foto").value("/uploads/a.jpg"))
+                .andExpect(jsonPath("$[0].latitud").exists())
+                .andExpect(jsonPath("$[0].usuarioId").doesNotExist())
+                .andExpect(jsonPath("$[0].historialEstados").doesNotExist());
+    }
+
+    @Test
+    void losFiltrosDevuelvenCategoriasYBarrios() throws Exception {
+        when(reporteService.opcionesFiltro()).thenReturn(new OpcionesFiltroResponse(List.of("Hueco"), List.of("Manga")));
+
+        mvc.perform(get("/api/reportes/filtros"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categorias[0]").value("Hueco"))
+                .andExpect(jsonPath("$.barrios[0]").value("Manga"));
     }
 
     @Test

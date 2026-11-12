@@ -63,7 +63,8 @@ describe("DashboardAdmin", () => {
   it("descarga las estadísticas en un CSV con BOM", async () => {
     obtenerDashboard.mockResolvedValue(respuesta("uno"))
     estadisticas.mockResolvedValue({ total: 2, porEstado: { PENDIENTE: 1, EN_REVISION: 0, EN_PROCESO: 0, RESUELTO: 1, RECHAZADO: 0 },
-      porcentajeResuelto: 50, diasPrimeraRespuesta: 0.5, diasResolucion: 2, meses: [], categorias: [], densidad: [] })
+      porcentajeResuelto: 50, diasPrimeraRespuesta: 0.5, diasResolucion: 2, meses: [], categorias: [], densidad: [],
+      prioridadActivos: { BAJA: 0, MEDIA: 1, ALTA: 0 }, pendienteMasAntiguo: null })
     const archivos: Blob[] = []
     URL.createObjectURL = vi.fn((archivo: Blob) => { archivos.push(archivo); return "blob:estadisticas" })
     URL.revokeObjectURL = vi.fn()

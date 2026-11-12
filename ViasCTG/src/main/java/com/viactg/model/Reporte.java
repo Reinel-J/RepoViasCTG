@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "reportes")
+// Páginas del listado: del más reciente al más antiguo, y el _id desempata los creados en el mismo instante.
+@CompoundIndex(name = "fecha_id", def = "{'fechaCreacion': -1, '_id': -1}")
 // Listados públicos y del panel: por estado y del más reciente al más antiguo.
 @CompoundIndex(name = "estado_fecha", def = "{'estado': 1, 'fechaCreacion': -1}")
 // "Mis reportes": los de un autor, del más reciente al más antiguo.
