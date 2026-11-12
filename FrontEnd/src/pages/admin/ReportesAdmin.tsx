@@ -9,8 +9,10 @@ import { useDialogo } from "../../components/useDialogo"
 import { plural } from "../../utils/texto"
 import { useValorDiferido } from "../../utils/useValorDiferido"
 import { ACCION_ESTADO, ESTADOS, ETIQUETA_ESTADO, PRIORIDADES, SIGUIENTES, mensajeError } from "./estados"
+import { ordenar, type OrdenReportes } from "./ordenReportes"
 
 const POR_PAGINA = 10
+const CLAVE_ORDEN = "viactg.admin.reportes.orden"
 
 type CargaPagina = { clave: string } & ({ pagina: PaginaResponse<ReporteResponse> } | { error: string })
 
@@ -46,6 +48,14 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
   const [estado, setEstado] = useState<EstadoReporte | "">(ESTADOS.includes(estadoInicial as EstadoReporte) ? estadoInicial as EstadoReporte : "")
   const [busqueda, setBusqueda] = useState("")
   const [pagina, setPagina] = useState(1)
+  const [orden, setOrden] = useState<OrdenReportes>(() => {
+    try {
+      const guardado = localStorage.getItem(CLAVE_ORDEN)
+      return guardado === "prioridad" || guardado === "antiguos" || guardado === "recientes" ? guardado : "recientes"
+    } catch {
+      return "recientes"
+    }
+  })
   // Sube para volver a pedir la misma página (por ejemplo, cuando un reporte sale del filtro y hay que rellenarla).
   const [version, setVersion] = useState(0)
   const [aviso, setAviso] = useState("")
@@ -78,7 +88,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
   const cargando = carga?.clave !== clave
   const datos = carga && "pagina" in carga ? carga.pagina : null
   const error = !cargando && carga && "error" in carga ? carga.error : ""
-  const visibles = datos?.contenido ?? []
+  const visibles = ordenar(datos?.contenido ?? [], orden)
   const total = datos?.totalElementos ?? 0
   const totalPaginas = Math.max(1, datos?.totalPaginas ?? 1)
 
@@ -92,6 +102,15 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
     setAviso("")
     setPagina(1)
     setEstado(nuevo)
+  }
+
+  function cambiarOrden(nuevo: OrdenReportes) {
+    setOrden(nuevo)
+    try {
+      localStorage.setItem(CLAVE_ORDEN, nuevo)
+    } catch {
+      // Algunos navegadores bloquean el almacenamiento; el orden sigue funcionando durante esta sesión.
+    }
   }
 
   function borrador(id: string): Borrador {
@@ -168,6 +187,13 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
         </label>
         <label>Buscar
           <input type="search" value={busqueda} onChange={(event) => { setBusqueda(event.target.value); setPagina(1) }} placeholder="Descripción, categoría o dirección" />
+        </label>
+        <label>Ordenar por
+          <select value={orden} onChange={(event) => cambiarOrden(event.target.value as OrdenReportes)}>
+            <option value="prioridad">Prioridad</option>
+            <option value="antiguos">Más antiguos</option>
+            <option value="recientes">Más recientes</option>
+          </select>
         </label>
         <span className="muted">{cargando ? "Cargando…" : plural(total, "reporte")}</span>
       </div>
