@@ -86,6 +86,10 @@
   (puntos livianos, hasta 5000) y `GET /api/reportes/filtros` (opciones de los selectores); las estadísticas suman
   `prioridadActivos` y `pendienteMasAntiguo` para el Resumen del panel. En el frontend, la lista, la portada y la
   pestaña Reportes piden páginas; ninguna pantalla descarga ya todos los reportes completos.
+- Auditoría y acciones en lote (12 de noviembre de 2026): los filtros `datetime-local` se convierten a instantes ISO
+  antes de consultar el backend; el cambio se verificó con `@WebMvcTest` (fecha local sin zona: 400; instante con `Z`:
+  200). Se agregaron pruebas para `AuditoriaService`, los filtros y la paginación del panel, y la selección y resultado
+  de las acciones en lote.
 
 ## Pendiente recomendado
 
