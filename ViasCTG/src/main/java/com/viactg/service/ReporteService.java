@@ -28,7 +28,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -96,14 +95,6 @@ public class ReporteService {
         return hilo;
     });
 
-    public ReporteService(ReporteRepository reporteRepository, UsuarioRepository usuarioRepository,
-                          UsuarioService usuarioService, MongoTemplate mongoTemplate, GeocodingService geocodingService,
-                          NotificacionService notificacionService, CategoriaService categoriaService,
-                          ConfirmacionRepository confirmacionRepository, LimitadorIntentos limitador,
-                          AreaServicio areaServicio, @Value("${app.uploads.dir:uploads}") String uploadsDirectory) {
-        this(reporteRepository, usuarioRepository, usuarioService, mongoTemplate, geocodingService, notificacionService, categoriaService, confirmacionRepository, limitador, areaServicio, uploadsDirectory, null);
-    }
-    @Autowired
     public ReporteService(ReporteRepository reporteRepository, UsuarioRepository usuarioRepository,
                           UsuarioService usuarioService, MongoTemplate mongoTemplate, GeocodingService geocodingService,
                           NotificacionService notificacionService, CategoriaService categoriaService,
@@ -359,7 +350,7 @@ public class ReporteService {
         Reporte reporte = buscarPorId(reporteId);
         validarTransicion(reporte.getEstado(), nuevoEstado);
         Reporte actualizado = aplicarCambioEstado(reporte, nuevoEstado, adminId, comentario, prioridad);
-        if (auditoriaService != null) auditoriaService.registrar(adminId, "REPORTE_ESTADO_CAMBIADO", "REPORTE", reporteId,
+        auditoriaService.registrar(adminId, "REPORTE_ESTADO_CAMBIADO", "REPORTE", reporteId,
                 reporte.getEstado() + " → " + nuevoEstado);
         return actualizado;
     }
@@ -398,10 +389,8 @@ public class ReporteService {
             throw new BusinessRuleException("Solo un reporte en proceso puede cerrarse por los votos de la comunidad");
         }
         Reporte actualizado = aplicarCambioEstado(reporte, EstadoReporte.RESUELTO, null, comentario, null);
-        if (auditoriaService != null) {
-            auditoriaService.registrar(AuditoriaService.ACTOR_SISTEMA, "REPORTE_CERRADO_POR_COMUNIDAD", "REPORTE",
-                    reporteId, "EN_PROCESO → RESUELTO");
-        }
+        auditoriaService.registrar(AuditoriaService.ACTOR_SISTEMA, "REPORTE_CERRADO_POR_COMUNIDAD", "REPORTE",
+                reporteId, "EN_PROCESO → RESUELTO");
         return actualizado;
     }
 
@@ -422,7 +411,7 @@ public class ReporteService {
         notificarCambioEstado(actualizado, nuevoEstado);
         return actualizado;
     }
-//Se notifica el cambio de una notififacion
+    // Notifica al autor cuando cambia el estado del reporte.
     private void notificarCambioEstado(Reporte reporte, EstadoReporte nuevoEstado) {
         try {
             notificacionService.crear(reporte.getUsuarioId(), reporte.getId(),

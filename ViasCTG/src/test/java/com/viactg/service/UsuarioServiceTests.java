@@ -32,7 +32,8 @@ class UsuarioServiceTests {
     private final UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
-    private final UsuarioService service = new UsuarioService(usuarioRepository, passwordEncoder, mongoTemplate);
+    private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
+    private final UsuarioService service = new UsuarioService(usuarioRepository, passwordEncoder, mongoTemplate, auditoriaService);
 
     private Update capturarActualizacion() {
         ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);

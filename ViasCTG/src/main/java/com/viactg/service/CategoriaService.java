@@ -6,7 +6,6 @@ import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.model.Categoria;
 import com.viactg.repository.CategoriaRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.text.Normalizer;
 import java.util.List;
@@ -19,8 +18,10 @@ public class CategoriaService {
     private final CategoriaRepository categoriaRepository;
     private final AuditoriaService auditoriaService;
 
-    public CategoriaService(CategoriaRepository categoriaRepository) { this(categoriaRepository, null); }
-    @Autowired public CategoriaService(CategoriaRepository categoriaRepository, AuditoriaService auditoriaService) { this.categoriaRepository = categoriaRepository; this.auditoriaService = auditoriaService; }
+    public CategoriaService(CategoriaRepository categoriaRepository, AuditoriaService auditoriaService) {
+        this.categoriaRepository = categoriaRepository;
+        this.auditoriaService = auditoriaService;
+    }
 
     public Categoria crear(CategoriaRequest request) {
         String nombre = limpiar(request.nombre());
@@ -53,7 +54,9 @@ public class CategoriaService {
         return categoriaRepository.save(categoria);
     }
     public Categoria cambiarEstado(String id, boolean activa, String actorId) { Categoria actualizada = cambiarEstado(id, activa); auditar(actorId, activa ? "CATEGORIA_ACTIVADA" : "CATEGORIA_DESACTIVADA", id, actualizada.getNombre()); return actualizada; }
-    private void auditar(String actorId, String accion, String id, String detalle) { if (auditoriaService != null) auditoriaService.registrar(actorId, accion, "CATEGORIA", id, detalle); }
+    private void auditar(String actorId, String accion, String id, String detalle) {
+        auditoriaService.registrar(actorId, accion, "CATEGORIA", id, detalle);
+    }
 
     /**
      * La categoría de un reporte es texto libre, pero si coincide con una del catálogo (sin distinguir

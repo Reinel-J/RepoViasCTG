@@ -29,8 +29,7 @@ public class JwtService {
                 .expiration(new Date(ahora.getTime() + expirationMs)).signWith(secretKey).compact();
     }
 
-    public String extraerEmail(String token) { return claims(token).getSubject();
-    }
+    public String extraerEmail(String token) { return claims(token).getSubject(); }
 
     public boolean esValido(String token, UserDetails userDetails) {
         Claims claims = claims(token);

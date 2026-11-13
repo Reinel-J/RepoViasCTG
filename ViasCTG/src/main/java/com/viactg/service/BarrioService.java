@@ -14,7 +14,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,8 +26,7 @@ public class BarrioService {
     private final MongoTemplate mongoTemplate;
     private final AuditoriaService auditoriaService;
 
-    public BarrioService(BarrioRepository barrioRepository, MongoTemplate mongoTemplate) { this(barrioRepository, mongoTemplate, null); }
-    @Autowired public BarrioService(BarrioRepository barrioRepository, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
+    public BarrioService(BarrioRepository barrioRepository, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
         this.barrioRepository = barrioRepository;
         this.mongoTemplate = mongoTemplate;
         this.auditoriaService = auditoriaService;
@@ -80,7 +78,9 @@ public class BarrioService {
         throw new ResourceNotFoundException("Calle no encontrada: " + calleId);
     }
     public Barrio eliminarCalle(String id, String calleId, String actorId) { Barrio actualizado = eliminarCalle(id, calleId); auditar(actorId, "BARRIO_CALLE_ELIMINADA", id, calleId); return actualizado; }
-    private void auditar(String actorId, String accion, String id, String detalle) { if (auditoriaService != null) auditoriaService.registrar(actorId, accion, "BARRIO", id, detalle); }
+    private void auditar(String actorId, String accion, String id, String detalle) {
+        auditoriaService.registrar(actorId, accion, "BARRIO", id, detalle);
+    }
 
     public boolean existeCalle(String calleId) {
         return barrioRepository.findByCallesId(calleId).isPresent();

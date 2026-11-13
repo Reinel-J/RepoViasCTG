@@ -18,7 +18,8 @@ import static org.mockito.Mockito.when;
 
 class CategoriaServiceTests {
     private final CategoriaRepository categoriaRepository = mock(CategoriaRepository.class);
-    private final CategoriaService service = new CategoriaService(categoriaRepository);
+    private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
+    private final CategoriaService service = new CategoriaService(categoriaRepository, auditoriaService);
 
     private void catalogo(String... nombres) {
         when(categoriaRepository.findAll()).thenReturn(java.util.Arrays.stream(nombres)

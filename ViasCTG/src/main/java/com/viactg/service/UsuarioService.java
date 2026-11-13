@@ -19,7 +19,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -47,10 +46,6 @@ public class UsuarioService {
     private final MongoTemplate mongoTemplate;
     private final AuditoriaService auditoriaService;
 
-    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, MongoTemplate mongoTemplate) {
-        this(usuarioRepository, passwordEncoder, mongoTemplate, null);
-    }
-    @Autowired
     public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
@@ -207,7 +202,7 @@ public class UsuarioService {
         return actualizado;
     }
     private void auditar(String actorId, String accion, String entidadId, String detalle) {
-        if (auditoriaService != null) auditoriaService.registrar(actorId, accion, "USUARIO", entidadId, detalle);
+        auditoriaService.registrar(actorId, accion, "USUARIO", entidadId, detalle);
     }
 
     private static String limpiarTelefono(String telefono) {

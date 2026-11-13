@@ -32,7 +32,8 @@ import static org.mockito.Mockito.when;
 class BarrioServiceTests {
     private final BarrioRepository barrioRepository = mock(BarrioRepository.class);
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
-    private final BarrioService service = new BarrioService(barrioRepository, mongoTemplate);
+    private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
+    private final BarrioService service = new BarrioService(barrioRepository, mongoTemplate, auditoriaService);
 
     private Barrio barrioExistente(Calle... calles) {
         Barrio barrio = Barrio.builder().id("b1").nombre("Getsemaní").localidad("Histórica")
