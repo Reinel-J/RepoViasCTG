@@ -397,7 +397,12 @@ public class ReporteService {
         if (reporte.getEstado() != EstadoReporte.EN_PROCESO) {
             throw new BusinessRuleException("Solo un reporte en proceso puede cerrarse por los votos de la comunidad");
         }
-        return aplicarCambioEstado(reporte, EstadoReporte.RESUELTO, null, comentario, null);
+        Reporte actualizado = aplicarCambioEstado(reporte, EstadoReporte.RESUELTO, null, comentario, null);
+        if (auditoriaService != null) {
+            auditoriaService.registrar(AuditoriaService.ACTOR_SISTEMA, "REPORTE_CERRADO_POR_COMUNIDAD", "REPORTE",
+                    reporteId, "EN_PROCESO → RESUELTO");
+        }
+        return actualizado;
     }
 
     // Filtra por el estado leído: si otro cambio llegó antes, no se pisa y se responde 409.

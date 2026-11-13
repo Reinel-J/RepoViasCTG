@@ -202,7 +202,7 @@ defecto de Bean Validation sale en inglés.
 | Seguimiento | `GET/POST /api/reportes/{reporteId}/seguimiento` |
 | Geocodificación | `GET /api/geocoding/inverso` |
 | Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial`, `GET /api/admin/reportes/seguimiento`, `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) |
-| Auditoría | `GET /api/admin/auditoria` (`ADMIN`; filtros opcionales `entidad`, `accion`, `actorId`, `desde`, `hasta`, `pagina` y `tamano`) |
+| Auditoría | `GET /api/admin/auditoria` (`ADMIN`; filtros opcionales `entidad`, `accion`, `actorId`, `desde`, `hasta`, `pagina` y `tamano`; incluye `REPORTE_CERRADO_POR_COMUNIDAD` para los cierres automáticos) |
 | Estadísticas | `GET /api/admin/estadisticas` |
 | Dashboard (Metabase) | `GET /api/admin/dashboard` (`{url, expiraEn}`: URL de embebido firmada con HS256; `503` sin configuración) |
 | Barrios y calles | `GET/POST /api/barrios`, `GET/PUT/DELETE /api/barrios/{id}`, `POST /api/barrios/{id}/calles`, `DELETE /api/barrios/{id}/calles/{calleId}` |

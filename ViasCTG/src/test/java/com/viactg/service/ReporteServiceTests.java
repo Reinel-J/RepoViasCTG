@@ -57,6 +57,7 @@ class ReporteServiceTests {
     private final NotificacionService notificacionService = mock(NotificacionService.class);
     private final CategoriaService categoriaService = mock(CategoriaService.class);
     private final ConfirmacionRepository confirmacionRepository = mock(ConfirmacionRepository.class);
+    private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
 
     private ReporteService crearServicio() {
         return crearServicio("/tmp/viasctg-test-uploads");
@@ -65,13 +66,43 @@ class ReporteServiceTests {
     private ReporteService crearServicio(String uploads) {
         return new ReporteService(reporteRepository, usuarioRepository, usuarioService, mongoTemplate, geocodingService,
                 notificacionService, categoriaService, confirmacionRepository, new LimitadorIntentos(),
-                AreaServicio.cartagena(), uploads);
+                AreaServicio.cartagena(), uploads, auditoriaService);
     }
 
     private static Reporte pendiente(String id, String autor) {
         return Reporte.builder().id(id).usuarioId(autor).descripcion("Hueco grande frente al colegio")
                 .latitud(10.391).longitud(-75.479).estado(EstadoReporte.PENDIENTE)
                 .fechaCreacion(Instant.now()).fechaActualizacion(Instant.now()).build();
+    }
+
+    @Test
+    void cerrarPorLaComunidadAuditaElCierreAutomatico() {
+        Reporte enProceso = pendiente("r1", "u1");
+        enProceso.setEstado(EstadoReporte.EN_PROCESO);
+        Reporte resuelto = pendiente("r1", "u1");
+        resuelto.setEstado(EstadoReporte.RESUELTO);
+        when(reporteRepository.findById("r1")).thenReturn(Optional.of(enProceso));
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Reporte.class)))
+                .thenReturn(resuelto);
+
+        crearServicio().cerrarPorLaComunidad("r1", "Resuelto por los votos");
+
+        verify(auditoriaService).registrar(AuditoriaService.ACTOR_SISTEMA, "REPORTE_CERRADO_POR_COMUNIDAD", "REPORTE",
+                "r1", "EN_PROCESO → RESUELTO");
+    }
+
+    @Test
+    void cerrarPorLaComunidadNoAuditaSiElCambioAtomicoFalla() {
+        Reporte enProceso = pendiente("r1", "u1");
+        enProceso.setEstado(EstadoReporte.EN_PROCESO);
+        when(reporteRepository.findById("r1")).thenReturn(Optional.of(enProceso));
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Reporte.class)))
+                .thenReturn(null);
+
+        assertThatThrownBy(() -> crearServicio().cerrarPorLaComunidad("r1", "Resuelto por los votos"))
+                .isInstanceOf(BusinessRuleException.class);
+
+        verify(auditoriaService, never()).registrar(anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test

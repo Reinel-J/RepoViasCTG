@@ -16,12 +16,13 @@ import java.util.List;
 
 @Service
 public class AuditoriaService {
+    public static final String ACTOR_SISTEMA = "sistema";
     private static final Logger log = LoggerFactory.getLogger(AuditoriaService.class);
     private final MongoTemplate mongoTemplate; private final UsuarioRepository usuarioRepository;
     public AuditoriaService(MongoTemplate mongoTemplate, UsuarioRepository usuarioRepository) { this.mongoTemplate = mongoTemplate; this.usuarioRepository = usuarioRepository; }
     public void registrar(String actorId, String accion, String entidad, String entidadId, String detalle) {
         try {
-            String nombre = "sistema".equals(actorId) ? "Sistema" : usuarioRepository.findById(actorId).map(u -> u.getNombre()).orElse("Usuario eliminado");
+            String nombre = ACTOR_SISTEMA.equals(actorId) ? "Sistema" : usuarioRepository.findById(actorId).map(u -> u.getNombre()).orElse("Usuario eliminado");
             mongoTemplate.insert(RegistroAuditoria.builder().fecha(Instant.now()).actorId(actorId).actorNombre(nombre).accion(accion).entidad(entidad).entidadId(entidadId).detalle(detalle).build());
         } catch (RuntimeException exception) { log.warn("No fue posible guardar la auditoría de {} sobre {} {}", accion, entidad, entidadId, exception); }
     }

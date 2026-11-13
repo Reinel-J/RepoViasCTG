@@ -6,6 +6,7 @@ import { mensajeError } from "./estados"
 const ETIQUETA: Record<string, string> = {
   USUARIO_ROL_CAMBIADO: "Rol cambiado", USUARIO_ESTADO_CAMBIADO: "Estado de cuenta cambiado",
   REPORTE_ESTADO_CAMBIADO: "Estado de reporte cambiado", REPORTE_MANTENIDO_ABIERTO: "Reporte mantenido abierto",
+  REPORTE_CERRADO_POR_COMUNIDAD: "Reporte cerrado por la comunidad",
   CATEGORIA_CREADA: "Categoría creada", CATEGORIA_EDITADA: "Categoría editada", CATEGORIA_ACTIVADA: "Categoría activada", CATEGORIA_DESACTIVADA: "Categoría desactivada",
   BARRIO_CREADO: "Barrio creado", BARRIO_EDITADO: "Barrio editado", BARRIO_ELIMINADO: "Barrio eliminado", BARRIO_CALLE_AGREGADA: "Calle agregada", BARRIO_CALLE_ELIMINADA: "Calle eliminada",
   SEGUIMIENTO_TAREA_EJECUTADA: "Tarea diaria ejecutada",
