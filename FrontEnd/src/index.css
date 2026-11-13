@@ -457,6 +457,11 @@ footer p { max-width: 290px; text-align: center; line-height: 1.6; }
 .report-form label, .auth-form > label, .profile-form label { display: flex; flex-direction: column; gap: 7px; color: var(--ink); font-size: 13px; font-weight: 700; }
 .report-form label input, .report-form textarea, .auth-form label input, .profile-form label input { width: 100%; border: 1px solid var(--line); border-radius: 3px 11px 3px 11px; outline: 0; padding: 13px; background: var(--cream); color: var(--ink); font: 500 15px var(--sans); resize: vertical; }
 .report-form label input:focus, .report-form textarea:focus, .auth-form label input:focus { border-color: var(--sea); box-shadow: 0 0 0 3px rgba(21,155,154,.08); }
+.campo-contrasena { position: relative; display: block; width: 100%; }
+.auth-form label .campo-contrasena > input, .profile-form label .campo-contrasena > input { padding-right: 82px; }
+.campo-contrasena button { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); min-height: 32px; padding: 0 8px; border: 0; border-radius: 3px 8px 3px 8px; background: transparent; color: var(--teal); font: 700 12px var(--sans); }
+.campo-contrasena button:hover { color: var(--coral-dark); background: var(--sand); }
+.campo-contrasena button:focus-visible { outline: 2px solid var(--sea); outline-offset: 1px; }
 .form-fields { display: grid; gap: 18px; }
 .upload-zone { min-height: 150px; align-items: center; justify-content: center; text-align: center; border: 1px dashed rgba(7,59,63,.3); background: var(--sand); border-radius: 4px 20px 4px 20px; cursor: pointer; }
 .upload-zone svg { color: var(--coral); }
