@@ -50,6 +50,21 @@ class AdminControllerTests extends ControllerTestBase {
     }
 
     @Test
+    void auditoriaRequiereZonaHorariaEnLosFiltrosDeFecha() throws Exception {
+        when(auditoriaService.listar(null, null, null, Instant.parse("2026-11-12T08:00:00Z"), null, 0, 50))
+                .thenReturn(new PaginaResponse<>(List.of(), 0, 50, 0, 0));
+
+        mvc.perform(get("/api/admin/auditoria").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN))
+                        .param("desde", "2026-11-12T03:00"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/auditoria").header(HttpHeaders.AUTHORIZATION, bearer(Rol.ADMIN))
+                        .param("desde", "2026-11-12T08:00:00Z"))
+                .andExpect(status().isOk());
+
+        verify(auditoriaService).listar(null, null, null, Instant.parse("2026-11-12T08:00:00Z"), null, 0, 50);
+    }
+
+    @Test
     void pendientesListaSoloLosReportesPendientes() throws Exception {
         when(reporteService.listar(EstadoReporte.PENDIENTE)).thenReturn(List.of(reporte("r1", "ciudadano")));
 

@@ -21,8 +21,20 @@ export async function listarPendientes(): Promise<ReporteResponse[]> {
   return response.data
 }
 
+export function fechaLocalAISO(valor?: string): string | undefined {
+  if (!valor) return undefined
+  const fecha = new Date(valor)
+  return Number.isNaN(fecha.getTime()) ? undefined : fecha.toISOString()
+}
+
 export async function auditoria(params: { entidad?: string; accion?: string; desde?: string; hasta?: string; pagina?: number; tamano?: number }): Promise<PaginaResponse<RegistroAuditoriaResponse>> {
-  const response = await client.get<PaginaResponse<RegistroAuditoriaResponse>>('/admin/auditoria', { params })
+  const response = await client.get<PaginaResponse<RegistroAuditoriaResponse>>('/admin/auditoria', {
+    params: {
+      ...params,
+      desde: fechaLocalAISO(params.desde),
+      hasta: fechaLocalAISO(params.hasta),
+    },
+  })
   return response.data
 }
 
