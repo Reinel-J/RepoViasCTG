@@ -1,10 +1,13 @@
 package com.viactg.config;
 
 import com.viactg.model.Categoria;
+import com.viactg.model.Comentario;
+import com.viactg.model.Confirmacion;
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.HistorialEstado;
 import com.viactg.model.Reporte;
 import com.viactg.model.Rol;
+import com.viactg.model.Seguimiento;
 import com.viactg.model.Usuario;
 import com.viactg.repository.CategoriaRepository;
 import com.viactg.repository.ReporteRepository;
@@ -23,12 +26,14 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -39,6 +44,8 @@ import static org.mockito.Mockito.when;
 class DatosDemoTests {
     private static final List<String> CATEGORIAS = List.of("Hueco", "Inundación", "Derrumbe");
     private static final AreaServicio AREA = AreaServicio.cartagena();
+    private static final Set<String> ATIENDEN = Set.of("admin-1", "u-moderador1@demo.viasctg.local", "u-moderador2@demo.viasctg.local",
+            "u-moderador3@demo.viasctg.local");
 
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final ReporteRepository reporteRepository = mock(ReporteRepository.class);
@@ -48,8 +55,12 @@ class DatosDemoTests {
     private final org.springframework.context.ApplicationEventPublisher eventos = mock(org.springframework.context.ApplicationEventPublisher.class);
 
     private DatosDemo datosDemo(boolean habilitado) {
+        return datosDemo(habilitado, 200);
+    }
+
+    private DatosDemo datosDemo(boolean habilitado, int reportes) {
         return new DatosDemo(mongoTemplate, reporteRepository, usuarioRepository, categoriaRepository, AREA, passwordEncoder,
-                habilitado, "admin@viactg.co", eventos);
+                habilitado, reportes, "admin@viactg.co", eventos);
     }
 
     @BeforeEach
@@ -66,16 +77,25 @@ class DatosDemoTests {
             Collection<?> documentos = invocacion.getArgument(0);
             documentos.forEach(documento -> {
                 if (documento instanceof Usuario usuario) usuario.setId("u-" + usuario.getEmail());
+                if (documento instanceof Reporte reporte) reporte.setId("r-" + contador++);
             });
             return documentos;
         });
     }
 
+    private int contador;
+
+    // Todo lo insertado, agrupado por tipo de documento (se inserta por bloques, en varias llamadas por tipo).
     @SuppressWarnings("unchecked")
     private Map<Class<?>, List<Object>> insertados() {
         ArgumentCaptor<Collection<Object>> captor = ArgumentCaptor.forClass(Collection.class);
-        verify(mongoTemplate, times(2)).insertAll(captor.capture());
-        return captor.getAllValues().stream().collect(Collectors.toMap(lote -> lote.iterator().next().getClass(), List::copyOf));
+        verify(mongoTemplate, atLeastOnce()).insertAll(captor.capture());
+        return captor.getAllValues().stream().flatMap(Collection::stream).collect(Collectors.groupingBy(Object::getClass));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> List<T> insertados(Class<T> tipo) {
+        return (List<T>) (List<?>) insertados().getOrDefault(tipo, List.of());
     }
 
     private List<Reporte> reportesGenerados() {
@@ -108,16 +128,26 @@ class DatosDemoTests {
     }
 
     @Test
-    void creaCincoCiudadanosVerificadosDelDominioDemo() {
+    void creaCincoCiudadanosYTresModeradoresVerificadosDelDominioDemo() {
         datosDemo(true).run();
 
-        List<Usuario> usuarios = insertados().get(Usuario.class).stream().map(Usuario.class::cast).toList();
-        assertThat(usuarios).hasSize(5).allSatisfy(usuario -> {
+        List<Usuario> usuarios = insertados(Usuario.class);
+        assertThat(usuarios).hasSize(8).allSatisfy(usuario -> {
             assertThat(usuario.getEmail()).endsWith("@demo.viasctg.local");
             assertThat(usuario.isEmailVerificado()).isTrue();
-            assertThat(usuario.getRol()).isEqualTo(Rol.CIUDADANO);
             assertThat(usuario.getPasswordHash()).isNotBlank();
         });
+        assertThat(usuarios).filteredOn(usuario -> usuario.getRol() == Rol.CIUDADANO).hasSize(5);
+        assertThat(usuarios).filteredOn(usuario -> usuario.getRol() == Rol.MODERADOR).extracting(Usuario::getEmail)
+                .containsExactly("moderador1@demo.viasctg.local", "moderador2@demo.viasctg.local", "moderador3@demo.viasctg.local");
+        // Un solo hash para todas las cuentas: BCrypt es lento y con miles de cuentas tardaría minutos.
+        verify(passwordEncoder).encode(anyString());
+    }
+
+    @Test
+    void conMasReportesHayUnCiudadanoPorCadaCuarenta() {
+        assertThat(DatosDemo.ciudadanosPara(200)).isEqualTo(5);
+        assertThat(DatosDemo.ciudadanosPara(10_000)).isEqualTo(250);
     }
 
     @Test
@@ -127,9 +157,8 @@ class DatosDemoTests {
 
         datosDemo(true).run();
 
-        ArgumentCaptor<Collection<Object>> captor = captorReportes();
-        verify(mongoTemplate).insertAll(captor.capture());
-        assertThat(captor.getValue()).allSatisfy(reporte -> assertThat(reporte).isInstanceOf(Reporte.class));
+        assertThat(insertados(Usuario.class)).isEmpty();
+        assertThat(insertados(Reporte.class)).hasSize(200);
     }
 
     @SuppressWarnings("unchecked")
@@ -187,7 +216,8 @@ class DatosDemoTests {
                 assertThat(cambio.getEstadoAnterior()).isEqualTo(estado);
                 assertThat(ReporteService.esTransicionValida(cambio.getEstadoAnterior(), cambio.getEstadoNuevo())).isTrue();
                 assertThat(cambio.getFecha()).isAfter(anterior).isBefore(ahora.plusSeconds(1));
-                assertThat(cambio.getUsuarioAdminId()).isEqualTo("admin-1");
+                // Lo atiende el administrador o uno de los moderadores demo, el mismo en todo el historial.
+                assertThat(cambio.getUsuarioAdminId()).isIn(ATIENDEN).isEqualTo(historial.get(0).getUsuarioAdminId());
                 estado = cambio.getEstadoNuevo();
                 anterior = cambio.getFecha();
             }
@@ -220,5 +250,53 @@ class DatosDemoTests {
 
         assertThat(porBarrio.keySet()).containsExactlyInAnyOrderElementsOf(DatosDemo.ZONAS.stream().map(DatosDemo.Zona::barrio).toList());
         assertThat(porBarrio.values().stream().max(Long::compare).orElseThrow()).isGreaterThan(20);
+    }
+    @Test
+    void laParticipacionRespetaLasReglasDeLaApi() {
+        datosDemo(true).run();
+        Map<String, Reporte> reportes = insertados(Reporte.class).stream().collect(Collectors.toMap(Reporte::getId, reporte -> reporte));
+        Instant ahora = Instant.now().plusSeconds(1);
+
+        List<Comentario> comentarios = insertados(Comentario.class);
+        List<Confirmacion> confirmaciones = insertados(Confirmacion.class);
+        List<Seguimiento> votos = insertados(Seguimiento.class);
+        assertThat(comentarios).isNotEmpty().allSatisfy(comentario -> {
+            Reporte reporte = reportes.get(comentario.getReporteId());
+            assertThat(comentario.getUsuarioId()).isNotEqualTo(reporte.getUsuarioId());
+            assertThat(comentario.getFecha()).isAfter(reporte.getFechaCreacion()).isBefore(ahora);
+        });
+        // Nadie confirma su propio reporte ni lo confirma dos veces; tampoco después de cerrado.
+        assertThat(confirmaciones).isNotEmpty().allSatisfy(confirmacion -> {
+            Reporte reporte = reportes.get(confirmacion.getReporteId());
+            assertThat(confirmacion.getUsuarioId()).isNotEqualTo(reporte.getUsuarioId());
+            assertThat(confirmacion.getFecha()).isAfter(reporte.getFechaCreacion());
+            if (!reporte.getEstado().esActivo()) assertThat(confirmacion.getFecha()).isBeforeOrEqualTo(reporte.getFechaActualizacion());
+        });
+        assertThat(confirmaciones.stream().map(c -> c.getReporteId() + "|" + c.getUsuarioId()).distinct()).hasSameSizeAs(confirmaciones);
+        // Los votos solo existen en reportes activos y hay uno por persona.
+        assertThat(votos).isNotEmpty().allSatisfy(voto -> assertThat(reportes.get(voto.getReporteId()).getEstado().esActivo()).isTrue());
+        assertThat(votos.stream().map(v -> v.getReporteId() + "|" + v.getUsuarioId()).distinct()).hasSameSizeAs(votos);
+    }
+
+    @Test
+    void conDiezMilReportesLaBaseSuperaLosDiecinueveMilDocumentosInsertandoPorBloques() {
+        datosDemo(true, 10_000).run();
+
+        Map<Class<?>, List<Object>> insertados = insertados();
+        int total = insertados.values().stream().mapToInt(List::size).sum();
+        assertThat(insertados.get(Reporte.class)).hasSize(10_000);
+        assertThat(insertados.get(Usuario.class)).hasSize(253);
+        assertThat(total).isGreaterThan(19_000);
+        ArgumentCaptor<Collection<Object>> captor = captorReportes();
+        verify(mongoTemplate, atLeastOnce()).insertAll(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(lote -> assertThat(lote).hasSizeLessThanOrEqualTo(DatosDemo.TAMANO_LOTE));
+        verify(eventos).publishEvent(com.viactg.service.CambioReplicable.todo());
+    }
+
+    @Test
+    void conUnTotalQueNoEsMultiploDeCienNoPierdeReportes() {
+        datosDemo(true, 1_234).run();
+
+        assertThat(insertados(Reporte.class)).hasSize(1_234);
     }
 }

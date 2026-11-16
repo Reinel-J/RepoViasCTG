@@ -69,6 +69,7 @@ services:
       METABASE_DASHBOARD_ID: ${METABASE_DASHBOARD_ID:-}
       METABASE_TOKEN_MINUTOS: ${METABASE_TOKEN_MINUTOS:-10}
       SEED_DEMO: ${SEED_DEMO:-false}
+      SEED_DEMO_REPORTES: ${SEED_DEMO_REPORTES:-200}
       # Réplica en PostgreSQL. Si la base no responde, la API sigue funcionando y la réplica se reintenta sola.
       SQL_REPLICA_HABILITADA: ${SQL_REPLICA_HABILITADA:-true}
       SQL_URL: jdbc:postgresql://postgres:5432/viasctg_sql

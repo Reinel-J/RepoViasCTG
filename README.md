@@ -71,23 +71,35 @@ el volumen `metabase_data` (en producción se recomienda PostgreSQL) y activa el
 
 ### Datos de demostración
 
-Con `SEED_DEMO=true` y menos de 20 reportes, el backend crea al arrancar 5 ciudadanos (`ciudadano1…5@demo.viasctg.local`,
-correo verificado y una contraseña aleatoria que nadie conoce) y 200 reportes de los últimos 12 meses en nueve barrios
-reales (25 % pendientes, 15 % en revisión, 20 % en proceso, 30 % resueltos y 10 % rechazados), con historiales de
-transiciones válidas y fechas crecientes. Se insertan en bloque, sin geocodificar ni enviar notificaciones ni correos.
+Con `SEED_DEMO=true` y menos de 20 reportes, el backend crea al arrancar `SEED_DEMO_REPORTES` reportes (200 por
+defecto) de los últimos 12 meses en nueve barrios reales (25 % pendientes, 15 % en revisión, 20 % en proceso, 30 %
+resueltos y 10 % rechazados), con historiales de transiciones válidas y fechas crecientes, y en proporción:
+
+- un ciudadano demo por cada 40 reportes (mínimo 5; `ciudadanoN@demo.viasctg.local`) y 3 moderadores demo
+  (`moderadorN@demo.viasctg.local`), con el correo verificado y una contraseña aleatoria que nadie conoce;
+- comentarios (~0,45 por reporte), confirmaciones (~0,46, nunca del autor ni repetidas) y votos «¿ya lo arreglaron?»
+  (solo en reportes activos), con fechas dentro del tiempo en que el caso estuvo abierto.
+
+Con `SEED_DEMO_REPORTES=10000` la base queda con **más de 23 000 documentos** (10 000 reportes, 253 usuarios y unos
+4 500 comentarios, 4 600 confirmaciones y 4 000 votos); tarda unos 2 segundos. Se insertan por bloques de 1 000, sin
+geocodificar ni enviar notificaciones ni correos, y al final la réplica SQL se reconstruye una vez. La semilla es fija:
+siempre salen los mismos datos.
 
 ```bash
 # Cargarlos (con la base casi vacía)
-SEED_DEMO=true docker compose up -d backend
+SEED_DEMO=true SEED_DEMO_REPORTES=10000 docker compose up -d backend
 docker compose logs backend | grep SEED_DEMO
 
-# Borrarlos: los reportes empiezan con "[DEMO]" y los ciudadanos usan @demo.viasctg.local
+# Borrarlos: los reportes empiezan con "[DEMO]" y las cuentas usan @demo.viasctg.local
 docker compose exec mongo mongosh viasctg_db --eval '
+  const ids = db.reportes.find({descripcion: /^\[DEMO\]/}, {_id: 1}).toArray().map(r => r._id.toString());
+  ["comentarios", "confirmaciones", "seguimientos", "notificaciones"].forEach(c => db[c].deleteMany({reporteId: {$in: ids}}));
   db.reportes.deleteMany({descripcion: /^\[DEMO\]/});
   db.usuarios.deleteMany({email: /@demo\.viasctg\.local$/})'
 ```
 
-Después de borrarlos, deja `SEED_DEMO=false` en el `.env`: si no, se vuelven a crear en el siguiente arranque mientras
+Después de borrarlos, pulsa «Reconstruir réplica» en la pestaña Base SQL del panel (o reinicia el backend) y deja
+`SEED_DEMO=false` en el `.env`: si no, se vuelven a crear en el siguiente arranque mientras
 haya menos de 20 reportes.
 
 Pruebas: `MetabaseServiceTests` (token verificable con la misma clave y HS256, dashboard, `params` vacío, vencimiento y
