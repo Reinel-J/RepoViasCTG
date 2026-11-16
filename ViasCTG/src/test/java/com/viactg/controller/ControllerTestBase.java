@@ -8,6 +8,7 @@ import com.viactg.mapper.ConfirmacionMapper;
 import com.viactg.mapper.NotificacionMapper;
 import com.viactg.mapper.ReporteMapper;
 import com.viactg.mapper.UsuarioMapper;
+import com.viactg.model.CategoriaReporte;
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.PrioridadReporte;
 import com.viactg.model.Reporte;
@@ -96,7 +97,7 @@ abstract class ControllerTestBase {
 
     protected static Reporte reporte(String id, String autorId) {
         Instant creado = Instant.parse("2026-10-20T15:00:00Z");
-        return Reporte.builder().id(id).usuarioId(autorId).categoriaId("Hueco").descripcion("Hueco profundo frente al colegio")
+        return Reporte.builder().id(id).usuarioId(autorId).categoria(new CategoriaReporte("c1", "Hueco")).descripcion("Hueco profundo frente al colegio")
                 .latitud(10.42).longitud(-75.54).estado(EstadoReporte.PENDIENTE).prioridad(PrioridadReporte.MEDIA)
                 .fechaCreacion(creado).fechaActualizacion(creado).build();
     }

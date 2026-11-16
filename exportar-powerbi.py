@@ -23,7 +23,7 @@ ACTIVOS = {"PENDIENTE", "EN_REVISION", "EN_PROCESO"}
 
 # Solo los campos que usa el reporte; EJSON relajado: fechas como {"$date": "…Z"} y ObjectId como {"$oid": …}.
 CONSULTA = """
-const proyeccion = {categoriaId: 1, estado: 1, prioridad: 1, barrioOsm: 1, direccionOsm: 1, latitud: 1, longitud: 1,
+const proyeccion = {categoria: 1, estado: 1, prioridad: 1, barrioOsm: 1, direccionOsm: 1, latitud: 1, longitud: 1,
   fechaCreacion: 1, fechaActualizacion: 1, "historialEstados.estadoAnterior": 1, "historialEstados.estadoNuevo": 1,
   "historialEstados.fecha": 1, "historialEstados.comentarioAdmin": 1};
 print(EJSON.stringify({
@@ -83,7 +83,8 @@ def main():
         creado = fecha(reporte.get("fechaCreacion"))
         resuelto_en = fecha(resuelto["fecha"]) if resuelto else ""
         reportes.append([
-            reporte_id, (reporte.get("categoriaId") or "").strip(), reporte.get("estado", ""), reporte.get("prioridad", ""),
+            reporte_id, (reporte.get("categoria") or {}).get("nombre", ""), (reporte.get("categoria") or {}).get("id", ""),
+            reporte.get("estado", ""), reporte.get("prioridad", ""),
             reporte.get("barrioOsm") or "", reporte.get("direccionOsm") or "", reporte.get("latitud", ""), reporte.get("longitud", ""),
             "SI" if reporte.get("estado") in ACTIVOS else "NO",
             creado, creado[:10], fecha(reporte.get("fechaActualizacion")),
@@ -93,7 +94,7 @@ def main():
                               fecha(cambio.get("fecha")), cambio.get("comentarioAdmin") or ""])
 
     escribir(os.path.join(opciones.salida, "reportes.csv"),
-             ["id", "categoria", "estado", "prioridad", "barrio", "direccion", "latitud", "longitud", "activo",
+             ["id", "categoria", "categoria_id", "estado", "prioridad", "barrio", "direccion", "latitud", "longitud", "activo",
               "fecha_creacion", "dia_creacion", "fecha_actualizacion", "fecha_primera_respuesta", "fecha_resuelto", "dia_resuelto"],
              reportes)
     escribir(os.path.join(opciones.salida, "historial_estados.csv"),

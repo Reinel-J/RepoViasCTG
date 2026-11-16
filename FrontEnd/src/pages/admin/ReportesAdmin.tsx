@@ -237,7 +237,7 @@ export function ReportesAdmin({ estadoInicial }: { estadoInicial: string | null 
                 <div className="admin-report-tags">
                   <StatusBadge status={reporte.estado} />
                   <span className={`priority priority-${reporte.prioridad.toLowerCase()}`}>{reporte.prioridad}</span>
-                  <span className="admin-chip">{reporte.categoriaId}</span>
+                  {reporte.categoria && <span className="admin-chip">{reporte.categoria.nombre}</span>}
                   {siguientes.length > 0 && <SenalComunidad seguimiento={seguimientos[reporte.id]} />}
                 </div>
                 <h2><Link to={`/reportes/${reporte.id}`}>{reporte.descripcion}</Link></h2>

@@ -14,8 +14,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Crea las categorías iniciales del documento de visión (sección 6.4) cuando el catálogo está vacío, para que
- * el formulario de reportes tenga sugerencias desde el primer arranque. SEED_CATEGORIAS=false lo desactiva.
+ * Crea las categorías iniciales del documento de visión (sección 6.4), más «Otro», cuando el catálogo está vacío, para
+ * que el formulario de reportes tenga opciones desde el primer arranque; si ya hay catálogo, solo asegura «Otro».
+ * SEED_CATEGORIAS=false lo desactiva.
  */
 @Component
 // Antes de DatosDemo, que usa el catálogo y el administrador.
@@ -30,7 +31,8 @@ public class CategoriasIniciales implements ApplicationRunner {
             new CategoriaRequest("Hundimiento", "Hundimiento o deformación del pavimento"),
             new CategoriaRequest("Daño en alcantarillado", "Alcantarilla o sumidero destapado, roto o colapsado"),
             new CategoriaRequest("Derrumbe", "Material caído o deslizamiento de tierra sobre la vía"),
-            new CategoriaRequest("Obstáculo en la vía", "Escombros, objetos o vehículos que bloquean el paso"));
+            new CategoriaRequest("Obstáculo en la vía", "Escombros, objetos o vehículos que bloquean el paso"),
+            new CategoriaRequest(CategoriaService.NOMBRE_OTRO, "Daño que no encaja en ninguna de las demás categorías"));
 
     private final CategoriaRepository categoriaRepository;
     private final CategoriaService categoriaService;
@@ -45,7 +47,12 @@ public class CategoriasIniciales implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (!habilitado || categoriaRepository.count() > 0) return;
+        if (!habilitado) return;
+        if (categoriaRepository.count() > 0) {
+            // Catálogos creados antes de que existiera «Otro»: el formulario la necesita para los daños sin categoría propia.
+            categoriaService.asegurarOtro();
+            return;
+        }
         CATEGORIAS.forEach(categoriaService::crear);
         log.info("Catálogo vacío: se crearon {} categorías iniciales", CATEGORIAS.size());
     }

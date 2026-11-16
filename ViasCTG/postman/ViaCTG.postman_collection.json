@@ -800,7 +800,7 @@
             "description": "Guarda el id en {{reporteId}}. La dirección OSM llega unos segundos después.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"categoriaId\": \"Hueco\",\n  \"descripcion\": \"Hueco grande frente al colegio\",\n  \"latitud\": 10.391,\n  \"longitud\": -75.479\n}"
+              "raw": "{\n  \"categoriaId\": \"{{categoriaId}}\",\n  \"descripcion\": \"Hueco grande frente al colegio\",\n  \"latitud\": 10.391,\n  \"longitud\": -75.479\n}"
             }
           },
           "event": [

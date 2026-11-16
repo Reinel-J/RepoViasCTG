@@ -21,8 +21,8 @@ const cambiarEstadoLote = vi.mocked(adminApi.cambiarEstadoLote)
 const listar = vi.mocked(reportesApi.listar)
 
 const reportes: ReporteResponse[] = [
-  { id: "r1", usuarioId: "u1", calleId: null, categoriaId: "Hueco", direccionOsm: null, barrioOsm: null, descripcion: "Hueco frente al colegio", latitud: 10.4, longitud: -75.5, estado: "PENDIENTE", prioridad: "MEDIA", fotos: [], fechaCreacion: "2026-11-01T12:00:00Z", fechaActualizacion: "2026-11-01T12:00:00Z", historialEstados: [] },
-  { id: "r2", usuarioId: "u2", calleId: null, categoriaId: "Andén", direccionOsm: null, barrioOsm: null, descripcion: "Andén roto", latitud: 10.41, longitud: -75.51, estado: "PENDIENTE", prioridad: "BAJA", fotos: [], fechaCreacion: "2026-11-02T12:00:00Z", fechaActualizacion: "2026-11-02T12:00:00Z", historialEstados: [] },
+  { id: "r1", usuarioId: "u1", calleId: null, categoria: { id: "c1", nombre: "Hueco" }, direccionOsm: null, barrioOsm: null, descripcion: "Hueco frente al colegio", latitud: 10.4, longitud: -75.5, estado: "PENDIENTE", prioridad: "MEDIA", fotos: [], fechaCreacion: "2026-11-01T12:00:00Z", fechaActualizacion: "2026-11-01T12:00:00Z", historialEstados: [] },
+  { id: "r2", usuarioId: "u2", calleId: null, categoria: { id: "c2", nombre: "Andén" }, direccionOsm: null, barrioOsm: null, descripcion: "Andén roto", latitud: 10.41, longitud: -75.51, estado: "PENDIENTE", prioridad: "BAJA", fotos: [], fechaCreacion: "2026-11-02T12:00:00Z", fechaActualizacion: "2026-11-02T12:00:00Z", historialEstados: [] },
 ]
 
 function renderizar() {

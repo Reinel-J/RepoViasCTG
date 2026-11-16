@@ -1,5 +1,6 @@
 package com.viactg.service;
 
+import com.viactg.dto.CategoriaReporteResponse;
 import com.viactg.dto.OpcionesFiltroResponse;
 import com.viactg.dto.CambioEstadoLoteRequest;
 import com.viactg.dto.CambioEstadoLoteResponse;
@@ -8,6 +9,7 @@ import com.viactg.dto.ReporteCrearRequest;
 import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.ForbiddenOperationException;
 import com.viactg.exception.ResourceNotFoundException;
+import com.viactg.model.CategoriaReporte;
 import com.viactg.model.Confirmacion;
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.HistorialEstado;
@@ -17,12 +19,14 @@ import com.viactg.repository.ConfirmacionRepository;
 import com.viactg.repository.ReporteRepository;
 import com.viactg.repository.UsuarioRepository;
 import com.viactg.security.LimitadorIntentos;
+import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -65,10 +69,13 @@ public class ReporteService {
     static final int MAX_REPORTES_POR_HORA = 10;
     private static final Sort MAS_RECIENTES = Sort.by(Sort.Direction.DESC, "fechaCreacion");
     private static final Sort MAS_RECIENTES_ESTABLE = Sort.by(Sort.Direction.DESC, "fechaCreacion", "_id");
-    private static final List<String> CAMPOS_BUSQUEDA = List.of("categoriaId", "descripcion", "direccionOsm", "barrioOsm");
+    private static final List<String> CAMPOS_BUSQUEDA = List.of("categoria.nombre", "descripcion", "direccionOsm", "barrioOsm");
     static final int MAX_REPORTES_MAPA = 5000;
 
-    /** Filtros del listado público; cualquiera puede ser null (o vacío, en los de texto) para no filtrar por él. */
+    /**
+     * Filtros del listado público; cualquiera puede ser null (o vacío, en los de texto) para no filtrar por él.
+     * {@code categoria} es el id de la categoría en el catálogo.
+     */
     public record FiltroReportes(EstadoReporte estado, String categoria, String barrio, String texto) {
     }
 
@@ -117,10 +124,12 @@ public class ReporteService {
     public Reporte crear(ReporteCrearRequest request, String usuarioId) {
         validarReferencias(usuarioId);
         areaServicio.validar(request.latitud(), request.longitud());
+        // Antes del límite de intentos: una categoría inválida no debe gastar uno de los reportes por hora.
+        CategoriaReporte categoria = categoriaService.paraReporte(request.categoriaId());
         limitador.consumir("reportes-usuario:" + usuarioId, MAX_REPORTES_POR_HORA, Duration.ofHours(1));
         Instant ahora = Instant.now();
         Reporte guardado = reporteRepository.save(Reporte.builder().usuarioId(usuarioId)
-                .categoriaId(categoriaService.normalizarNombre(request.categoriaId()))
+                .categoria(categoria)
                 .descripcion(request.descripcion().trim())
                 .latitud(request.latitud()).longitud(request.longitud())
                 .ubicacion(new GeoJsonPoint(request.longitud(), request.latitud())).prioridad(PrioridadReporte.MEDIA)
@@ -163,7 +172,7 @@ public class ReporteService {
         Query query = new Query();
         if (filtro.estado() != null) query.addCriteria(Criteria.where("estado").is(filtro.estado()));
         if (tieneTexto(filtro.categoria())) {
-            query.addCriteria(Criteria.where("categoriaId").regex(PatronTexto.igual(filtro.categoria()), "i"));
+            query.addCriteria(Criteria.where("categoria.id").is(filtro.categoria().trim()));
         }
         if (tieneTexto(filtro.barrio())) {
             query.addCriteria(Criteria.where("barrioOsm").regex(PatronTexto.igual(filtro.barrio()), "i"));
@@ -187,14 +196,27 @@ public class ReporteService {
     public List<Reporte> listarParaMapa(EstadoReporte estado) {
         Query query = new Query().with(MAS_RECIENTES_ESTABLE).limit(MAX_REPORTES_MAPA);
         if (estado != null) query.addCriteria(Criteria.where("estado").is(estado));
-        query.fields().include("latitud", "longitud", "estado", "categoriaId", "descripcion", "direccionOsm", "barrioOsm")
+        query.fields().include("latitud", "longitud", "estado", "categoria", "descripcion", "direccionOsm", "barrioOsm")
                 .slice("fotos", 1);
         return mongoTemplate.find(query, Reporte.class);
     }
 
     /** Opciones de los filtros de categoría y barrio: las que tiene algún reporte, sin repetir variantes de escritura. */
     public OpcionesFiltroResponse opcionesFiltro() {
-        return new OpcionesFiltroResponse(valoresDistintos("categoriaId"), valoresDistintos("barrioOsm"));
+        return new OpcionesFiltroResponse(categoriasConReportes(), valoresDistintos("barrioOsm"));
+    }
+
+    // Una entrada por id de categoría (con su nombre actual), en orden alfabético.
+    private List<CategoriaReporteResponse> categoriasConReportes() {
+        Aggregation agregacion = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("categoria.id").ne(null)),
+                Aggregation.group("categoria.id").first("categoria.nombre").as("nombre"));
+        Collator orden = Collator.getInstance(Locale.forLanguageTag("es"));
+        return mongoTemplate.aggregate(agregacion, Reporte.class, Document.class).getMappedResults().stream()
+                .map(grupo -> new CategoriaReporteResponse(grupo.getString("_id"), grupo.getString("nombre")))
+                .filter(categoria -> tieneTexto(categoria.nombre()))
+                .sorted((a, b) -> orden.compare(a.nombre(), b.nombre()))
+                .toList();
     }
 
     private List<String> valoresDistintos(String campo) {

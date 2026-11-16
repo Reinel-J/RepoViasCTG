@@ -11,11 +11,12 @@ import type {
   ResumenReportesResponse,
 } from './types'
 
-// Filtros de GET /reportes. Categoría y barrio comparan el valor completo y `q` busca en categoría, descripción,
-// dirección y barrio, sin distinguir mayúsculas ni tildes. `pagina` empieza en 0 y `tamano` va de 1 a 100 (20 por
+// Filtros de GET /reportes. `categoria` es el id de la categoría; barrio compara el valor completo y `q` busca en el
+// nombre de la categoría, la descripción, la dirección y el barrio, sin distinguir mayúsculas ni tildes. `pagina` empieza en 0 y `tamano` va de 1 a 100 (20 por
 // defecto).
 export interface FiltroReportes {
   estado?: EstadoReporte
+  // Id de la categoría (las opciones vienen de GET /reportes/filtros).
   categoria?: string
   barrio?: string
   q?: string

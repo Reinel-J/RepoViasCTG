@@ -10,7 +10,7 @@ import { pinEstado } from './pinMapa'
 import { ZoomConRueda } from './ZoomConRueda'
 
 // Lo que el mapa dibuja de cada reporte: el mapa público pasa los de GET /reportes/mapa y el detalle, el suyo.
-export type PuntoMapa = Pick<ReporteMapaResponse, 'id' | 'latitud' | 'longitud' | 'estado' | 'categoriaId' | 'descripcion' | 'direccionOsm' | 'foto'>
+export type PuntoMapa = Pick<ReporteMapaResponse, 'id' | 'latitud' | 'longitud' | 'estado' | 'categoria' | 'descripcion' | 'direccionOsm' | 'foto'>
 
 interface MapaReportesProps {
   reportes: PuntoMapa[]
@@ -151,10 +151,10 @@ function MarcadoresReportes({ reportes, enlaces }: Required<MapaReportesProps>) 
         <Popup autoPanPaddingTopLeft={MARGEN_VENTANITA_ARRIBA_IZQUIERDA} autoPanPaddingBottomRight={MARGEN_VENTANITA_ABAJO_DERECHA}>
           <div className="mapa-popup">
             <div className="mapa-popup-img">
-              <img src={foto ? urlFoto(foto) : imagenCategoria(reporte.categoriaId ?? '')} alt="" />
+              <img src={foto ? urlFoto(foto) : imagenCategoria(reporte.categoria?.nombre ?? '')} alt="" />
               {!foto && <span className="mapa-popup-etiqueta">Imagen ilustrativa</span>}
             </div>
-            <strong>{reporte.categoriaId}</strong> · {textoEstado(reporte.estado)}
+            <strong>{reporte.categoria?.nombre ?? 'Reporte ciudadano'}</strong> · {textoEstado(reporte.estado)}
             <br />
             {resumirDescripcion(reporte.descripcion)}
             {reporte.direccionOsm && <><br /><small>{reporte.direccionOsm}</small></>}

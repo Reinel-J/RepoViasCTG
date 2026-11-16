@@ -25,6 +25,10 @@ class EstadisticasServiceTests {
         assertThat(facet.keySet()).containsExactly("porEstado", "tiempos", "creadosPorMes", "resueltosPorMes", "categorias", "densidad",
                 "prioridadActivos", "pendienteMasAntiguo");
         assertThat(facet.toString()).contains("America/Bogota", "$round", "RESUELTO");
+        // Las categorías se agrupan por el id del catálogo, no por el texto.
+        Document grupoCategorias = facet.getList("categorias", Document.class).get(1).get("$group", Document.class);
+        assertThat(grupoCategorias.get("_id")).isEqualTo("$categoria.id");
+        assertThat(grupoCategorias.get("nombre", Document.class)).isEqualTo(new Document("$first", "$categoria.nombre"));
     }
 
     @Test
@@ -34,7 +38,7 @@ class EstadisticasServiceTests {
                 .append("tiempos", List.of(new Document("diasPrimeraRespuesta", 1.26).append("diasResolucion", null)))
                 .append("creadosPorMes", List.of(grupo("2026-10", 4), grupo("2026-08", 1)))
                 .append("resueltosPorMes", List.of(grupo("2026-10", 2)))
-                .append("categorias", List.of(new Document("nombre", "Hueco").append("total", 6).append("resueltos", 2)))
+                .append("categorias", List.of(new Document("_id", "c1").append("nombre", "Hueco").append("total", 6).append("resueltos", 2)))
                 .append("densidad", List.of(new Document("_id", new Document("lat", 10.4).append("lng", -75.55)).append("total", 3)));
 
         EstadisticasResponse respuesta = EstadisticasService.aRespuesta(resultado, YearMonth.of(2025, 11));
@@ -49,7 +53,7 @@ class EstadisticasServiceTests {
         assertThat(respuesta.meses().get(0)).isEqualTo(new EstadisticasResponse.Mes("2025-11", 0, 0));
         assertThat(respuesta.meses().get(9)).isEqualTo(new EstadisticasResponse.Mes("2026-08", 1, 0));
         assertThat(respuesta.meses().get(11)).isEqualTo(new EstadisticasResponse.Mes("2026-10", 4, 2));
-        assertThat(respuesta.categorias()).containsExactly(new EstadisticasResponse.Categoria("Hueco", 6, 2));
+        assertThat(respuesta.categorias()).containsExactly(new EstadisticasResponse.Categoria("c1", "Hueco", 6, 2));
         assertThat(respuesta.densidad()).containsExactly(new EstadisticasResponse.CeldaDensidad(10.4, -75.55, 3));
     }
 

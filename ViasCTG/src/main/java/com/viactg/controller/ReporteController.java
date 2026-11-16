@@ -38,8 +38,9 @@ public class ReporteController {
     private final ReporteMapper reporteMapper;
     public ReporteController(ReporteService reporteService, DuplicadoService duplicadoService, ReporteMapper reporteMapper) { this.reporteService = reporteService; this.duplicadoService = duplicadoService; this.reporteMapper = reporteMapper; }
 
-    // Una página del listado, del más reciente al más antiguo; "pagina" empieza en 0. Categoría y barrio comparan el
-    // valor completo y "q" busca en categoría, descripción, dirección y barrio, sin distinguir mayúsculas ni tildes.
+    // Una página del listado, del más reciente al más antiguo; "pagina" empieza en 0. "categoria" es el id de la categoría,
+    // "barrio" compara el valor completo y "q" busca en el nombre de la categoría, la descripción, la dirección y el
+    // barrio, sin distinguir mayúsculas ni tildes.
     @GetMapping
     public PaginaResponse<ReporteResponse> listar(
             @RequestParam(required = false) EstadoReporte estado,

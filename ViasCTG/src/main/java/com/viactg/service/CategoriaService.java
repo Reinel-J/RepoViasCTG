@@ -1,10 +1,18 @@
 package com.viactg.service;
 
 import com.viactg.dto.CategoriaRequest;
+import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.DuplicateResourceException;
 import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.model.Categoria;
+import com.viactg.model.CategoriaReporte;
+import com.viactg.model.Reporte;
 import com.viactg.repository.CategoriaRepository;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
@@ -13,13 +21,23 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Catálogo de categorías. Un reporte guarda su categoría embebida ({@link CategoriaReporte}: id y copia del nombre), así
+ * que renombrar una categoría también actualiza esa copia en sus reportes. Las categorías no se borran: se desactivan.
+ */
 @Service
 public class CategoriaService {
+    /** Categoría para los daños que no encajan en ninguna otra; también recibe los textos antiguos sin equivalente. */
+    public static final String NOMBRE_OTRO = "Otro";
+    static final String DESCRIPCION_OTRO = "Daño que no encaja en ninguna de las demás categorías";
+
     private final CategoriaRepository categoriaRepository;
+    private final MongoTemplate mongoTemplate;
     private final AuditoriaService auditoriaService;
 
-    public CategoriaService(CategoriaRepository categoriaRepository, AuditoriaService auditoriaService) {
+    public CategoriaService(CategoriaRepository categoriaRepository, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
         this.categoriaRepository = categoriaRepository;
+        this.mongoTemplate = mongoTemplate;
         this.auditoriaService = auditoriaService;
     }
 
@@ -38,20 +56,43 @@ public class CategoriaService {
         return categoriaRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada: " + id));
     }
 
+    /** Cambia nombre y descripción. Si cambia el nombre, actualiza la copia embebida en los reportes de esa categoría. */
     public Categoria actualizar(String id, CategoriaRequest request) {
-        Categoria categoria = buscarPorId(id);
+        return actualizarConConteo(id, request).categoria();
+    }
+    public Categoria actualizar(String id, CategoriaRequest request, String actorId) {
+        Renombre resultado = actualizarConConteo(id, request);
+        String detalle = resultado.anterior().equals(resultado.categoria().getNombre())
+                ? resultado.categoria().getNombre()
+                : resultado.anterior() + " → " + resultado.categoria().getNombre() + " (" + resultado.reportes() + " reporte(s) actualizados)";
+        auditar(actorId, "CATEGORIA_EDITADA", id, detalle);
+        return resultado.categoria();
+    }
+
+    private Renombre actualizarConConteo(String id, CategoriaRequest request) {
         String nombre = limpiar(request.nombre());
         validarNombreLibre(nombre, id);
-        categoria.setNombre(nombre);
-        categoria.setDescripcion(request.descripcion());
-        return categoriaRepository.save(categoria);
+        // Actualización parcial atómica; devuelve el documento anterior para saber si cambió el nombre.
+        Categoria anterior = mongoTemplate.findAndModify(Query.query(Criteria.where("_id").is(id)),
+                new Update().set("nombre", nombre).set("descripcion", request.descripcion()),
+                FindAndModifyOptions.options().returnNew(false), Categoria.class);
+        if (anterior == null) throw new ResourceNotFoundException("Categoría no encontrada: " + id);
+        long reportes = nombre.equals(anterior.getNombre()) ? 0 : mongoTemplate.updateMulti(
+                Query.query(Criteria.where("categoria.id").is(id)), new Update().set("categoria.nombre", nombre), Reporte.class)
+                .getModifiedCount();
+        Categoria actualizada = Categoria.builder().id(id).nombre(nombre).descripcion(request.descripcion())
+                .activa(anterior.isActiva()).build();
+        return new Renombre(actualizada, anterior.getNombre(), reportes);
     }
-    public Categoria actualizar(String id, CategoriaRequest request, String actorId) { Categoria actualizada = actualizar(id, request); auditar(actorId, "CATEGORIA_EDITADA", id, actualizada.getNombre()); return actualizada; }
+
+    private record Renombre(Categoria categoria, String anterior, long reportes) {
+    }
 
     public Categoria cambiarEstado(String id, boolean activa) {
-        Categoria categoria = buscarPorId(id);
-        categoria.setActiva(activa);
-        return categoriaRepository.save(categoria);
+        Categoria actualizada = mongoTemplate.findAndModify(Query.query(Criteria.where("_id").is(id)),
+                new Update().set("activa", activa), FindAndModifyOptions.options().returnNew(true), Categoria.class);
+        if (actualizada == null) throw new ResourceNotFoundException("Categoría no encontrada: " + id);
+        return actualizada;
     }
     public Categoria cambiarEstado(String id, boolean activa, String actorId) { Categoria actualizada = cambiarEstado(id, activa); auditar(actorId, activa ? "CATEGORIA_ACTIVADA" : "CATEGORIA_DESACTIVADA", id, actualizada.getNombre()); return actualizada; }
     private void auditar(String actorId, String accion, String id, String detalle) {
@@ -59,14 +100,21 @@ public class CategoriaService {
     }
 
     /**
-     * La categoría de un reporte es texto libre, pero si coincide con una del catálogo (sin distinguir
-     * mayúsculas, tildes ni espacios repetidos) se guarda con el nombre oficial. Así "inundacion " y
-     * "Inundación" quedan juntas en filtros y estadísticas.
+     * La categoría que se embebe en un reporte nuevo: debe existir en el catálogo y estar activa. Una desactivada sigue
+     * en los reportes que ya la tenían, pero no se puede elegir para reportes nuevos.
      */
-    public String normalizarNombre(String texto) {
-        String limpio = limpiar(texto);
-        if (limpio.isEmpty()) return limpio;
-        return buscarPorNombre(limpio).map(Categoria::getNombre).orElse(limpio);
+    public CategoriaReporte paraReporte(String categoriaId) {
+        Categoria categoria = categoriaRepository.findById(categoriaId.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("La categoría elegida no existe; recarga la página y elige otra"));
+        if (!categoria.isActiva()) {
+            throw new BusinessRuleException("La categoría «" + categoria.getNombre() + "» ya no está disponible; elige otra");
+        }
+        return CategoriaReporte.de(categoria);
+    }
+
+    /** La categoría «Otro»; si no existe, la crea activa. */
+    public Categoria asegurarOtro() {
+        return buscarPorNombre(NOMBRE_OTRO).orElseGet(() -> crear(new CategoriaRequest(NOMBRE_OTRO, DESCRIPCION_OTRO)));
     }
 
     /** Forma de comparación: sin tildes, en minúsculas y con los espacios normalizados. */
@@ -75,7 +123,8 @@ public class CategoriaService {
         return sinTildes.toLowerCase(Locale.ROOT);
     }
 
-    private Optional<Categoria> buscarPorNombre(String nombre) {
+    /** Categoría del catálogo con ese nombre, sin distinguir mayúsculas, tildes ni espacios repetidos. */
+    public Optional<Categoria> buscarPorNombre(String nombre) {
         String clave = claveComparacion(nombre);
         return categoriaRepository.findAll().stream()
                 .filter(categoria -> categoria.getNombre() != null && claveComparacion(categoria.getNombre()).equals(clave))

@@ -150,7 +150,18 @@ class DatosDemoTests {
 
     @Test
     void todasLasCategoriasExistenEnElCatalogo() {
-        assertThat(reportesGenerados()).extracting(Reporte::getCategoriaId).isSubsetOf(CATEGORIAS);
+        List<Reporte> reportes = reportesGenerados();
+        assertThat(reportes).extracting(reporte -> reporte.getCategoria().getNombre()).isSubsetOf(CATEGORIAS);
+        assertThat(reportes).allSatisfy(reporte -> assertThat(reporte.getCategoria().getId()).isEqualTo("id-" + reporte.getCategoria().getNombre()));
+    }
+
+    @Test
+    void laCategoriaOtroNoSeUsaEnLaDemo() {
+        when(categoriaRepository.findByActivaTrue()).thenReturn(List.of(
+                Categoria.builder().id("id-Hueco").nombre("Hueco").activa(true).build(),
+                Categoria.builder().id("id-Otro").nombre("Otro").activa(true).build()));
+
+        assertThat(reportesGenerados()).extracting(reporte -> reporte.getCategoria().getNombre()).containsOnly("Hueco");
     }
 
     @Test

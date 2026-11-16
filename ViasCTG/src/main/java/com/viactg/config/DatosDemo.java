@@ -1,6 +1,6 @@
 package com.viactg.config;
 
-import com.viactg.model.Categoria;
+import com.viactg.model.CategoriaReporte;
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.HistorialEstado;
 import com.viactg.model.PrioridadReporte;
@@ -11,6 +11,7 @@ import com.viactg.repository.CategoriaRepository;
 import com.viactg.repository.ReporteRepository;
 import com.viactg.repository.UsuarioRepository;
 import com.viactg.service.AreaServicio;
+import com.viactg.service.CategoriaService;
 import com.viactg.service.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,7 +118,10 @@ public class DatosDemo implements CommandLineRunner {
             log.info("SEED_DEMO: ya hay {} reportes; no se crean datos de demostración", existentes);
             return;
         }
-        List<String> categorias = categoriaRepository.findByActivaTrue().stream().map(Categoria::getNombre).toList();
+        // «Otro» no se usa en la demo: sus reportes no dirían qué daño es.
+        List<CategoriaReporte> categorias = categoriaRepository.findByActivaTrue().stream()
+                .filter(categoria -> !CategoriaService.NOMBRE_OTRO.equalsIgnoreCase(categoria.getNombre()))
+                .map(CategoriaReporte::de).toList();
         if (categorias.isEmpty()) {
             log.warn("SEED_DEMO: no hay categorías activas; no se crean datos de demostración");
             return;
@@ -150,7 +154,7 @@ public class DatosDemo implements CommandLineRunner {
         return ids;
     }
 
-    List<Reporte> generarReportes(Random random, Instant ahora, List<String> categorias, List<String> ciudadanos, String adminId) {
+    List<Reporte> generarReportes(Random random, Instant ahora, List<CategoriaReporte> categorias, List<String> ciudadanos, String adminId) {
         List<EstadoReporte> estados = new ArrayList<>();
         PORCENTAJES.forEach((estado, porcentaje) -> estados.addAll(Collections.nCopies(TOTAL_REPORTES * porcentaje / 100, estado)));
         Collections.shuffle(estados, random);
@@ -167,21 +171,21 @@ public class DatosDemo implements CommandLineRunner {
         return YearMonth.from(ahora.atZone(ZONA)).minusMonths(MESES - 1).atDay(1).atStartOfDay(ZONA).toInstant();
     }
 
-    private Reporte generarReporte(Random random, Instant ahora, double diasVentana, EstadoReporte estadoFinal, List<String> categorias,
+    private Reporte generarReporte(Random random, Instant ahora, double diasVentana, EstadoReporte estadoFinal, List<CategoriaReporte> categorias,
                                    List<String> ciudadanos, String adminId) {
         Zona zona = elegirZona(random);
         double[] punto = puntoEn(random, zona);
-        String categoria = elegirCategoria(random, categorias);
+        CategoriaReporte categoria = elegirCategoria(random, categorias);
         List<EstadoReporte> secuencia = secuenciaHasta(random, estadoFinal);
         Instant creado = ahora.minus(Duration.ofMinutes((long) (edadEnDias(random, estadoFinal, diasVentana) * 24 * 60)));
         List<HistorialEstado> historial = historial(random, ahora, creado, secuencia, adminId);
         Instant actualizado = historial.isEmpty() ? creado : historial.get(historial.size() - 1).getFecha();
         return Reporte.builder()
                 .usuarioId(ciudadanos.isEmpty() ? null : ciudadanos.get(random.nextInt(ciudadanos.size())))
-                .categoriaId(categoria)
+                .categoria(categoria)
                 .direccionOsm(zona.barrio())
                 .barrioOsm(zona.barrio())
-                .descripcion(MARCA + " " + PLANTILLAS.get(random.nextInt(PLANTILLAS.size())).formatted(categoria, zona.barrio()))
+                .descripcion(MARCA + " " + PLANTILLAS.get(random.nextInt(PLANTILLAS.size())).formatted(categoria.getNombre(), zona.barrio()))
                 .latitud(punto[0])
                 .longitud(punto[1])
                 .ubicacion(new GeoJsonPoint(punto[1], punto[0]))
@@ -214,7 +218,7 @@ public class DatosDemo implements CommandLineRunner {
     }
 
     // Las primeras categorías del catálogo pesan más, para que el top de categorías no salga parejo.
-    private static String elegirCategoria(Random random, List<String> categorias) {
+    private static CategoriaReporte elegirCategoria(Random random, List<CategoriaReporte> categorias) {
         int n = categorias.size();
         int tirada = random.nextInt(n * (n + 1) / 2);
         for (int i = 0; i < n; i++) {

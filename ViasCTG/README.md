@@ -14,7 +14,7 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
-Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque otra persona pudo registrar antes ese correo; un administrador existente conserva su contraseña; esa cuenta queda con el correo verificado), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `CIERRE_COMUNITARIO` (`false` por defecto; `true` permite que los votos cierren un reporte en proceso, ver «¿Ya lo arreglaron?») con `CIERRE_COMUNITARIO_MINIMO` (`3`), `CIERRE_COMUNITARIO_PROPORCION` (`0.75`) y `CIERRE_COMUNITARIO_GRACIA_HORAS` (`72`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión si el catálogo está vacío) `SEED_DEMO` (`false` por defecto; `true` crea datos de demostración si hay menos de 20 reportes), `METABASE_SITE_URL`, `METABASE_SECRET_KEY`, `METABASE_DASHBOARD_ID` y `METABASE_TOKEN_MINUTOS` (dashboard de Metabase del panel; ver `../docs/metabase.md`), `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`) y `TRUSTED_PROXIES` (IP del proxy inverso cuyo `X-Forwarded-For` se acepta, como expresión regular; vacía por defecto: no se confía en ninguno).
+Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque otra persona pudo registrar antes ese correo; un administrador existente conserva su contraseña; esa cuenta queda con el correo verificado), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `CIERRE_COMUNITARIO` (`false` por defecto; `true` permite que los votos cierren un reporte en proceso, ver «¿Ya lo arreglaron?») con `CIERRE_COMUNITARIO_MINIMO` (`3`), `CIERRE_COMUNITARIO_PROPORCION` (`0.75`) y `CIERRE_COMUNITARIO_GRACIA_HORAS` (`72`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión más «Otro» si el catálogo está vacío; si ya existe, solo agrega «Otro» cuando falta) `SEED_DEMO` (`false` por defecto; `true` crea datos de demostración si hay menos de 20 reportes), `METABASE_SITE_URL`, `METABASE_SECRET_KEY`, `METABASE_DASHBOARD_ID` y `METABASE_TOKEN_MINUTOS` (dashboard de Metabase del panel; ver `../docs/metabase.md`), `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`) y `TRUSTED_PROXIES` (IP del proxy inverso cuyo `X-Forwarded-For` se acepta, como expresión regular; vacía por defecto: no se confía en ninguno).
 
 No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`, y los de consulta `reportes(estado, fechaCreacion)`, `reportes.fechaCreacion`, `reportes(usuarioId, fechaCreacion)`, `comentarios(reporteId, fecha)`, `notificaciones(usuarioId, fecha)` y `notificaciones(usuarioId, leida)`.
 
@@ -24,7 +24,7 @@ No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices
 
 El código se organiza bajo `com.viactg` por responsabilidad: `controller`, `service`, `repository`, `model`, `dto`, `mapper`, `security`, `exception` y `config`. Los controladores solo usan DTOs; los servicios concentran reglas de negocio y validan referencias MongoDB.
 
-`Calle` está embebida en `Barrio`, y `HistorialEstado` en `Reporte`. Las demás entidades tienen su propia colección. El nombre de un barrio es único sin distinguir tildes, mayúsculas ni espacios repetidos (`nombreClave`, índice único); las calles se agregan y quitan con `$push`/`$pull` atómicos desde sus propios endpoints. `PUT /api/barrios/{id}` solo cambia nombre y localidad (si el cuerpo trae `calles`, responde `400`): antes las reemplazaba y, como el panel no las envía, editar un barrio borraba todas sus calles.
+`Calle` está embebida en `Barrio`, y `HistorialEstado` en `Reporte`. La categoría de un reporte es una **referencia extendida**: `Reporte.categoria` guarda `{id, nombre}`, el `id` de la colección `categorias` más una copia del nombre para mostrar, filtrar y agrupar sin consultar el catálogo; si un administrador renombra la categoría, la copia se actualiza en todos sus reportes con un `updateMulti` (índice `categoria_fecha`). Las demás entidades tienen su propia colección. El nombre de un barrio es único sin distinguir tildes, mayúsculas ni espacios repetidos (`nombreClave`, índice único); las calles se agregan y quitan con `$push`/`$pull` atómicos desde sus propios endpoints. `PUT /api/barrios/{id}` solo cambia nombre y localidad (si el cuerpo trae `calles`, responde `400`): antes las reemplazaba y, como el panel no las envía, editar un barrio borraba todas sus calles.
 
 El cliente React vive en el directorio hermano `../FrontEnd`. Consume esta API en desarrollo desde `http://localhost:5173` y usa `http://localhost:8080/api` como URL base.
 
@@ -42,14 +42,14 @@ Ejemplo de cuerpo para crear o actualizar un reporte:
 
 ```json
 {
-  "categoriaId": "Hueco",
+  "categoriaId": "665f1c2e8a4b2d0012ab34cd",
   "descripcion": "Hueco de gran tamaño cerca de la intersección.",
   "latitud": 10.391,
   "longitud": -75.479
 }
 ```
 
-`categoriaId` es texto libre (máximo 100 caracteres), pero si coincide con una categoría del catálogo sin distinguir mayúsculas, tildes ni espacios repetidos se guarda con el nombre oficial («inundacion » → «Inundación»), así filtros y estadísticas no se fragmentan. El catálogo no admite nombres duplicados. La prioridad no la envía el ciudadano: todo reporte inicia en `MEDIA` y solo `ADMIN` o `MODERADOR` la modifican al cambiar el estado (`prioridad` opcional en `PATCH /api/admin/reportes/{id}/estado`). La edición (`PUT`) solo aplica a reportes `PENDIENTE` y solo recibe descripción y coordenadas.
+`categoriaId` (solo al crear) es el id de una categoría **activa** del catálogo (`GET /api/categorias`); si no existe responde `404` y si está desactivada, `409`. El reporte la guarda embebida como `categoria: {id, nombre}` y así la devuelve la API. Para los daños que no encajan en ninguna está la categoría «Otro». El catálogo no admite nombres duplicados (sin distinguir mayúsculas, tildes ni espacios) y las categorías no se borran: se desactivan, y los reportes que ya la tenían la conservan. Antes la categoría era texto libre en `categoriaId`; al arrancar, `MigracionCategoriaReporte` pasa esos reportes a la categoría del catálogo con el mismo nombre o, si no hay ninguna, a «Otro». La prioridad no la envía el ciudadano: todo reporte inicia en `MEDIA` y solo `ADMIN` o `MODERADOR` la modifican al cambiar el estado (`prioridad` opcional en `PATCH /api/admin/reportes/{id}/estado`). La edición (`PUT`) solo aplica a reportes `PENDIENTE` y solo recibe descripción y coordenadas.
 
 ### Dirección (OpenStreetMap)
 
@@ -72,13 +72,13 @@ GET /api/reportes?estado=PENDIENTE&categoria=Hueco&barrio=Manga&q=colegio&pagina
 - `pagina` empieza en 0 (por defecto 0) y `tamano` va de 1 a 100 (por defecto 20); una página después de la última
   devuelve `contenido` vacío con los totales. El `_id` desempata los reportes creados en el mismo instante (índice
   `fecha_id`), así que ninguno se repite ni se salta entre páginas.
-- `categoria` y `barrio` comparan el valor completo y `q` busca dentro de categoría, descripción, dirección y barrio;
-  ninguno distingue mayúsculas, tildes ni espacios repetidos («inundacion» encuentra «Inundación»). Máximo 100
-  caracteres cada uno. La búsqueda es literal: los caracteres especiales no funcionan como expresión regular.
-- `GET /api/reportes/filtros` devuelve `{categorias, barrios}`: los valores que tiene algún reporte, sin repetir
-  variantes de escritura y en orden alfabético, para los selectores.
+- `categoria` es el id de la categoría. `barrio` compara el valor completo y `q` busca dentro del nombre de la
+  categoría, la descripción, la dirección y el barrio; ninguno de los dos distingue mayúsculas, tildes ni espacios
+  repetidos («inundacion» encuentra «Inundación»). Máximo 100 caracteres cada uno. La búsqueda es literal: los caracteres especiales no funcionan como expresión regular.
+- `GET /api/reportes/filtros` devuelve `{categorias, barrios}`: las categorías (`{id, nombre}`) y los barrios que
+  tiene algún reporte, sin repetir y en orden alfabético, para los selectores.
 - `GET /api/reportes/mapa?estado=` devuelve todos los puntos del mapa (hasta 5000, los más recientes) con solo
-  `id`, coordenadas, `estado`, `categoriaId`, `descripcion`, `direccionOsm`, `barrioOsm` y `foto` (la primera o
+  `id`, coordenadas, `estado`, `categoria` (`{id, nombre}`), `descripcion`, `direccionOsm`, `barrioOsm` y `foto` (la primera o
   `null`), sin historial ni autor.
 
 ### Comentarios y notificaciones
@@ -139,7 +139,7 @@ confirmar» en vez de crear un reporte repetido (`DuplicadoService`).
 `GET /api/admin/estadisticas` (`ADMIN` o `MODERADOR`) calcula en una sola agregación `$facet` sobre `reportes`:
 totales por estado, porcentaje resuelto (sin contar rechazados), días promedio hasta la primera respuesta y
 hasta resolver (a partir de `historialEstados`), creados y resueltos por mes en los últimos 12 meses (hora de
-Colombia), las 8 categorías con más reportes (sin distinguir mayúsculas ni espacios), la densidad de reportes
+Colombia), las 8 categorías con más reportes (agrupadas por `categoria.id`, con su nombre actual), la densidad de reportes
 activos en celdas de ~110 m (coordenadas redondeadas a 3 decimales), los activos por prioridad (`prioridadActivos`)
 y la fecha del pendiente más antiguo (`pendienteMasAntiguo`, `null` si no hay pendientes).
 

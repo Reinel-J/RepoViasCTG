@@ -1,5 +1,6 @@
 package com.viactg.controller;
 
+import com.viactg.dto.CategoriaReporteResponse;
 import com.viactg.dto.OpcionesFiltroResponse;
 import com.viactg.dto.ReporteActualizarRequest;
 import com.viactg.dto.ReporteCrearRequest;
@@ -37,18 +38,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ReporteControllerTests extends ControllerTestBase {
     private static final String REPORTE_VALIDO = """
-            {"categoriaId":"hueco","descripcion":"Hueco profundo frente al colegio","latitud":10.42,"longitud":-75.54}""";
+            {"categoriaId":"c1","descripcion":"Hueco profundo frente al colegio","latitud":10.42,"longitud":-75.54}""";
 
     @Test
     void listarPasaLosFiltrosYLaPaginaAlServicioYDevuelveLaPagina() throws Exception {
-        ReporteService.FiltroReportes filtro = new ReporteService.FiltroReportes(EstadoReporte.EN_PROCESO, "Hueco", "Manga", "colegio");
+        ReporteService.FiltroReportes filtro = new ReporteService.FiltroReportes(EstadoReporte.EN_PROCESO, "c1", "Manga", "colegio");
         when(reporteService.listar(filtro, 2, 10)).thenReturn(new ReporteService.Pagina(List.of(reporte("r1", "ciudadano")), 21));
 
-        mvc.perform(get("/api/reportes").param("estado", "EN_PROCESO").param("categoria", "Hueco").param("barrio", "Manga")
+        mvc.perform(get("/api/reportes").param("estado", "EN_PROCESO").param("categoria", "c1").param("barrio", "Manga")
                         .param("q", "colegio").param("pagina", "2").param("tamano", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.contenido[0].id").value("r1"))
                 .andExpect(jsonPath("$.contenido[0].estado").value("PENDIENTE"))
+                .andExpect(jsonPath("$.contenido[0].categoria.id").value("c1"))
+                .andExpect(jsonPath("$.contenido[0].categoria.nombre").value("Hueco"))
+                .andExpect(jsonPath("$.contenido[0].categoriaId").doesNotExist())
                 .andExpect(jsonPath("$.contenido[0].fechaCreacion").value("2026-10-20T15:00:00Z"))
                 .andExpect(jsonPath("$.contenido[0].fotos").isEmpty())
                 .andExpect(jsonPath("$.contenido[0].ubicacion").doesNotExist())
@@ -107,11 +111,12 @@ class ReporteControllerTests extends ControllerTestBase {
 
     @Test
     void losFiltrosDevuelvenCategoriasYBarrios() throws Exception {
-        when(reporteService.opcionesFiltro()).thenReturn(new OpcionesFiltroResponse(List.of("Hueco"), List.of("Manga")));
+        when(reporteService.opcionesFiltro()).thenReturn(new OpcionesFiltroResponse(List.of(new CategoriaReporteResponse("c1", "Hueco")), List.of("Manga")));
 
         mvc.perform(get("/api/reportes/filtros"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.categorias[0]").value("Hueco"))
+                .andExpect(jsonPath("$.categorias[0].id").value("c1"))
+                .andExpect(jsonPath("$.categorias[0].nombre").value("Hueco"))
                 .andExpect(jsonPath("$.barrios[0]").value("Manga"));
     }
 
@@ -204,7 +209,7 @@ class ReporteControllerTests extends ControllerTestBase {
 
         ArgumentCaptor<ReporteCrearRequest> captor = ArgumentCaptor.forClass(ReporteCrearRequest.class);
         verify(reporteService).crear(captor.capture(), eq("ciudadano"));
-        assertThat(captor.getValue()).isEqualTo(new ReporteCrearRequest("hueco", "Hueco profundo frente al colegio", 10.42, -75.54));
+        assertThat(captor.getValue()).isEqualTo(new ReporteCrearRequest("c1", "Hueco profundo frente al colegio", 10.42, -75.54));
     }
 
     @Test

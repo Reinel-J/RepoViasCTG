@@ -27,6 +27,8 @@ import java.util.List;
 @CompoundIndex(name = "estado_fecha", def = "{'estado': 1, 'fechaCreacion': -1}")
 // "Mis reportes": los de un autor, del más reciente al más antiguo.
 @CompoundIndex(name = "usuario_fecha", def = "{'usuarioId': 1, 'fechaCreacion': -1}")
+// Filtro por categoría del listado y propagación de un renombre del catálogo (updateMulti por categoria.id).
+@CompoundIndex(name = "categoria_fecha", def = "{'categoria.id': 1, 'fechaCreacion': -1}")
 @Getter
 @Setter
 @Builder
@@ -38,7 +40,8 @@ public class Reporte {
     private String id;
     private String usuarioId;
     private String calleId;
-    private String categoriaId;
+    // Referencia extendida al catálogo: id de la categoría y copia de su nombre (ver CategoriaReporte).
+    private CategoriaReporte categoria;
     private String direccionOsm;
     // Barrio según OpenStreetMap (neighbourhood/suburb), resuelto junto con la dirección; null si no se conoce.
     private String barrioOsm;

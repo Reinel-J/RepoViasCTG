@@ -38,7 +38,14 @@ export interface UsuarioRegistroRequest {
   telefono?: string
 }
 
+// Categoría tal como queda embebida en el reporte: el id del catálogo y su nombre (se actualiza si se renombra).
+export interface CategoriaReporte {
+  id: string
+  nombre: string
+}
+
 export interface ReporteCrearRequest {
+  // Id de una categoría activa del catálogo (GET /categorias).
   categoriaId: string
   descripcion: string
   latitud: number
@@ -77,7 +84,7 @@ export interface ReporteResponse {
   id: string
   usuarioId: string
   calleId: string | null
-  categoriaId: string
+  categoria: CategoriaReporte | null
   direccionOsm: string | null
   // Barrio según OpenStreetMap; null en reportes antiguos o si no se pudo resolver.
   barrioOsm: string | null
@@ -107,7 +114,7 @@ export interface ReporteMapaResponse {
   latitud: number
   longitud: number
   estado: EstadoReporte
-  categoriaId: string
+  categoria: CategoriaReporte | null
   descripcion: string
   direccionOsm: string | null
   barrioOsm: string | null
@@ -115,8 +122,9 @@ export interface ReporteMapaResponse {
 }
 
 // Opciones de los selectores de categoría y barrio (GET /reportes/filtros), sin repetidos y en orden alfabético.
+// La categoría se filtra por su id.
 export interface OpcionesFiltroResponse {
-  categorias: string[]
+  categorias: CategoriaReporte[]
   barrios: string[]
 }
 
@@ -171,7 +179,8 @@ export interface EstadisticasResponse {
   diasResolucion: number | null
   // Últimos 12 meses, del más antiguo al actual; mes en formato yyyy-MM.
   meses: { mes: string; creados: number; resueltos: number }[]
-  categorias: { nombre: string; total: number; resueltos: number }[]
+  // Las categorías con más reportes, agrupadas por el id del catálogo.
+  categorias: { id: string; nombre: string; total: number; resueltos: number }[]
   // Celdas de ~110 m con los reportes activos que contienen.
   densidad: { latitud: number; longitud: number; total: number }[]
   // Reportes activos por prioridad.

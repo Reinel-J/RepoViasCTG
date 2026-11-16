@@ -1,11 +1,12 @@
 import * as reportesApi from './reportes'
 import { empiezaPalabra } from '../utils/texto'
-import type { EstadoReporte, HistorialEstadoResponse, PaginaResponse, PrioridadReporte, ReporteResponse } from './types'
+import type { CategoriaReporte, EstadoReporte, HistorialEstadoResponse, PaginaResponse, PrioridadReporte, ReporteResponse } from './types'
 
 // Reporte tal como lo consumen las pantallas públicas: el DTO del backend más los textos y clases ya resueltos.
 export interface Reporte {
   id: string
   usuarioId: string
+  // Nombre de la categoría listo para mostrar; categoriaId es su id en el catálogo (vacío si el reporte no tiene).
   categoria: string
   categoriaId: string
   descripcion: string
@@ -66,8 +67,8 @@ function normalizar(reporte: ReporteResponse): Reporte {
   return {
     id: reporte.id,
     usuarioId: reporte.usuarioId ?? '',
-    categoria: reporte.categoriaId ?? 'Reporte ciudadano',
-    categoriaId: reporte.categoriaId ?? '',
+    categoria: reporte.categoria?.nombre ?? 'Reporte ciudadano',
+    categoriaId: reporte.categoria?.id ?? '',
     descripcion: reporte.descripcion ?? '',
     lugar: reporte.direccionOsm ?? `${Number(reporte.latitud).toFixed(5)}, ${Number(reporte.longitud).toFixed(5)}`,
     direccionOsm: reporte.direccionOsm,
@@ -111,7 +112,7 @@ export function fotoReporte(reporte: Reporte): string | null {
   return foto ? urlFoto(foto) : null
 }
 
-// La categoría es texto libre: se busca, en este orden, una palabra que empiece por alguna clave (sin tildes ni
+// El administrador puede crear categorías con cualquier nombre: se busca, en este orden, una palabra que empiece por alguna clave (sin tildes ni
 // mayúsculas). Derrumbe va antes que la vía sin pavimentar para que "derrumbe de tierra" no caiga en "tierra".
 const ilustraciones: [string[], string][] = [
   [['alcantarilla', 'manjol'], 'alcantarilla'],
@@ -131,6 +132,15 @@ const ilustraciones: [string[], string][] = [
 export function imagenCategoria(texto: string): string {
   const nombre = ilustraciones.find(([claves]) => claves.some((clave) => empiezaPalabra(texto, clave)))?.[1] ?? 'otro'
   return `/img/categorias/${nombre}.svg`
+}
+
+// Categorías distintas (por id) de una lista de reportes, ordenadas por nombre en español, para los filtros.
+export function categoriasUnicas(categorias: (CategoriaReporte | null | undefined)[]): CategoriaReporte[] {
+  const vistas = new Map<string, CategoriaReporte>()
+  for (const categoria of categorias) {
+    if (categoria?.id && !vistas.has(categoria.id)) vistas.set(categoria.id, categoria)
+  }
+  return [...vistas.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
 
 // URLs de todas las fotos del reporte (hasta 3).

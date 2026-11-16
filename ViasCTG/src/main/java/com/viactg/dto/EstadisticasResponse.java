@@ -22,7 +22,8 @@ public record EstadisticasResponse(long total, Map<EstadoReporte, Long> porEstad
     public record Mes(String mes, long creados, long resueltos) {
     }
 
-    public record Categoria(String nombre, long total, long resueltos) {
+    /** Agrupada por el id del catálogo; {@code nombre} es el actual. */
+    public record Categoria(String id, String nombre, long total, long resueltos) {
     }
 
     /** Centro de una celda de ~110 m con los reportes activos que contiene. */

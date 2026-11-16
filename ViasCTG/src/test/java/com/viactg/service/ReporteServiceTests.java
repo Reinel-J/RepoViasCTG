@@ -4,9 +4,11 @@ import com.viactg.dto.ReporteActualizarRequest;
 import com.viactg.dto.CambioEstadoLoteRequest;
 import com.viactg.dto.CambioEstadoLoteResponse;
 import com.viactg.dto.ReporteCrearRequest;
+import com.viactg.dto.CategoriaReporteResponse;
 import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.exception.TooManyRequestsException;
+import com.viactg.model.CategoriaReporte;
 import com.viactg.model.Confirmacion;
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.HistorialEstado;
@@ -21,6 +23,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.mock.web.MockMultipartFile;
@@ -196,15 +200,16 @@ class ReporteServiceTests {
     }
 
     @Test
-    void listarFiltraCategoriaYBarrioCompletosYBuscaElTextoEnCuatroCampos() {
+    void listarFiltraCategoriaPorIdBarrioCompletoYBuscaElTextoEnCuatroCampos() {
         when(mongoTemplate.count(any(Query.class), eq(Reporte.class))).thenReturn(1L);
 
-        crearServicio().listar(new ReporteService.FiltroReportes(null, "hueco", "Manga", "colegio"), 0, 20);
+        crearServicio().listar(new ReporteService.FiltroReportes(null, " c-hueco ", "Manga", "colegio"), 0, 20);
 
         ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).count(queryCaptor.capture(), eq(Reporte.class));
+        assertThat(queryCaptor.getValue().getQueryObject().get("categoria.id")).isEqualTo("c-hueco");
         String consulta = queryCaptor.getValue().getQueryObject().toJson();
-        assertThat(consulta).contains("categoriaId", "barrioOsm", "$or", "descripcion", "direccionOsm", "\"options\": \"i\"");
+        assertThat(consulta).contains("barrioOsm", "$or", "categoria.nombre", "descripcion", "direccionOsm", "\"options\": \"i\"");
         assertThat(queryCaptor.getValue().getQueryObject().get("$or", List.class)).hasSize(4);
     }
 
@@ -218,22 +223,24 @@ class ReporteServiceTests {
         assertThat(consulta.getQueryObject()).isEmpty();
         assertThat(consulta.getLimit()).isEqualTo(ReporteService.MAX_REPORTES_MAPA);
         assertThat(consulta.getFieldsObject()).containsEntry("fotos", new Document("$slice", 1))
-                .containsKeys("latitud", "longitud", "estado", "categoriaId", "descripcion", "direccionOsm", "barrioOsm")
+                .containsKeys("latitud", "longitud", "estado", "categoria", "descripcion", "direccionOsm", "barrioOsm")
                 .doesNotContainKeys("usuarioId", "historialEstados");
     }
 
     @Test
     void lasOpcionesDeFiltroQuitanVaciosYVariantesYQuedanEnOrdenAlfabetico() {
-        when(mongoTemplate.findDistinct(any(Query.class), eq("categoriaId"), eq(Reporte.class), eq(String.class)))
-                .thenReturn(List.of("Señal", "hueco ", "Hueco", "Árbol caído"));
+        when(mongoTemplate.aggregate(any(Aggregation.class), eq(Reporte.class), eq(Document.class))).thenReturn(new AggregationResults<>(
+                List.of(new Document("_id", "c3").append("nombre", "Señal"), new Document("_id", "c1").append("nombre", "Hueco"),
+                        new Document("_id", "c2").append("nombre", "Árbol caído"), new Document("_id", "c4").append("nombre", " ")),
+                new Document()));
         List<String> barrios = new ArrayList<>(List.of("Manga", "  "));
         barrios.add(null);
         when(mongoTemplate.findDistinct(any(Query.class), eq("barrioOsm"), eq(Reporte.class), eq(String.class))).thenReturn(barrios);
 
         var opciones = crearServicio().opcionesFiltro();
 
-        assertThat(opciones.categorias()).hasSize(3).startsWith("Árbol caído").endsWith("Señal");
-        assertThat(opciones.categorias().get(1)).isIn("hueco", "Hueco");
+        assertThat(opciones.categorias()).extracting(CategoriaReporteResponse::nombre).containsExactly("Árbol caído", "Hueco", "Señal");
+        assertThat(opciones.categorias()).extracting(CategoriaReporteResponse::id).containsExactly("c2", "c1", "c3");
         assertThat(opciones.barrios()).containsExactly("Manga");
     }
 
@@ -263,19 +270,20 @@ class ReporteServiceTests {
     }
 
     @Test
-    void crearNormalizaLaCategoriaYGuardaElReportePendienteConPrioridadMedia() {
+    void crearEmbebeLaCategoriaDelCatalogoYGuardaElReportePendienteConPrioridadMedia() {
         when(usuarioRepository.existsById("u-1")).thenReturn(true);
-        when(categoriaService.normalizarNombre(" inundacion ")).thenReturn("Inundación");
+        when(categoriaService.paraReporte("c-inundacion")).thenReturn(new CategoriaReporte("c-inundacion", "Inundación"));
         when(reporteRepository.save(any(Reporte.class))).thenAnswer(invocacion -> {
             Reporte reporte = invocacion.getArgument(0);
             reporte.setId("r-1");
             return reporte;
         });
 
-        Reporte creado = crearServicio().crear(new ReporteCrearRequest(" inundacion ", "  Calle inundada tras la lluvia  ",
+        Reporte creado = crearServicio().crear(new ReporteCrearRequest("c-inundacion", "  Calle inundada tras la lluvia  ",
                 10.40, -75.50), "u-1");
 
-        assertThat(creado.getCategoriaId()).isEqualTo("Inundación");
+        assertThat(creado.getCategoria().getId()).isEqualTo("c-inundacion");
+        assertThat(creado.getCategoria().getNombre()).isEqualTo("Inundación");
         assertThat(creado.getDescripcion()).isEqualTo("Calle inundada tras la lluvia");
         assertThat(creado.getEstado()).isEqualTo(EstadoReporte.PENDIENTE);
         assertThat(creado.getPrioridad()).isEqualTo(com.viactg.model.PrioridadReporte.MEDIA);
@@ -293,9 +301,27 @@ class ReporteServiceTests {
     }
 
     @Test
+    void unaCategoriaInvalidaNoCreaElReporteNiGastaElLimiteDeLaHora() {
+        when(usuarioRepository.existsById("u-1")).thenReturn(true);
+        when(categoriaService.paraReporte("c-vieja")).thenThrow(new BusinessRuleException("La categoría «Bache» ya no está disponible; elige otra"));
+        when(categoriaService.paraReporte("c1")).thenReturn(new CategoriaReporte("c1", "Hueco"));
+        when(reporteRepository.save(any(Reporte.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+        ReporteService service = crearServicio();
+
+        for (int i = 0; i < 3; i++) {
+            assertThatThrownBy(() -> service.crear(new ReporteCrearRequest("c-vieja", "Hueco en la vía principal", 10.40, -75.50), "u-1"))
+                    .isInstanceOf(BusinessRuleException.class);
+        }
+        verify(reporteRepository, never()).save(any());
+        for (int i = 0; i < ReporteService.MAX_REPORTES_POR_HORA; i++) {
+            service.crear(new ReporteCrearRequest("c1", "Hueco en la vía principal", 10.40, -75.50), "u-1");
+        }
+    }
+
+    @Test
     void crearLimitaLaCantidadDeReportesPorUsuarioYHora() {
         when(usuarioRepository.existsById("u-1")).thenReturn(true);
-        when(categoriaService.normalizarNombre(anyString())).thenReturn("Hueco");
+        when(categoriaService.paraReporte(anyString())).thenReturn(new CategoriaReporte("c1", "Hueco"));
         when(reporteRepository.save(any(Reporte.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
         ReporteService service = crearServicio();
         ReporteCrearRequest request = new ReporteCrearRequest("Hueco", "Hueco en la vía principal", 10.40, -75.50);

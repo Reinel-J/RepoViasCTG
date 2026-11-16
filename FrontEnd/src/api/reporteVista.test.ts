@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { imagenCategoria, motivoNoEditable } from "./reporteVista"
+import { categoriasUnicas, imagenCategoria, motivoNoEditable } from "./reporteVista"
 
 describe("motivoNoEditable", () => {
   it("deja editar al autor mientras el reporte está pendiente", () => {
@@ -33,5 +33,13 @@ describe("imagenCategoria", () => {
   it("un derrumbe de tierra no se confunde con una vía sin pavimentar", () => {
     expect(imagenCategoria("Derrumbe de tierra")).toBe("/img/categorias/derrumbe.svg")
     expect(imagenCategoria("Calle de tierra")).toBe("/img/categorias/via_sin_pavimentar.svg")
+  })
+})
+
+describe("categoriasUnicas", () => {
+  it("deja una opción por id, sin reportes sin categoría, en orden alfabético", () => {
+    const hueco = { id: "c1", nombre: "Hueco" }
+    expect(categoriasUnicas([hueco, null, { id: "c2", nombre: "Árbol caído" }, undefined, hueco, { id: "c3", nombre: "Derrumbe" }]))
+      .toEqual([{ id: "c2", nombre: "Árbol caído" }, { id: "c3", nombre: "Derrumbe" }, hueco])
   })
 })

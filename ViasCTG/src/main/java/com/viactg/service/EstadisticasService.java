@@ -82,9 +82,10 @@ public class EstadisticasService {
                                 .append("historialEstados.fecha", new Document("$gte", desde))),
                         new Document("$group", new Document("_id", mes("$historialEstados.fecha")).append("total", new Document("$sum", 1)))))
                 .append("categorias", List.of(
-                        // La categoría es texto libre: "Hueco" y " hueco" se agrupan juntas.
-                        new Document("$group", new Document("_id", new Document("$toLower", new Document("$trim", new Document("input", "$categoriaId"))))
-                                .append("nombre", new Document("$first", new Document("$trim", new Document("input", "$categoriaId"))))
+                        // Por el id del catálogo: un renombre ya se propagó a todos sus reportes, así que no se parte en dos.
+                        new Document("$match", new Document("categoria.id", new Document("$ne", null))),
+                        new Document("$group", new Document("_id", "$categoria.id")
+                                .append("nombre", new Document("$first", "$categoria.nombre"))
                                 .append("total", new Document("$sum", 1))
                                 .append("resueltos", new Document("$sum", new Document("$cond", List.of(new Document("$eq", List.of("$estado", "RESUELTO")), 1, 0))))),
                         new Document("$sort", new Document("total", -1).append("_id", 1)),
@@ -128,7 +129,8 @@ public class EstadisticasService {
         }
 
         List<EstadisticasResponse.Categoria> categorias = lista(resultado, "categorias").stream()
-                .map(grupo -> new EstadisticasResponse.Categoria(grupo.getString("nombre"), numero(grupo, "total"), numero(grupo, "resueltos")))
+                .map(grupo -> new EstadisticasResponse.Categoria(grupo.getString("_id"), grupo.getString("nombre"), numero(grupo, "total"),
+                        numero(grupo, "resueltos")))
                 .toList();
         List<EstadisticasResponse.CeldaDensidad> densidad = lista(resultado, "densidad").stream()
                 .map(grupo -> {

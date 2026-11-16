@@ -57,7 +57,7 @@ export function EstadisticasAdmin() {
           <h2>Categorías con más reportes</h2>
           {datos.categorias.length === 0 && <p className="muted">Todavía no hay reportes.</p>}
           {datos.categorias.map((categoria) => (
-            <div key={categoria.nombre} className="stats-hbar">
+            <div key={categoria.id} className="stats-hbar">
               <span className="stats-hbar-label">{categoria.nombre}</span>
               <span className="stats-hbar-track"><span className="stats-hbar-fill" style={{ width: `${(categoria.total / maximoCategoria) * 100}%` }} /></span>
               <span className="stats-hbar-value"><strong>{categoria.total}</strong> · {categoria.resueltos} resueltos</span>
