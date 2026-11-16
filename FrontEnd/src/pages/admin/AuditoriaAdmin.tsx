@@ -17,6 +17,8 @@ const ETIQUETA: Record<string, string> = {
   BARRIO_CREADO: "Barrio creado",
   BARRIO_EDITADO: "Barrio editado",
   BARRIO_ELIMINADO: "Barrio eliminado",
+  COMENTARIO_ELIMINADO: "Comentario retirado por moderación",
+  REPLICA_SQL_RECONSTRUIDA: "Réplica SQL reconstruida",
   BARRIO_CALLE_AGREGADA: "Calle agregada",
   BARRIO_CALLE_ELIMINADA: "Calle eliminada",
   SEGUIMIENTO_TAREA_EJECUTADA: "Tarea diaria ejecutada",

@@ -16,6 +16,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,8 +27,9 @@ class ComentarioServiceTests {
     private final ReporteRepository reporteRepository = mock(ReporteRepository.class);
     private final UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
     private final UsuarioService usuarioService = mock(UsuarioService.class);
+    private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
     private final ComentarioService service = new ComentarioService(comentarioRepository, reporteRepository, usuarioRepository,
-            usuarioService, new LimitadorIntentos(), evento -> { });
+            usuarioService, new LimitadorIntentos(), auditoriaService, evento -> { });
 
     private Comentario comentarioDe(String autor) {
         return Comentario.builder().id("c-1").reporteId("r-1").usuarioId(autor).texto("Sigue igual").build();
@@ -52,6 +54,18 @@ class ComentarioServiceTests {
         service.eliminar("c-1", "moderador-1");
 
         verify(comentarioRepository).delete(comentario);
+        verify(auditoriaService).registrar(eq("moderador-1"), eq("COMENTARIO_ELIMINADO"), eq("COMENTARIO"), eq("c-1"), anyString());
+    }
+
+    @Test
+    void elAutorQueBorraSuPropioComentarioNoQuedaEnLaAuditoria() {
+        Comentario comentario = comentarioDe("vecina-1");
+        when(comentarioRepository.findById("c-1")).thenReturn(Optional.of(comentario));
+
+        service.eliminar("c-1", "vecina-1");
+
+        verify(comentarioRepository).delete(comentario);
+        verify(auditoriaService, never()).registrar(anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test

@@ -27,16 +27,18 @@ public class ComentarioService {
     private final UsuarioRepository usuarioRepository;
     private final UsuarioService usuarioService;
     private final LimitadorIntentos limitador;
+    private final AuditoriaService auditoriaService;
     private final ApplicationEventPublisher eventos;
 
     public ComentarioService(ComentarioRepository comentarioRepository, ReporteRepository reporteRepository,
                              UsuarioRepository usuarioRepository, UsuarioService usuarioService, LimitadorIntentos limitador,
-                             ApplicationEventPublisher eventos) {
+                             AuditoriaService auditoriaService, ApplicationEventPublisher eventos) {
         this.comentarioRepository = comentarioRepository;
         this.reporteRepository = reporteRepository;
         this.usuarioRepository = usuarioRepository;
         this.usuarioService = usuarioService;
         this.limitador = limitador;
+        this.auditoriaService = auditoriaService;
         this.eventos = eventos;
     }
 
@@ -76,6 +78,12 @@ public class ComentarioService {
         }
         comentarioRepository.delete(comentario);
         eventos.publishEvent(CambioReplicable.comentario(comentarioId));
+        // Retirar el comentario de otra persona es moderación: queda en la auditoría. El autor borrando el suyo, no.
+        if (!comentario.getUsuarioId().equals(solicitanteId)) {
+            String texto = comentario.getTexto() == null ? "" : comentario.getTexto();
+            auditoriaService.registrar(solicitanteId, "COMENTARIO_ELIMINADO", "COMENTARIO", comentarioId,
+                    "Reporte " + comentario.getReporteId() + ": «" + (texto.length() > 80 ? texto.substring(0, 77) + "..." : texto) + "»");
+        }
     }
 
     private Comentario buscar(String comentarioId) {

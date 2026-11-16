@@ -5,8 +5,13 @@ ViaCTG es una API REST para registrar y hacer seguimiento a daños viales de Car
 ## Requisitos y configuración
 
 - JDK 21 o superior.
-- MongoDB accesible desde la aplicación.
+- MongoDB accesible desde la aplicación (por defecto `mongodb://localhost:27017/viasctg_db`, o `MONGODB_URI`).
 - Un secreto JWT en Base64 de 32 bytes o más.
+- Opcional: PostgreSQL para la réplica secundaria (ver «Base secundaria en PostgreSQL»).
+
+La forma más simple fuera de Docker es copiar `local.properties.example` como `local.properties` (está en
+`.gitignore`) y completar el secreto JWT, el administrador local y la conexión a PostgreSQL. `./mvnw spring-boot:run`
+lo lee solo; cada línea reemplaza el valor de `application.properties`. También se puede trabajar con variables:
 
 ```bash
 export MONGODB_URI='mongodb://localhost:27017/viasctg_db'
@@ -274,11 +279,9 @@ Las pruebas no necesitan MongoDB ni PostgreSQL: las de servicios usan Mockito y 
 
 ## Desarrollo con frontend
 
-En una terminal, inicia la API con MongoDB local y un secreto JWT temporal:
+En una terminal, inicia la API (con `local.properties` completo, ver «Requisitos y configuración»):
 
 ```bash
-export MONGODB_URI='mongodb://localhost:27017/viasctg_db'
-export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
@@ -294,4 +297,4 @@ La API queda disponible en `http://localhost:8080`, Swagger en
 `http://localhost:8080/swagger-ui/index.html` y Vite normalmente en
 `http://localhost:5173`.
 
-Consulta [HELP.md](HELP.md) para solucionar problemas comunes y [PROGRESS.md](PROGRESS.md) para conocer el trabajo pendiente.
+Consulta [PROGRESS.md](PROGRESS.md) para conocer el trabajo hecho y pendiente.

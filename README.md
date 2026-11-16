@@ -1,75 +1,186 @@
-# ViaCTG — Pruebas unitarias con Mockito
+# ViaCTG — Reporte ciudadano de daños viales en Cartagena
 
-Esta rama agrega pruebas unitarias con **JUnit 5 y Mockito** para dos servicios del backend que aún no tenían cobertura.
+ViaCTG es una plataforma web para que la ciudadanía de Cartagena reporte daños en las vías (huecos, inundaciones,
+hundimientos, alcantarillas…) y siga su atención. Los ciudadanos crean reportes con ubicación en el mapa y fotos,
+confirman los de otros, comentan y responden «¿ya lo arreglaron?»; los moderadores y administradores revisan, priorizan y
+cambian el estado de cada caso, con historial, notificaciones, estadísticas y auditoría.
 
-| Servicio | Clase de prueba | Qué cubre |
-| --- | --- | --- |
-| `BarrioService` | `BarrioServiceTests` | Crear, buscar, actualizar y eliminar barrios; agregar y eliminar calles (incluidas listas inmutables o nulas); y el error `ResourceNotFoundException` cuando no existen. |
-| `CorreoService` | `CorreoServiceTests` | Que no se envíe nada sin SMTP configurado; el envío con destinatario, asunto y cuerpo correctos; el remitente por defecto; y que un fallo de envío no afecte a quien llama. |
-
-## Pruebas HTTP de controladores (`@WebMvcTest`)
-
-En `ViasCTG/src/test/java/com/viactg/controller/` se prueban los 13 controladores sobre MockMvc con la seguridad real
-(`SecurityConfig`, filtro JWT, `JwtService` y `GlobalExceptionHandler`) y los mappers reales; los servicios son mocks de
-Mockito, así que no hace falta MongoDB. `ControllerTestBase` reúne la configuración común (todas las clases comparten un
-solo contexto de Spring) y emite JWT reales por rol.
-
-| Clase de prueba | Qué cubre |
+| Capa | Tecnología |
 | --- | --- |
-| `SeguridadRutasTests` | Qué rutas son públicas, cuáles responden 401 sin sesión y cuáles 403 según el rol (ciudadano, moderador, admin), sin llegar a los servicios; tokens mal formados, firmados con otra clave, vencidos, de cuentas desactivadas, eliminadas o con la versión revocada; que el rol se lea de la base de datos y no del token; `/uploads/**` público y CORS. |
-| `AuthControllerTests` | Registro sin token hasta confirmar el correo, confirmación y reenvío del enlace, login con la IP del cliente (403 si el correo no está confirmado), sin `passwordHash`; 400 por campo, JSON mal formado, 401, 415 y 429; recuperar y restablecer contraseña. |
-| `ReporteControllerTests` | Filtros y límites del listado, resumen, cercanos y posibles duplicados; que el autor salga del token y no del cuerpo; 400/403/404/409; subida de fotos multipart. |
-| `AdminControllerTests` | Cambio de estado con moderador, comentario y prioridad; estados o prioridades inexistentes; historial, votos de seguimiento y recordatorios. |
-| `UsuarioControllerTests` | Perfil, cambio de contraseña con token nuevo (el anterior queda revocado), cierre de sesiones, cambio de rol y activación. |
-| `DashboardControllerTests` | URL firmada del dashboard: 401 sin sesión, 403 para ciudadanos, 200 con `{url, expiraEn}` para moderador y admin, 503 sin configuración. |
-| `ComentarioControllerTests`, `SeguimientoControllerTests`, `NotificacionControllerTests`, `GeocodingControllerTests`, `CatalogoControllerTests` | Usuario tomado del token, validaciones en español, límite por IP de la geocodificación, 405, y que los errores del driver de Mongo o las excepciones inesperadas no expongan detalles técnicos. |
+| Frontend ([FrontEnd/](FrontEnd)) | React 19, TypeScript, Vite, React Router, Axios, Leaflet + OpenStreetMap, Tailwind |
+| Backend ([ViasCTG/](ViasCTG)) | Java 21, Spring Boot 3.3, Spring Security + JWT, Spring Data MongoDB, JDBC + Flyway |
+| Base principal | **MongoDB 7** (`viasctg_db`) |
+| Base secundaria | **PostgreSQL 17** (`viasctg_sql`): réplica relacional para SQL y analítica |
+| Analítica | Metabase embebido en el panel; guía equivalente en Power BI |
+| Infraestructura | Docker Compose, GitHub Actions (CI) |
 
-## Dashboard (Metabase)
+## Qué puede hacer cada rol
 
-El panel de administración tiene una pestaña **Dashboard** (moderador y admin) con un dashboard de
-[Metabase](https://www.metabase.com/) open source conectado a la misma base `viasctg_db`. Se muestra en un iframe con
-**embebido estático firmado**: `GET /api/admin/dashboard` devuelve `{url, expiraEn}`, una URL con un JWT HS256
-(`resource.dashboard`, `params` vacío, vence en `METABASE_TOKEN_MINUTOS`) firmado con la clave de embebido de Metabase,
-que nunca sale del backend. El panel pide otra URL un minuto antes de que venza y el dashboard se actualiza solo cada
-minuto (`#refresh=60`). Sin configuración, la API responde `503` «El dashboard no está configurado».
-El botón **Descargar estadísticas (.csv)** de esa pestaña baja las cifras de la pestaña Estadísticas en un solo CSV
-(una cifra por fila: resumen, estados, meses y categorías), y cada tarjeta del dashboard también se descarga desde su menú.
+| Rol | Funciones |
+| --- | --- |
+| Visitante | Ver reportes (listado paginado con búsqueda y filtros, mapa, detalle), cifras de la portada, registrarse |
+| Ciudadano | Crear reportes (punto en el mapa dentro de Cartagena, categoría del catálogo, descripción, hasta 3 fotos), ver si ya lo reportaron (a menos de 100 m), editar los suyos mientras están pendientes, confirmar, comentar, votar «¿ya lo arreglaron?», notificaciones, perfil |
+| Moderador | Panel: cola de reportes ordenable, cambio de estado individual o en lote con comentario y prioridad, historial, señales de la comunidad, estadísticas, dashboard |
+| Administrador | Todo lo anterior más usuarios (rol y activación), barrios y calles, categorías, auditoría y la réplica SQL |
 
-### Cómo levantarlo
+Flujo de un reporte: `PENDIENTE → EN_REVISION → EN_PROCESO → RESUELTO`, y `RECHAZADO` desde cualquier estado activo.
 
-```bash
-cp .env.example .env            # si aún no existe; define JWT_SECRET
-docker compose up -d --build    # Mongo, backend, frontend y Metabase (http://localhost:3000)
+## Arquitectura
+
+```mermaid
+flowchart LR
+    subgraph Navegador
+        SPA["React + Vite<br/>(Leaflet / OpenStreetMap)"]
+    end
+    subgraph Servidor
+        NGINX["nginx<br/>(sirve la SPA y reenvía /api y /uploads)"]
+        API["API REST Spring Boot<br/>controller → service → repository"]
+        HILO["ReplicaSqlService<br/>(hilo en segundo plano)"]
+    end
+    MONGO[("MongoDB<br/>base principal")]
+    PG[("PostgreSQL<br/>base secundaria")]
+    MB["Metabase"]
+    NOM["Nominatim<br/>(OpenStreetMap)"]
+
+    SPA -- "HTTPS + JWT" --> NGINX --> API
+    API -- "lee y escribe" --> MONGO
+    API -- "CambioReplicable<br/>(evento tras cada escritura)" --> HILO
+    HILO -- "relee el documento" --> MONGO
+    HILO -- "INSERT … ON CONFLICT<br/>(Flyway crea el esquema)" --> PG
+    API -. "dirección de cada reporte" .-> NOM
+    MB -- "consultas" --> MONGO
+    SPA -. "iframe firmado" .-> MB
 ```
 
-Luego sigue [docs/metabase.md](docs/metabase.md): crear el administrador de Metabase, conectar MongoDB (host `mongo`,
-puerto `27017`, base `viasctg_db`), ocultar las colecciones sensibles, crear las ocho preguntas, armar y publicar el
-dashboard. Copia la clave de embebido y el id del dashboard al `.env` y recrea el backend con
-`docker compose up -d backend`.
+- El backend sigue capas fijas bajo `com.viactg`: `controller` (solo DTOs), `service` (reglas de negocio, permisos y
+  validación de referencias), `repository`, `model`, `dto`/`mapper`, `security` (filtro JWT), `exception` (errores en
+  español con el mismo formato) y `config`.
+- Toda escritura sobre un documento existente es una actualización parcial atómica (`findAndModify` con `$set`, `$push`,
+  `$inc`) filtrando por el estado leído: dos moderadores a la vez no se pisan (el segundo recibe `409`).
+- Seguridad: BCrypt, JWT con versión revocable, roles leídos de la base en cada petición, permisos por URL y con
+  `@PreAuthorize`, límites de intentos (login, registro, reportes, comentarios) y verificación de correo.
 
-Atajo: después de crear la cuenta de administrador en el asistente de Metabase, `python3 configurar-metabase.py` hace el
-resto (conexión, colecciones ocultas, preguntas, dashboard publicado y las dos variables en el `.env`); pide la contraseña
-de Metabase sin mostrarla.
+## Bases de datos
 
-También hay una versión en Power BI de los mismos ocho indicadores: [docs/powerbi.md](docs/powerbi.md) (modelo,
-medidas DAX y cifras esperadas), con los datos demo en `docs/powerbi/datos-demo/` y `python3 exportar-powerbi.py` para
-exportar a CSV los datos reales (a `powerbi-datos/`, que git ignora).
+### MongoDB (principal)
 
-### Variables nuevas
+La aplicación lee y escribe solo aquí. Lo que se consulta junto va **embebido**; lo que tiene vida propia es una
+colección aparte y se **referencia** por id:
 
-| Variable | Por defecto | Para qué |
-| --- | --- | --- |
-| `METABASE_SITE_URL` | `http://localhost:3000` | Dirección de Metabase tal como la abre el navegador (el iframe la carga directamente). |
-| `METABASE_SECRET_KEY` | vacía | Clave de embebido de *Admin › Embedding* de Metabase. |
-| `METABASE_DASHBOARD_ID` | vacía | Número del dashboard publicado (`/dashboard/<id>`). |
-| `METABASE_TOKEN_MINUTOS` | `10` | Vigencia de cada URL firmada. |
-| `SEED_DEMO` | `false` | Con `true`, carga datos de demostración al arrancar (ver abajo). |
+| Colección | Embebido | Referencia a | Índices destacados |
+| --- | --- | --- | --- |
+| `reportes` | `historialEstados[]`, `fotos[]`, `ubicacion` (GeoJSON), `categoria {id, nombre}` | `usuarios` (`usuarioId`), `categorias` (`categoria.id`) | `2dsphere`, `(estado, fechaCreacion)`, `(categoria.id, fechaCreacion)` |
+| `barrios` | `calles[]` | — | `nombreClave` único |
+| `usuarios` | — | — | `email` único |
+| `categorias` | — | — | — |
+| `comentarios`, `confirmaciones`, `seguimientos` | — | `reportes`, `usuarios` | únicos `(reporteId, usuarioId)` en confirmaciones y votos |
+| `notificaciones`, `auditoria` | — | `usuarios` | por usuario y fecha |
+| `tokens_recuperacion`, `tokens_verificacion` | — | `usuarios` | TTL (Mongo los borra al vencer) |
 
-El servicio `metabase` de `docker-compose.yml` usa `metabase/metabase:v0.64.4.3` (rama LTS), guarda su base interna H2 en
-el volumen `metabase_data` (en producción se recomienda PostgreSQL) y activa el embebido con
-`MB_ENABLE_EMBEDDING_STATIC=true`.
+La categoría del reporte es una **referencia extendida**: guarda el `id` del catálogo y una copia del `nombre`, así se
+muestra, filtra y agrupa sin consultar `categorias`; si un administrador la renombra, la copia se actualiza en todos
+sus reportes. Con los datos de demostración (`SEED_DEMO_REPORTES=10000`) la base tiene más de **23 000 documentos**.
 
-### Datos de demostración
+### PostgreSQL (secundaria)
+
+Una réplica relacional y normalizada que nunca lee la aplicación: sirve para consultas SQL, reportes y analítica. Si
+PostgreSQL se cae, todo sigue funcionando y la réplica se reintenta sola. Lo embebido en Mongo pasa a tablas hijas:
+
+```mermaid
+erDiagram
+    usuarios ||--o{ reportes : "crea"
+    categorias ||--o{ reportes : "clasifica"
+    reportes ||--o{ reporte_fotos : "fotos[]"
+    reportes ||--o{ historial_estados : "historialEstados[]"
+    usuarios ||--o{ historial_estados : "atiende"
+    reportes ||--o{ comentarios : "tiene"
+    reportes ||--o{ confirmaciones : "tiene"
+    reportes ||--o{ seguimientos : "tiene"
+    usuarios ||--o{ comentarios : "escribe"
+    usuarios ||--o{ confirmaciones : "confirma"
+    usuarios ||--o{ seguimientos : "vota"
+    barrios ||--o{ calles : "calles[]"
+    reportes {
+        varchar id PK
+        varchar usuario_id FK
+        varchar categoria_id FK
+        text descripcion
+        float latitud
+        float longitud
+        varchar estado
+        varchar prioridad
+        timestamptz fecha_creacion
+    }
+    historial_estados {
+        varchar id PK
+        varchar reporte_id FK
+        int orden
+        varchar usuario_admin_id FK
+        varchar estado_anterior
+        varchar estado_nuevo
+        timestamptz fecha
+    }
+```
+
+Cada escritura en Mongo publica un evento (`CambioReplicable`); un hilo en segundo plano relee ese documento y lo copia
+con `INSERT … ON CONFLICT DO UPDATE`. Al arrancar (y desde la pestaña **Base SQL** del panel) la réplica se reconstruye
+completa. El esquema está versionado con Flyway (`ViasCTG/src/main/resources/db/migration`) e incluye las vistas
+`v_reportes_por_categoria`, `v_reportes_detalle` y `v_actividad_moderadores`. No se copian contraseñas ni tokens.
+Detalle en [ViasCTG/README.md](ViasCTG/README.md#base-secundaria-en-postgresql).
+
+## Estructura del repositorio
+
+```text
+ViasCTG/             API Spring Boot (código, pruebas, colección de Postman, scripts SQL locales)
+FrontEnd/            Cliente React (pantallas públicas y panel de administración)
+docs/                Guías de Metabase y Power BI (con datos de ejemplo para Power BI)
+docker-compose.yml   Mongo, PostgreSQL, backend, frontend, Metabase y túnel opcional para la demo
+configurar-metabase.py, exportar-powerbi.py, demo-tunel.sh   Utilidades del dashboard y la demo pública
+```
+
+## Cómo ejecutarlo
+
+### Opción A: en el PC, sin Docker
+
+Requisitos: JDK 21, Node.js 20 o superior, MongoDB en `localhost:27017` y, para la base secundaria, PostgreSQL en
+`localhost:5432`.
+
+1. Configuración local: copia `ViasCTG/local.properties.example` como `ViasCTG/local.properties` (no se sube a git) y
+   completa el secreto JWT, el administrador local y la contraseña del usuario `viasctg` de PostgreSQL.
+2. Base secundaria (una vez): crea el usuario y la base en PostgreSQL; pide la contraseña del usuario `postgres`.
+
+   ```powershell
+   cd ViasCTG
+   powershell -ExecutionPolicy Bypass -File sql\crear-base-local.ps1
+   ```
+
+3. Backend (la primera vez, con datos de demostración; después basta `.\mvnw spring-boot:run`):
+
+   ```powershell
+   cd ViasCTG
+   $env:SEED_DEMO = 'true'; $env:SEED_DEMO_REPORTES = '10000'
+   .\mvnw spring-boot:run
+   ```
+
+4. Frontend, en otra terminal:
+
+   ```powershell
+   cd FrontEnd
+   npm install
+   npm run dev
+   ```
+
+Abre `http://localhost:5173` y entra al panel con el administrador de `local.properties`. Swagger queda en
+`http://localhost:8080/swagger-ui/index.html`.
+
+### Opción B: con Docker Compose
+
+```bash
+cp .env.example .env            # define JWT_SECRET y SQL_PASSWORD (openssl rand -base64 32)
+docker compose up -d --build    # Mongo, PostgreSQL, backend, frontend (http://localhost:5173) y Metabase (:3000)
+```
+
+## Datos de demostración
 
 Con `SEED_DEMO=true` y menos de 20 reportes, el backend crea al arrancar `SEED_DEMO_REPORTES` reportes (200 por
 defecto) de los últimos 12 meses en nueve barrios reales (25 % pendientes, 15 % en revisión, 20 % en proceso, 30 %
@@ -99,10 +210,51 @@ docker compose exec mongo mongosh viasctg_db --eval '
 ```
 
 Después de borrarlos, pulsa «Reconstruir réplica» en la pestaña Base SQL del panel (o reinicia el backend) y deja
-`SEED_DEMO=false` en el `.env`: si no, se vuelven a crear en el siguiente arranque mientras
-haya menos de 20 reportes.
+`SEED_DEMO=false` en el `.env`: si no, se vuelven a crear en el siguiente arranque mientras haya menos de 20 reportes.
 
-Pruebas: `MetabaseServiceTests` (token verificable con la misma clave y HS256, dashboard, `params` vacío, vencimiento y
-formato de la URL, 503 sin configuración), `DashboardControllerTests` y `SeguridadRutasTests` (permisos por rol),
-`DatosDemoTests` (apagado no hace nada, no duplica, área de servicio, transiciones válidas con fechas crecientes y
-categorías del catálogo) y `DashboardAdmin.test.tsx` en el frontend (iframe, mensaje de error, botón Actualizar).
+## Dashboard (Metabase)
+
+El panel tiene una pestaña **Dashboard** (moderador y admin) con un dashboard de [Metabase](https://www.metabase.com/)
+open source conectado a `viasctg_db`, mostrado en un iframe con **embebido estático firmado**: `GET /api/admin/dashboard`
+devuelve `{url, expiraEn}`, una URL con un JWT HS256 firmado con la clave de embebido de Metabase, que nunca sale del
+backend. El panel pide otra URL antes de que venza y el dashboard se actualiza cada minuto. Sin configuración, la API
+responde `503` «El dashboard no está configurado». El botón **Descargar estadísticas (.csv)** baja las cifras de la
+pestaña Estadísticas.
+
+Para armarlo sigue [docs/metabase.md](docs/metabase.md) (conectar la base, ocultar colecciones sensibles, crear las ocho
+preguntas y publicar el dashboard) o, tras crear la cuenta de administrador de Metabase, `python3 configurar-metabase.py`,
+que hace el resto y escribe `METABASE_SECRET_KEY` y `METABASE_DASHBOARD_ID` en el `.env`. Hay una versión en Power BI de
+los mismos indicadores en [docs/powerbi.md](docs/powerbi.md), con `python3 exportar-powerbi.py` para exportar los datos.
+
+| Variable | Por defecto | Para qué |
+| --- | --- | --- |
+| `METABASE_SITE_URL` | `http://localhost:3000` | Dirección de Metabase tal como la abre el navegador. |
+| `METABASE_SECRET_KEY` | vacía | Clave de embebido de *Admin › Embedding* de Metabase. |
+| `METABASE_DASHBOARD_ID` | vacía | Número del dashboard publicado (`/dashboard/<id>`). |
+| `METABASE_TOKEN_MINUTOS` | `10` | Vigencia de cada URL firmada. |
+
+## Pruebas
+
+```bash
+cd ViasCTG && ./mvnw test          # backend: JUnit 5 + Mockito, MockMvc y, con SQL_TEST_URL, PostgreSQL real
+cd FrontEnd && npm test            # frontend: Vitest + Testing Library
+```
+
+- **Servicios** (Mockito): reglas de negocio de reportes, estados, categorías, usuarios, autenticación, cierre por la
+  comunidad, estadísticas, réplica SQL y datos de demostración.
+- **Controladores** (`@WebMvcTest` con la seguridad real): qué rutas son públicas, cuáles exigen sesión o rol (401/403),
+  validaciones y errores en español, sin exponer detalles técnicos.
+- **Mapeo a MongoDB**: cómo se guarda la categoría embebida, con el conversor real de Spring Data.
+- **Integración con PostgreSQL** (`ReplicaSqlRepositoryIntegracionTests`): esquema de Flyway, upserts, llaves foráneas,
+  borrado en cascada y vistas, contra una base real; en la CI corre con un PostgreSQL desechable.
+- **Frontend**: utilidades, llamadas a la API y pantallas del panel (reportes, auditoría, dashboard, base SQL).
+
+La CI de GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) corre en cada push las pruebas del
+backend y, en el frontend, lint, pruebas y build.
+
+## Más documentación
+
+- [ViasCTG/README.md](ViasCTG/README.md): API completa (rutas, seguridad, errores, configuración, réplica SQL).
+- [FrontEnd/README.md](FrontEnd/README.md): pantallas y organización del cliente.
+- [ViasCTG/postman/](ViasCTG/postman): colección de Postman con todas las rutas.
+- [docs/metabase.md](docs/metabase.md) y [docs/powerbi.md](docs/powerbi.md): analítica.

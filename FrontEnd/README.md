@@ -25,9 +25,7 @@ Primero levanta el backend desde su directorio:
 
 ```bash
 cd ../ViasCTG
-export MONGODB_URI='mongodb://localhost:27017/viasctg_db'
-export JWT_SECRET="$(openssl rand -base64 32)"
-./mvnw spring-boot:run
+./mvnw spring-boot:run   # con ViasCTG/local.properties completo (ver el README de la raíz)
 ```
 
 Después inicia el cliente:
