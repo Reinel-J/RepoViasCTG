@@ -34,7 +34,7 @@ class CategoriaServiceTests {
     private final CategoriaRepository categoriaRepository = mock(CategoriaRepository.class);
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
-    private final CategoriaService service = new CategoriaService(categoriaRepository, mongoTemplate, auditoriaService);
+    private final CategoriaService service = new CategoriaService(categoriaRepository, mongoTemplate, auditoriaService, evento -> { });
 
     private void catalogo(String... nombres) {
         when(categoriaRepository.findAll()).thenReturn(Arrays.stream(nombres)

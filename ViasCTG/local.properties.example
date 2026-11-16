@@ -1,0 +1,10 @@
+# Copia este archivo como "local.properties" (en esta misma carpeta, ViasCTG) para correr el backend con
+# ./mvnw spring-boot:run sin exportar variables. local.properties está en .gitignore: no se sube a git.
+# Las variables de entorno (SQL_PASSWORD, etc.) siguen teniendo prioridad sobre este archivo.
+
+# Réplica secundaria en PostgreSQL (la principal es MongoDB). Crea la base y el usuario con:
+#   powershell -ExecutionPolicy Bypass -File sql\crear-base-local.ps1
+app.sql.habilitada=true
+app.sql.url=jdbc:postgresql://localhost:5432/viasctg_sql
+app.sql.usuario=viasctg
+app.sql.password=cambia-esta-contrasena

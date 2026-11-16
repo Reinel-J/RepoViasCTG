@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
@@ -34,17 +35,20 @@ public class CategoriaService {
     private final CategoriaRepository categoriaRepository;
     private final MongoTemplate mongoTemplate;
     private final AuditoriaService auditoriaService;
+    private final ApplicationEventPublisher eventos;
 
-    public CategoriaService(CategoriaRepository categoriaRepository, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
+    public CategoriaService(CategoriaRepository categoriaRepository, MongoTemplate mongoTemplate, AuditoriaService auditoriaService,
+                            ApplicationEventPublisher eventos) {
         this.categoriaRepository = categoriaRepository;
         this.mongoTemplate = mongoTemplate;
         this.auditoriaService = auditoriaService;
+        this.eventos = eventos;
     }
 
     public Categoria crear(CategoriaRequest request) {
         String nombre = limpiar(request.nombre());
         validarNombreLibre(nombre, null);
-        return categoriaRepository.save(Categoria.builder().nombre(nombre).descripcion(request.descripcion()).activa(true).build());
+        return avisar(categoriaRepository.save(Categoria.builder().nombre(nombre).descripcion(request.descripcion()).activa(true).build()));
     }
     public Categoria crear(CategoriaRequest request, String actorId) { Categoria creada = crear(request); auditar(actorId, "CATEGORIA_CREADA", creada.getId(), creada.getNombre()); return creada; }
 
@@ -82,6 +86,7 @@ public class CategoriaService {
                 .getModifiedCount();
         Categoria actualizada = Categoria.builder().id(id).nombre(nombre).descripcion(request.descripcion())
                 .activa(anterior.isActiva()).build();
+        avisar(actualizada);
         return new Renombre(actualizada, anterior.getNombre(), reportes);
     }
 
@@ -92,7 +97,13 @@ public class CategoriaService {
         Categoria actualizada = mongoTemplate.findAndModify(Query.query(Criteria.where("_id").is(id)),
                 new Update().set("activa", activa), FindAndModifyOptions.options().returnNew(true), Categoria.class);
         if (actualizada == null) throw new ResourceNotFoundException("Categoría no encontrada: " + id);
-        return actualizada;
+        return avisar(actualizada);
+    }
+
+    // En la réplica SQL el nombre vive solo en la tabla categorias: un renombre no toca las filas de reportes.
+    private Categoria avisar(Categoria categoria) {
+        if (categoria != null) eventos.publishEvent(CambioReplicable.categoria(categoria.getId()));
+        return categoria;
     }
     public Categoria cambiarEstado(String id, boolean activa, String actorId) { Categoria actualizada = cambiarEstado(id, activa); auditar(actorId, activa ? "CATEGORIA_ACTIVADA" : "CATEGORIA_DESACTIVADA", id, actualizada.getNombre()); return actualizada; }
     private void auditar(String actorId, String accion, String id, String detalle) {

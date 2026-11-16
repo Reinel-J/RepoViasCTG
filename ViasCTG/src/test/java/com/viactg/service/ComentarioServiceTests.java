@@ -27,7 +27,7 @@ class ComentarioServiceTests {
     private final UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
     private final UsuarioService usuarioService = mock(UsuarioService.class);
     private final ComentarioService service = new ComentarioService(comentarioRepository, reporteRepository, usuarioRepository,
-            usuarioService, new LimitadorIntentos());
+            usuarioService, new LimitadorIntentos(), evento -> { });
 
     private Comentario comentarioDe(String autor) {
         return Comentario.builder().id("c-1").reporteId("r-1").usuarioId(autor).texto("Sigue igual").build();

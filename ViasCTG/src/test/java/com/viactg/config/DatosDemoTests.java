@@ -45,10 +45,11 @@ class DatosDemoTests {
     private final UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
     private final CategoriaRepository categoriaRepository = mock(CategoriaRepository.class);
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+    private final org.springframework.context.ApplicationEventPublisher eventos = mock(org.springframework.context.ApplicationEventPublisher.class);
 
     private DatosDemo datosDemo(boolean habilitado) {
         return new DatosDemo(mongoTemplate, reporteRepository, usuarioRepository, categoriaRepository, AREA, passwordEncoder,
-                habilitado, "admin@viactg.co");
+                habilitado, "admin@viactg.co", eventos);
     }
 
     @BeforeEach
@@ -86,7 +87,7 @@ class DatosDemoTests {
     void conSeedDemoApagadoNoHaceNada() {
         datosDemo(false).run();
 
-        verifyNoInteractions(mongoTemplate, reporteRepository, usuarioRepository, categoriaRepository, passwordEncoder);
+        verifyNoInteractions(mongoTemplate, reporteRepository, usuarioRepository, categoriaRepository, passwordEncoder, eventos);
     }
 
     @Test
@@ -96,6 +97,14 @@ class DatosDemoTests {
         datosDemo(true).run();
 
         verify(mongoTemplate, never()).insertAll(any());
+        verifyNoInteractions(eventos);
+    }
+
+    @Test
+    void trasInsertarPideReconstruirLaReplicaSqlCompleta() {
+        reportesGenerados();
+
+        verify(eventos).publishEvent(com.viactg.service.CambioReplicable.todo());
     }
 
     @Test

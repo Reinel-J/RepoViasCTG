@@ -260,3 +260,16 @@ export interface CategoriaRequest {
   nombre: string
   descripcion?: string
 }
+
+// Estado de la base secundaria (réplica en PostgreSQL), GET /admin/replica-sql. `sql` es null si PostgreSQL no responde
+// o la réplica está deshabilitada.
+export interface EstadoReplicaResponse {
+  habilitada: boolean
+  conectada: boolean
+  pendienteReconstruir: boolean
+  ultimaSincronizacion: string | null
+  ultimaReconstruccion: string | null
+  ultimoError: string | null
+  ultimoErrorEn: string | null
+  tablas: { nombre: string; mongo: number; sql: number | null }[]
+}

@@ -26,6 +26,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -62,11 +63,12 @@ public class SeguimientoService {
     private final boolean cierreHabilitado;
     private final CierreComunitario reglaCierre;
     private final Duration graciaCierre;
+    private final ApplicationEventPublisher eventos;
 
     public SeguimientoService(SeguimientoRepository seguimientoRepository, ReporteRepository reporteRepository,
                               ConfirmacionRepository confirmacionRepository, UsuarioRepository usuarioRepository,
                               NotificacionService notificacionService, CorreoService correoService, MongoTemplate mongoTemplate,
-                              ReporteService reporteService,
+                              ReporteService reporteService, ApplicationEventPublisher eventos,
                               @Value("${app.seguimiento.dias:30}") long dias,
                               @Value("${app.frontend.url:http://localhost:5173}") String frontendUrl,
                               @Value("${app.seguimiento.cierre.habilitado:false}") boolean cierreHabilitado,
@@ -86,6 +88,7 @@ public class SeguimientoService {
         this.cierreHabilitado = cierreHabilitado;
         this.reglaCierre = new CierreComunitario(minimoVotos, proporcion);
         this.graciaCierre = Duration.ofHours(graciaHoras);
+        this.eventos = eventos;
     }
 
     /** Registra o cambia el voto del usuario. Solo para reportes activos. */
@@ -102,6 +105,7 @@ public class SeguimientoService {
             // Dos peticiones simultáneas del mismo usuario: la otra ya insertó, así que ahora es una actualización.
             mongoTemplate.upsert(voto, cambio, Seguimiento.class);
         }
+        eventos.publishEvent(CambioReplicable.seguimientos(reporteId));
         if (cierreHabilitado && reporte.getEstado() == EstadoReporte.EN_PROCESO) {
             reevaluarCierre(reporteId, Instant.now());
         }

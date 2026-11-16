@@ -28,6 +28,50 @@ El código se organiza bajo `com.viactg` por responsabilidad: `controller`, `ser
 
 El cliente React vive en el directorio hermano `../FrontEnd`. Consume esta API en desarrollo desde `http://localhost:5173` y usa `http://localhost:8080/api` como URL base.
 
+## Base secundaria en PostgreSQL
+
+MongoDB es la base **principal**: la aplicación lee y escribe ahí. PostgreSQL es la base **secundaria**: una réplica
+relacional y normalizada que sirve para consultas SQL, reportes y analítica (Metabase, Power BI), sin tocar la
+operación. La aplicación nunca lee de PostgreSQL; si se cae, todo sigue funcionando.
+
+**Cómo se mantiene al día** (`ReplicaSqlService`):
+
+- *Cambio a cambio*: después de cada escritura en Mongo, el servicio que la hizo publica un `CambioReplicable`
+  (`ApplicationEventPublisher`). Un único hilo en segundo plano vuelve a leer ese documento y deja su fila igual con
+  `INSERT … ON CONFLICT DO UPDATE`, o la borra si el documento ya no existe. Las peticiones HTTP no esperan a PostgreSQL.
+- *Reconstrucción completa*: al arrancar, al cargar los datos de demostración, desde el panel o después de un error,
+  aplica las migraciones de Flyway, vacía las tablas y copia todas las colecciones por lotes de 500, en una sola
+  transacción. Si PostgreSQL no responde, se reintenta cada `SQL_REINTENTO_MS` (5 minutos).
+
+**Modelo relacional** (`src/main/resources/db/migration`, versionado con Flyway). Lo que en Mongo va embebido aquí es
+una tabla hija con llave foránea:
+
+| MongoDB (principal) | PostgreSQL (secundaria) |
+| --- | --- |
+| `usuarios` | `usuarios` (sin `passwordHash`) |
+| `categorias` | `categorias` |
+| `barrios` con `calles[]` embebidas | `barrios` 1—N `calles` |
+| `reportes` con `categoria {id, nombre}`, `fotos[]` e `historialEstados[]` embebidos | `reportes` (N—1 `usuarios`, N—1 `categorias`) 1—N `reporte_fotos` y 1—N `historial_estados` |
+| `comentarios`, `confirmaciones`, `seguimientos` | las mismas tablas, N—1 `reportes` y N—1 `usuarios` |
+| `auditoria` | `auditoria` |
+
+No se replican contraseñas, tokens ni notificaciones. Los id son los de Mongo, así una fila se encuentra en las dos
+bases. Las vistas `v_reportes_por_categoria`, `v_reportes_detalle` y `v_actividad_moderadores` (migración V2)
+resuelven con un JOIN lo que en Mongo necesita `$group`/`$unwind`.
+
+**Configuración**: `SQL_REPLICA_HABILITADA` (`false` por defecto; `true` en Docker), `SQL_URL`
+(`jdbc:postgresql://localhost:5432/viasctg_sql`), `SQL_USUARIO` (`viasctg`), `SQL_PASSWORD` y `SQL_REINTENTO_MS`.
+Fuera de Docker se pueden poner en `local.properties` (copia de `local.properties.example`, ignorado por git), que
+`./mvnw spring-boot:run` lee solo. Para crear la base y el usuario en un PostgreSQL local:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File sqlcrear-base-local.ps1
+```
+
+`GET /api/admin/replica-sql` (`ADMIN`) compara, tabla por tabla, los registros de Mongo con las filas de PostgreSQL;
+`POST /api/admin/replica-sql/reconstruir` (`ADMIN`, `202`) pide una reconstrucción completa. Ambas están en la
+pestaña **Base SQL** del panel.
+
 ## Geolocalización de reportes
 
 Cada reporte guarda `latitud`, `longitud` y una ubicación GeoJSON en el campo `ubicacion`. Este último tiene un índice geoespacial MongoDB `2dsphere`, creado automáticamente al iniciar la aplicación, y almacena las coordenadas en el orden requerido por GeoJSON: `[longitud, latitud]`.
@@ -202,6 +246,7 @@ defecto de Bean Validation sale en inglés.
 | Seguimiento | `GET/POST /api/reportes/{reporteId}/seguimiento` |
 | Geocodificación | `GET /api/geocoding/inverso` |
 | Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial`, `GET /api/admin/reportes/seguimiento`, `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) |
+| Réplica SQL | `GET /api/admin/replica-sql` (estado por tabla), `POST /api/admin/replica-sql/reconstruir` (`ADMIN`) |
 | Auditoría | `GET /api/admin/auditoria` (`ADMIN`; filtros opcionales `entidad`, `accion`, `actorId`, `desde`, `hasta`, `pagina` y `tamano`; incluye `REPORTE_CERRADO_POR_COMUNIDAD` para los cierres automáticos) |
 | Estadísticas | `GET /api/admin/estadisticas` |
 | Dashboard (Metabase) | `GET /api/admin/dashboard` (`{url, expiraEn}`: URL de embebido firmada con HS256; `503` sin configuración) |
@@ -221,8 +266,11 @@ La documentación interactiva está en `http://localhost:8080/swagger-ui/index.h
 ./mvnw clean verify
 ```
 
-Las pruebas no necesitan MongoDB: las de servicios usan Mockito y las de `controller/` levantan solo la capa web con
+Las pruebas no necesitan MongoDB ni PostgreSQL: las de servicios usan Mockito y las de `controller/` levantan solo la capa web con
 `@WebMvcTest` (seguridad, filtro JWT y manejo de errores reales; servicios simulados).
+`ReplicaSqlRepositoryIntegracionTests` sí prueba el SQL contra un PostgreSQL real, pero solo si se define
+`SQL_TEST_URL` apuntando a una base de pruebas cuyo nombre termine en `_test` (la borra y la recrea), con
+`SQL_TEST_USUARIO` y `SQL_TEST_PASSWORD`; sin esas variables se omite.
 
 ## Desarrollo con frontend
 

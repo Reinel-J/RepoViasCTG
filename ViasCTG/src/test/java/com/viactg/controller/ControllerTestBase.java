@@ -30,6 +30,7 @@ import com.viactg.service.EstadisticasService;
 import com.viactg.service.GeocodingService;
 import com.viactg.service.MetabaseService;
 import com.viactg.service.NotificacionService;
+import com.viactg.service.ReplicaSqlService;
 import com.viactg.service.ReporteService;
 import com.viactg.service.SeguimientoService;
 import com.viactg.service.UsuarioService;
@@ -79,6 +80,7 @@ abstract class ControllerTestBase {
     @MockBean protected ReporteService reporteService;
     @MockBean protected SeguimientoService seguimientoService;
     @MockBean protected UsuarioService usuarioService;
+    @MockBean protected ReplicaSqlService replicaSqlService;
 
     /** Usuario activo cuyo id es el nombre del rol en minúsculas (por ejemplo, "ciudadano"). */
     protected static Usuario usuario(Rol rol) {

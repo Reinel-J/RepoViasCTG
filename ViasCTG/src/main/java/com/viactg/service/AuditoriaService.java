@@ -10,6 +10,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -23,10 +24,12 @@ public class AuditoriaService {
 
     private final MongoTemplate mongoTemplate;
     private final UsuarioRepository usuarioRepository;
+    private final ApplicationEventPublisher eventos;
 
-    public AuditoriaService(MongoTemplate mongoTemplate, UsuarioRepository usuarioRepository) {
+    public AuditoriaService(MongoTemplate mongoTemplate, UsuarioRepository usuarioRepository, ApplicationEventPublisher eventos) {
         this.mongoTemplate = mongoTemplate;
         this.usuarioRepository = usuarioRepository;
+        this.eventos = eventos;
     }
 
     public void registrar(String actorId, String accion, String entidad, String entidadId, String detalle) {
@@ -46,7 +49,8 @@ public class AuditoriaService {
                     .entidadId(entidadId)
                     .detalle(detalle)
                     .build();
-            mongoTemplate.insert(registro);
+            RegistroAuditoria guardado = mongoTemplate.insert(registro);
+            if (guardado != null) eventos.publishEvent(CambioReplicable.auditoria(guardado.getId()));
         } catch (RuntimeException exception) {
             log.warn(
                     "No fue posible guardar la auditoría de {} sobre {} {}",

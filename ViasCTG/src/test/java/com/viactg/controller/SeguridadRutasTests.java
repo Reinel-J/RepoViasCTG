@@ -108,6 +108,7 @@ class SeguridadRutasTests extends ControllerTestBase {
                 Arguments.of(HttpMethod.PATCH, "/api/admin/reportes/r1/estado"),
                 Arguments.of(HttpMethod.GET, "/api/admin/estadisticas"),
                 Arguments.of(HttpMethod.GET, "/api/admin/dashboard"),
+                Arguments.of(HttpMethod.GET, "/api/admin/replica-sql"),
                 Arguments.of(HttpMethod.POST, "/api/barrios"),
                 Arguments.of(HttpMethod.DELETE, "/api/barrios/b1"),
                 Arguments.of(HttpMethod.POST, "/api/categorias"),
@@ -133,6 +134,8 @@ class SeguridadRutasTests extends ControllerTestBase {
         return Stream.of(
                 Arguments.of(HttpMethod.POST, "/api/admin/reportes/seguimiento/recordatorios", null),
                 Arguments.of(HttpMethod.GET, "/api/admin/auditoria", null),
+                Arguments.of(HttpMethod.GET, "/api/admin/replica-sql", null),
+                Arguments.of(HttpMethod.POST, "/api/admin/replica-sql/reconstruir", null),
                 Arguments.of(HttpMethod.POST, "/api/barrios", barrio),
                 Arguments.of(HttpMethod.PUT, "/api/barrios/b1", barrio),
                 Arguments.of(HttpMethod.POST, "/api/barrios/b1/calles", "{\"nombre\":\"Calle Real\",\"codigoPostal\":\"130001\"}"),
@@ -153,7 +156,8 @@ class SeguridadRutasTests extends ControllerTestBase {
 
     private void sinTocarLosServicios() {
         verifyNoInteractions(reporteService, seguimientoService, estadisticasService, barrioService, categoriaService,
-                usuarioService, comentarioService, confirmacionService, notificacionService, authService, metabaseService);
+                usuarioService, comentarioService, confirmacionService, notificacionService, authService, metabaseService,
+                replicaSqlService);
     }
 
     @ParameterizedTest(name = "GET {0}")

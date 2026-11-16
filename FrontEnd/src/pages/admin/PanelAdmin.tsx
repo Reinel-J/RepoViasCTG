@@ -11,8 +11,9 @@ import { ReportesAdmin } from "./ReportesAdmin"
 import { ResumenAdmin } from "./ResumenAdmin"
 import { UsuariosAdmin } from "./UsuariosAdmin"
 import { AuditoriaAdmin } from "./AuditoriaAdmin"
+import { ReplicaSqlAdmin } from "./ReplicaSqlAdmin"
 
-type Seccion = "resumen" | "reportes" | "estadisticas" | "dashboard" | "usuarios" | "barrios" | "categorias" | "auditoria"
+type Seccion = "resumen" | "reportes" | "estadisticas" | "dashboard" | "usuarios" | "barrios" | "categorias" | "auditoria" | "replica"
 
 const SECCIONES: { id: Seccion; etiqueta: string; soloAdmin: boolean }[] = [
   { id: "resumen", etiqueta: "Resumen", soloAdmin: false },
@@ -23,6 +24,7 @@ const SECCIONES: { id: Seccion; etiqueta: string; soloAdmin: boolean }[] = [
   { id: "barrios", etiqueta: "Barrios", soloAdmin: true },
   { id: "categorias", etiqueta: "Categorías", soloAdmin: true },
   { id: "auditoria", etiqueta: "Auditoría", soloAdmin: true },
+  { id: "replica", etiqueta: "Base SQL", soloAdmin: true },
 ]
 
 export function PanelAdmin() {
@@ -81,6 +83,7 @@ export function PanelAdmin() {
       {actual === "barrios" && <BarriosAdmin />}
       {actual === "categorias" && <CategoriasAdmin />}
       {actual === "auditoria" && <AuditoriaAdmin />}
+      {actual === "replica" && <ReplicaSqlAdmin />}
     </div>
   )
 }

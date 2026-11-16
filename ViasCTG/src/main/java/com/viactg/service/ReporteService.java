@@ -31,6 +31,7 @@ import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -95,6 +96,7 @@ public class ReporteService {
     private final AreaServicio areaServicio;
     private final AuditoriaService auditoriaService;
     private final Path uploadsDirectory;
+    private final ApplicationEventPublisher eventos;
     // Un solo hilo: Nominatim limita a 1 petición/s y así no se bloquea la petición HTTP del usuario.
     private final ExecutorService geocodingExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread hilo = new Thread(runnable, "geocoding-direccion");
@@ -106,7 +108,8 @@ public class ReporteService {
                           UsuarioService usuarioService, MongoTemplate mongoTemplate, GeocodingService geocodingService,
                           NotificacionService notificacionService, CategoriaService categoriaService,
                           ConfirmacionRepository confirmacionRepository, LimitadorIntentos limitador,
-                          AreaServicio areaServicio, @Value("${app.uploads.dir:uploads}") String uploadsDirectory, AuditoriaService auditoriaService) {
+                          AreaServicio areaServicio, @Value("${app.uploads.dir:uploads}") String uploadsDirectory, AuditoriaService auditoriaService,
+                          ApplicationEventPublisher eventos) {
         this.reporteRepository = reporteRepository;
         this.usuarioRepository = usuarioRepository;
         this.usuarioService = usuarioService;
@@ -119,6 +122,7 @@ public class ReporteService {
         this.areaServicio = areaServicio;
         this.uploadsDirectory = Path.of(uploadsDirectory);
         this.auditoriaService = auditoriaService;
+        this.eventos = eventos;
     }
 
     public Reporte crear(ReporteCrearRequest request, String usuarioId) {
@@ -134,6 +138,7 @@ public class ReporteService {
                 .latitud(request.latitud()).longitud(request.longitud())
                 .ubicacion(new GeoJsonPoint(request.longitud(), request.latitud())).prioridad(PrioridadReporte.MEDIA)
                 .estado(EstadoReporte.PENDIENTE).fechaCreacion(ahora).fechaActualizacion(ahora).build());
+        eventos.publishEvent(CambioReplicable.reporte(guardado.getId()));
         resolverDireccionAsync(guardado.getId(), guardado.getLatitud(), guardado.getLongitud());
         return guardado;
     }
@@ -145,8 +150,9 @@ public class ReporteService {
                 if (direccion == null || direccion.vacia()) return;
                 // Solo si el reporte sigue en esas coordenadas: si lo movieron, la nueva ubicación pide su propia dirección.
                 Query query = Query.query(Criteria.where("_id").is(reporteId).and("latitud").is(latitud).and("longitud").is(longitud));
-                mongoTemplate.updateFirst(query, new Update().set("direccionOsm", direccion.direccion())
-                        .set("barrioOsm", direccion.barrio()), Reporte.class);
+                long cambiados = mongoTemplate.updateFirst(query, new Update().set("direccionOsm", direccion.direccion())
+                        .set("barrioOsm", direccion.barrio()), Reporte.class).getModifiedCount();
+                if (cambiados > 0) eventos.publishEvent(CambioReplicable.reporte(reporteId));
             } catch (RuntimeException exception) {
                 log.warn("No fue posible resolver la dirección del reporte {}", reporteId, exception);
             }
@@ -299,6 +305,7 @@ public class ReporteService {
         if (actualizado == null) {
             throw new BusinessRuleException("Solo se pueden editar reportes pendientes");
         }
+        eventos.publishEvent(CambioReplicable.reporte(reporteId));
         if (cambioUbicacion) {
             resolverDireccionAsync(actualizado.getId(), request.latitud(), request.longitud());
         }
@@ -352,6 +359,7 @@ public class ReporteService {
             borrarArchivos(escritos);
             throw new BusinessRuleException("Un reporte puede tener como máximo 3 fotos");
         }
+        eventos.publishEvent(CambioReplicable.reporte(reporteId));
         return actualizado;
     }
 
@@ -430,6 +438,7 @@ public class ReporteService {
         }
         Reporte actualizado = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), Reporte.class);
         if (actualizado == null) throw new BusinessRuleException("El reporte cambió de estado; vuelve a intentarlo");
+        eventos.publishEvent(CambioReplicable.reporte(actualizado.getId()));
         notificarCambioEstado(actualizado, nuevoEstado);
         return actualizado;
     }

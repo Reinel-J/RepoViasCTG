@@ -33,7 +33,8 @@ class UsuarioServiceTests {
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
-    private final UsuarioService service = new UsuarioService(usuarioRepository, passwordEncoder, mongoTemplate, auditoriaService);
+    private final org.springframework.context.ApplicationEventPublisher eventos = mock(org.springframework.context.ApplicationEventPublisher.class);
+    private final UsuarioService service = new UsuarioService(usuarioRepository, passwordEncoder, mongoTemplate, auditoriaService, eventos);
 
     private Update capturarActualizacion() {
         ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);

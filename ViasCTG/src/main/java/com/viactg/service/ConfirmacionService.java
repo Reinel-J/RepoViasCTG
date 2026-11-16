@@ -9,6 +9,7 @@ import com.viactg.repository.ConfirmacionRepository;
 import com.viactg.repository.ReporteRepository;
 import com.viactg.repository.UsuarioRepository;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -23,12 +24,14 @@ public class ConfirmacionService {
     private final ConfirmacionRepository confirmacionRepository;
     private final ReporteRepository reporteRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ApplicationEventPublisher eventos;
 
     public ConfirmacionService(ConfirmacionRepository confirmacionRepository, ReporteRepository reporteRepository,
-                               UsuarioRepository usuarioRepository) {
+                               UsuarioRepository usuarioRepository, ApplicationEventPublisher eventos) {
         this.confirmacionRepository = confirmacionRepository;
         this.reporteRepository = reporteRepository;
         this.usuarioRepository = usuarioRepository;
+        this.eventos = eventos;
     }
 
     public Confirmacion crear(String reporteId, String usuarioId) {
@@ -45,7 +48,9 @@ public class ConfirmacionService {
             throw new DuplicateResourceException("El usuario ya confirmó este reporte");
         }
         try {
-            return confirmacionRepository.save(Confirmacion.builder().reporteId(reporteId).usuarioId(usuarioId).fecha(Instant.now()).build());
+            Confirmacion creada = confirmacionRepository.save(Confirmacion.builder().reporteId(reporteId).usuarioId(usuarioId).fecha(Instant.now()).build());
+            eventos.publishEvent(CambioReplicable.confirmaciones(reporteId));
+            return creada;
         } catch (DuplicateKeyException exception) {
             throw new DuplicateResourceException("El usuario ya confirmó este reporte");
         }
@@ -60,5 +65,6 @@ public class ConfirmacionService {
         Confirmacion confirmacion = confirmacionRepository.findByReporteIdAndUsuarioId(reporteId, usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Confirmación no encontrada"));
         confirmacionRepository.delete(confirmacion);
+        eventos.publishEvent(CambioReplicable.confirmaciones(reporteId));
     }
 }

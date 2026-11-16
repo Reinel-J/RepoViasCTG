@@ -11,6 +11,7 @@ import com.viactg.repository.CategoriaRepository;
 import com.viactg.repository.ReporteRepository;
 import com.viactg.repository.UsuarioRepository;
 import com.viactg.service.AreaServicio;
+import com.viactg.service.CambioReplicable;
 import com.viactg.service.CategoriaService;
 import com.viactg.service.UsuarioService;
 import org.slf4j.Logger;
@@ -22,6 +23,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -96,10 +98,12 @@ public class DatosDemo implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final boolean habilitado;
     private final String adminEmail;
+    private final ApplicationEventPublisher eventos;
 
     public DatosDemo(MongoTemplate mongoTemplate, ReporteRepository reporteRepository, UsuarioRepository usuarioRepository,
                      CategoriaRepository categoriaRepository, AreaServicio areaServicio, PasswordEncoder passwordEncoder,
-                     @Value("${app.seed.demo:false}") boolean habilitado, @Value("${app.admin.email:}") String adminEmail) {
+                     @Value("${app.seed.demo:false}") boolean habilitado, @Value("${app.admin.email:}") String adminEmail,
+                     ApplicationEventPublisher eventos) {
         this.mongoTemplate = mongoTemplate;
         this.reporteRepository = reporteRepository;
         this.usuarioRepository = usuarioRepository;
@@ -108,6 +112,7 @@ public class DatosDemo implements CommandLineRunner {
         this.passwordEncoder = passwordEncoder;
         this.habilitado = habilitado;
         this.adminEmail = adminEmail;
+        this.eventos = eventos;
     }
 
     @Override
@@ -133,6 +138,8 @@ public class DatosDemo implements CommandLineRunner {
                 .filter(usuario -> usuario.getRol() == Rol.ADMIN).map(Usuario::getId).orElse(null);
         List<Reporte> reportes = generarReportes(random, ahora, categorias, ciudadanos, adminId);
         mongoTemplate.insertAll(reportes);
+        // Inserción en bloque: la réplica SQL se reconstruye completa en vez de copiar reporte por reporte.
+        eventos.publishEvent(CambioReplicable.todo());
         log.info("SEED_DEMO: se crearon {} reportes de demostración", reportes.size());
     }
 

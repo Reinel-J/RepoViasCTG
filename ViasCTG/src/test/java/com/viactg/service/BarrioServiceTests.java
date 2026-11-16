@@ -33,7 +33,7 @@ class BarrioServiceTests {
     private final BarrioRepository barrioRepository = mock(BarrioRepository.class);
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
-    private final BarrioService service = new BarrioService(barrioRepository, mongoTemplate, auditoriaService);
+    private final BarrioService service = new BarrioService(barrioRepository, mongoTemplate, auditoriaService, evento -> { });
 
     private Barrio barrioExistente(Calle... calles) {
         Barrio barrio = Barrio.builder().id("b1").nombre("Getsemaní").localidad("Histórica")
@@ -229,7 +229,7 @@ class BarrioServiceTests {
     @Test
     void eliminarConActorRegistraLaAuditoriaSoloDespuesDeBorrar() {
         AuditoriaService auditoria = mock(AuditoriaService.class);
-        BarrioService servicioAuditado = new BarrioService(barrioRepository, mongoTemplate, auditoria);
+        BarrioService servicioAuditado = new BarrioService(barrioRepository, mongoTemplate, auditoria, evento -> { });
         Barrio barrio = barrioExistente();
 
         servicioAuditado.eliminar("b1", "admin");

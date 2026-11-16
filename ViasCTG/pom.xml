@@ -65,6 +65,25 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
+		<!-- Base secundaria: réplica relacional en PostgreSQL (JDBC + migraciones de esquema con Flyway) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jdbc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+
 		<!-- Health check (/actuator/health) para Docker; solo se expone ese endpoint. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

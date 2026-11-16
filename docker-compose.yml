@@ -15,6 +15,25 @@ services:
       retries: 10
       start_period: 20s
 
+  # Base secundaria: réplica relacional de MongoDB (ver ViasCTG/README.md, «Base secundaria en PostgreSQL»).
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: viasctg_sql
+      POSTGRES_USER: viasctg
+      POSTGRES_PASSWORD: "${SQL_PASSWORD:?Define SQL_PASSWORD en el archivo .env (openssl rand -base64 18)}"
+    # Solo desde este PC, en el 5433 para no chocar con un PostgreSQL instalado en Windows (que usa el 5432).
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "viasctg", "-d", "viasctg_sql"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./ViasCTG
@@ -50,6 +69,11 @@ services:
       METABASE_DASHBOARD_ID: ${METABASE_DASHBOARD_ID:-}
       METABASE_TOKEN_MINUTOS: ${METABASE_TOKEN_MINUTOS:-10}
       SEED_DEMO: ${SEED_DEMO:-false}
+      # Réplica en PostgreSQL. Si la base no responde, la API sigue funcionando y la réplica se reintenta sola.
+      SQL_REPLICA_HABILITADA: ${SQL_REPLICA_HABILITADA:-true}
+      SQL_URL: jdbc:postgresql://postgres:5432/viasctg_sql
+      SQL_USUARIO: viasctg
+      SQL_PASSWORD: "${SQL_PASSWORD:?Define SQL_PASSWORD en el archivo .env (openssl rand -base64 18)}"
     # Solo desde este PC (Swagger, Postman, npm run dev): el sitio llega al backend por el nginx del frontend. Así nadie
     # de la red local puede hablarle directo y hacerse pasar por un proxy de confianza con un X-Forwarded-For falso.
     ports:
@@ -58,6 +82,8 @@ services:
       - uploads_data:/app/uploads
     depends_on:
       mongo:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
@@ -124,5 +150,6 @@ services:
 
 volumes:
   mongo_data:
+  postgres_data:
   uploads_data:
   metabase_data:

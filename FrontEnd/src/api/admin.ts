@@ -4,6 +4,7 @@ import type {
   CambioEstadoLoteRequest,
   CambioEstadoLoteResponse,
   DashboardResponse,
+  EstadoReplicaResponse,
   EstadisticasResponse,
   EstadoReporte,
   HistorialEstadoResponse,
@@ -95,4 +96,15 @@ export async function cambiarRol(usuarioId: string, rol: Rol): Promise<UsuarioRe
 export async function cambiarActivo(usuarioId: string, activo: boolean): Promise<UsuarioResponse> {
   const response = await client.patch<UsuarioResponse>(`/usuarios/${usuarioId}/activo`, null, { params: { activo } })
   return response.data
+}
+
+// Base secundaria: registros por colección en MongoDB y filas por tabla en PostgreSQL.
+export async function estadoReplica(): Promise<EstadoReplicaResponse> {
+  const response = await client.get<EstadoReplicaResponse>('/admin/replica-sql')
+  return response.data
+}
+
+// Reconstruye la réplica completa en segundo plano (202): el estado indica cuándo terminó.
+export async function reconstruirReplica(): Promise<void> {
+  await client.post('/admin/replica-sql/reconstruir')
 }

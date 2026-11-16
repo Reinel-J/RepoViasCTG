@@ -9,6 +9,7 @@ import com.viactg.repository.ComentarioRepository;
 import com.viactg.repository.ReporteRepository;
 import com.viactg.repository.UsuarioRepository;
 import com.viactg.security.LimitadorIntentos;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -26,22 +27,27 @@ public class ComentarioService {
     private final UsuarioRepository usuarioRepository;
     private final UsuarioService usuarioService;
     private final LimitadorIntentos limitador;
+    private final ApplicationEventPublisher eventos;
 
     public ComentarioService(ComentarioRepository comentarioRepository, ReporteRepository reporteRepository,
-                             UsuarioRepository usuarioRepository, UsuarioService usuarioService, LimitadorIntentos limitador) {
+                             UsuarioRepository usuarioRepository, UsuarioService usuarioService, LimitadorIntentos limitador,
+                             ApplicationEventPublisher eventos) {
         this.comentarioRepository = comentarioRepository;
         this.reporteRepository = reporteRepository;
         this.usuarioRepository = usuarioRepository;
         this.usuarioService = usuarioService;
         this.limitador = limitador;
+        this.eventos = eventos;
     }
 
     public Comentario crear(String reporteId, String usuarioId, ComentarioCrearRequest request) {
         if (!reporteRepository.existsById(reporteId)) throw new ResourceNotFoundException("Reporte no encontrado: " + reporteId);
         if (!usuarioRepository.existsById(usuarioId)) throw new ResourceNotFoundException("Usuario no encontrado: " + usuarioId);
         limitador.consumir("comentarios-usuario:" + usuarioId, MAX_COMENTARIOS, VENTANA_COMENTARIOS);
-        return comentarioRepository.save(Comentario.builder().reporteId(reporteId).usuarioId(usuarioId)
+        Comentario creado = comentarioRepository.save(Comentario.builder().reporteId(reporteId).usuarioId(usuarioId)
                 .texto(request.texto().trim()).fecha(Instant.now()).editado(false).build());
+        eventos.publishEvent(CambioReplicable.comentario(creado.getId()));
+        return creado;
     }
 
     public List<Comentario> listarPorReporte(String reporteId) {
@@ -57,7 +63,9 @@ public class ComentarioService {
         }
         comentario.setTexto(request.texto().trim());
         comentario.setEditado(true);
-        return comentarioRepository.save(comentario);
+        Comentario actualizado = comentarioRepository.save(comentario);
+        eventos.publishEvent(CambioReplicable.comentario(comentarioId));
+        return actualizado;
     }
 
     /** El autor o un moderador/administrador (para retirar contenido inapropiado). */
@@ -67,6 +75,7 @@ public class ComentarioService {
             throw new ForbiddenOperationException("No tienes permiso para eliminar este comentario");
         }
         comentarioRepository.delete(comentario);
+        eventos.publishEvent(CambioReplicable.comentario(comentarioId));
     }
 
     private Comentario buscar(String comentarioId) {

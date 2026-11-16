@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 class AuditoriaServiceTests {
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
-    private final AuditoriaService service = new AuditoriaService(mongoTemplate, usuarioRepository);
+    private final AuditoriaService service = new AuditoriaService(mongoTemplate, usuarioRepository, evento -> { });
 
     @Test
     void registrarGuardaTodosLosDatosDeLaAccion() {

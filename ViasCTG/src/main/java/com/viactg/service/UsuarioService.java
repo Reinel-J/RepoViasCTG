@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -45,12 +46,15 @@ public class UsuarioService {
     private final PasswordEncoder passwordEncoder;
     private final MongoTemplate mongoTemplate;
     private final AuditoriaService auditoriaService;
+    private final ApplicationEventPublisher eventos;
 
-    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
+    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, MongoTemplate mongoTemplate, AuditoriaService auditoriaService,
+                          ApplicationEventPublisher eventos) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.mongoTemplate = mongoTemplate;
         this.auditoriaService = auditoriaService;
+        this.eventos = eventos;
     }
 
     /** Forma canónica del correo (independiente del idioma del servidor). */
@@ -79,7 +83,7 @@ public class UsuarioService {
                 .passwordHash(passwordEncoder.encode(request.password())).telefono(limpiarTelefono(request.telefono()))
                 .rol(Rol.CIUDADANO).activo(true).emailVerificado(false).fechaRegistro(Instant.now()).build();
         try {
-            return usuarioRepository.save(usuario);
+            return avisar(usuarioRepository.save(usuario));
         } catch (DuplicateKeyException carrera) {
             // Dos registros simultáneos con el mismo correo: el índice único rechaza el segundo.
             throw new DuplicateResourceException("Ya existe un usuario con ese email");
@@ -162,9 +166,9 @@ public class UsuarioService {
         // ADMIN_EMAIL lo fija quien administra el servidor: la cuenta queda con el correo verificado.
         if (existente.isEmpty()) {
             validarLongitudPassword(password);
-            return usuarioRepository.save(Usuario.builder().nombre(nombre).email(emailNormalizado)
+            return avisar(usuarioRepository.save(Usuario.builder().nombre(nombre).email(emailNormalizado)
                     .passwordHash(passwordEncoder.encode(password)).rol(Rol.ADMIN).activo(true).emailVerificado(true)
-                    .fechaRegistro(Instant.now()).build());
+                    .fechaRegistro(Instant.now()).build()));
         }
         Usuario usuario = existente.get();
         if (usuario.getRol() == Rol.ADMIN) {
@@ -199,7 +203,13 @@ public class UsuarioService {
         if (actualizado == null) {
             throw new ResourceNotFoundException("Usuario no encontrado: " + id);
         }
-        return actualizado;
+        return avisar(actualizado);
+    }
+
+    // Copia el usuario a la réplica SQL (sin la contraseña).
+    private Usuario avisar(Usuario usuario) {
+        if (usuario != null) eventos.publishEvent(CambioReplicable.usuario(usuario.getId()));
+        return usuario;
     }
     private void auditar(String actorId, String accion, String entidadId, String detalle) {
         auditoriaService.registrar(actorId, accion, "USUARIO", entidadId, detalle);

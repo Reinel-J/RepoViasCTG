@@ -23,7 +23,7 @@ class ConfirmacionServiceTests {
     private final ConfirmacionRepository confirmacionRepository = mock(ConfirmacionRepository.class);
     private final ReporteRepository reporteRepository = mock(ReporteRepository.class);
     private final UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
-    private final ConfirmacionService service = new ConfirmacionService(confirmacionRepository, reporteRepository, usuarioRepository);
+    private final ConfirmacionService service = new ConfirmacionService(confirmacionRepository, reporteRepository, usuarioRepository, evento -> { });
 
     private void reporte(EstadoReporte estado) {
         when(reporteRepository.findById("r-1")).thenReturn(Optional.of(

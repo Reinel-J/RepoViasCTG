@@ -33,3 +33,6 @@ build/
 .vscode/
 *.deb
 target/
+
+### Configuración local con credenciales (ver local.properties.example) ###
+local.properties

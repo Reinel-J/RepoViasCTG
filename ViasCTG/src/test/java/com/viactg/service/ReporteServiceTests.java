@@ -60,6 +60,7 @@ class ReporteServiceTests {
     private final GeocodingService geocodingService = mock(GeocodingService.class);
     private final NotificacionService notificacionService = mock(NotificacionService.class);
     private final CategoriaService categoriaService = mock(CategoriaService.class);
+    private final org.springframework.context.ApplicationEventPublisher eventos = mock(org.springframework.context.ApplicationEventPublisher.class);
     private final ConfirmacionRepository confirmacionRepository = mock(ConfirmacionRepository.class);
     private final AuditoriaService auditoriaService = mock(AuditoriaService.class);
 
@@ -70,7 +71,7 @@ class ReporteServiceTests {
     private ReporteService crearServicio(String uploads) {
         return new ReporteService(reporteRepository, usuarioRepository, usuarioService, mongoTemplate, geocodingService,
                 notificacionService, categoriaService, confirmacionRepository, new LimitadorIntentos(),
-                AreaServicio.cartagena(), uploads, auditoriaService);
+                AreaServicio.cartagena(), uploads, auditoriaService, eventos);
     }
 
     private static Reporte pendiente(String id, String autor) {
@@ -289,6 +290,7 @@ class ReporteServiceTests {
         assertThat(creado.getPrioridad()).isEqualTo(com.viactg.model.PrioridadReporte.MEDIA);
         assertThat(creado.getUbicacion().getX()).isEqualTo(-75.50);
         assertThat(creado.getUbicacion().getY()).isEqualTo(10.40);
+        verify(eventos).publishEvent(CambioReplicable.reporte("r-1"));
     }
 
     @Test

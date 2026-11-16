@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -25,18 +26,23 @@ public class BarrioService {
     private final BarrioRepository barrioRepository;
     private final MongoTemplate mongoTemplate;
     private final AuditoriaService auditoriaService;
+    private final ApplicationEventPublisher eventos;
 
-    public BarrioService(BarrioRepository barrioRepository, MongoTemplate mongoTemplate, AuditoriaService auditoriaService) {
+    public BarrioService(BarrioRepository barrioRepository, MongoTemplate mongoTemplate, AuditoriaService auditoriaService,
+                         ApplicationEventPublisher eventos) {
         this.barrioRepository = barrioRepository;
         this.mongoTemplate = mongoTemplate;
         this.auditoriaService = auditoriaService;
+        this.eventos = eventos;
     }
 
     public Barrio crear(BarrioRequest request) {
         String nombre = request.nombre().trim();
         validarNombreLibre(nombre, null);
-        return barrioRepository.save(Barrio.builder().nombre(nombre).nombreClave(CategoriaService.claveComparacion(nombre))
+        Barrio creado = barrioRepository.save(Barrio.builder().nombre(nombre).nombreClave(CategoriaService.claveComparacion(nombre))
                 .localidad(request.localidad().trim()).calles(mapearCalles(request.calles())).build());
+        eventos.publishEvent(CambioReplicable.barrio(creado.getId()));
+        return creado;
     }
     public Barrio crear(BarrioRequest request, String actorId) { Barrio creado = crear(request); auditar(actorId, "BARRIO_CREADO", creado.getId(), creado.getNombre()); return creado; }
 
@@ -73,7 +79,10 @@ public class BarrioService {
         Barrio actualizado = mongoTemplate.findAndModify(conLaCalle,
                 new Update().pull("calles", Query.query(Criteria.where("id").is(calleId))),
                 FindAndModifyOptions.options().returnNew(true), Barrio.class);
-        if (actualizado != null) return actualizado;
+        if (actualizado != null) {
+            eventos.publishEvent(CambioReplicable.barrio(barrioId));
+            return actualizado;
+        }
         buscarPorId(barrioId); // 404 del barrio si no existe; si existe, la que falta es la calle.
         throw new ResourceNotFoundException("Calle no encontrada: " + calleId);
     }
@@ -88,11 +97,13 @@ public class BarrioService {
 
     public void eliminar(String id) {
         barrioRepository.delete(buscarPorId(id));
+        eventos.publishEvent(CambioReplicable.barrio(id));
     }
 
     public void eliminar(String id, String actorId) {
         Barrio barrio = buscarPorId(id);
         barrioRepository.delete(barrio);
+        eventos.publishEvent(CambioReplicable.barrio(id));
         auditar(actorId, "BARRIO_ELIMINADO", id, barrio.getNombre());
     }
 
@@ -100,6 +111,7 @@ public class BarrioService {
     private Barrio modificar(Query query, Update update, String id) {
         Barrio actualizado = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), Barrio.class);
         if (actualizado == null) throw new ResourceNotFoundException("Barrio no encontrado: " + id);
+        eventos.publishEvent(CambioReplicable.barrio(id));
         return actualizado;
     }
 

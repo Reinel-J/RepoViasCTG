@@ -68,7 +68,7 @@ class SeguimientoServiceTests {
     // Cierre por la comunidad con los valores por defecto: 3 votos, 75 % y 72 horas de gracia.
     private SeguimientoService servicio(boolean cierreHabilitado) {
         return new SeguimientoService(seguimientoRepository, reporteRepository, confirmacionRepository, usuarioRepository,
-                notificacionService, correoService, mongoTemplate, reporteService, 30, "http://localhost:5173/",
+                notificacionService, correoService, mongoTemplate, reporteService, evento -> { }, 30, "http://localhost:5173/",
                 cierreHabilitado, 3, 0.75, 72);
     }
 
