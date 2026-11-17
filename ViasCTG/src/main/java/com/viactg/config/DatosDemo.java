@@ -77,20 +77,37 @@ public class DatosDemo implements CommandLineRunner {
     private static final Map<EstadoReporte, Integer> PORCENTAJES = new EnumMap<>(Map.of(EstadoReporte.PENDIENTE, 25,
             EstadoReporte.EN_REVISION, 15, EstadoReporte.EN_PROCESO, 20, EstadoReporte.RESUELTO, 30, EstadoReporte.RECHAZADO, 10));
 
-    /** Barrios reales donde se concentran los daños, para que el mapa de calor tenga zonas; el peso es su proporción. */
-    record Zona(String barrio, double latitud, double longitud, int peso) {
+    /**
+     * Barrios reales donde se concentran los daños, para que el mapa de calor tenga zonas; el peso es su proporción.
+     * Cada barrio tiene varios puntos de calle (latitud, longitud) y los reportes caen a menos de {@link #DISPERSION}
+     * grados de alguno. Se eligieron tierra adentro y se comprobó sobre las teselas de OpenStreetMap que ni ellos ni su
+     * alrededor caen en el mar, la bahía o la ciénaga: varios barrios están en la costa y antes salían daños en el agua.
+     */
+    record Zona(String barrio, int peso, double[]... calles) {
     }
 
+    /** Unos 90 m: lo bastante para que los daños no se encimen, sin salirse del barrio. */
+    static final double DISPERSION = 0.0008;
+
     static final List<Zona> ZONAS = List.of(
-            new Zona("Centro Histórico", 10.4236, -75.5505, 14),
-            new Zona("Getsemaní", 10.4205, -75.5465, 8),
-            new Zona("Manga", 10.4125, -75.5375, 10),
-            new Zona("Bocagrande", 10.3985, -75.5560, 9),
-            new Zona("El Bosque", 10.3980, -75.5180, 12),
-            new Zona("Olaya Herrera", 10.4165, -75.4925, 16),
-            new Zona("El Pozón", 10.4085, -75.4660, 15),
-            new Zona("Nelson Mandela", 10.3725, -75.4835, 11),
-            new Zona("Crespo", 10.4440, -75.5145, 5));
+            new Zona("Centro Histórico", 14, new double[]{10.4235, -75.5510}, new double[]{10.4255, -75.5495},
+                    new double[]{10.4245, -75.5475}, new double[]{10.4262, -75.5470}, new double[]{10.4240, -75.5495}),
+            new Zona("Getsemaní", 8, new double[]{10.4215, -75.5455}, new double[]{10.4200, -75.5470},
+                    new double[]{10.4210, -75.5450}),
+            new Zona("Manga", 10, new double[]{10.4120, -75.5370}, new double[]{10.4100, -75.5345},
+                    new double[]{10.4140, -75.5390}),
+            new Zona("Bocagrande", 9, new double[]{10.4005, -75.5545}, new double[]{10.3985, -75.5560},
+                    new double[]{10.3965, -75.5580}),
+            new Zona("El Bosque", 12, new double[]{10.3995, -75.5150}, new double[]{10.3975, -75.5195},
+                    new double[]{10.4010, -75.5120}),
+            new Zona("Olaya Herrera", 16, new double[]{10.4100, -75.4900}, new double[]{10.4120, -75.4950},
+                    new double[]{10.4080, -75.4870}, new double[]{10.4110, -75.4850}),
+            new Zona("El Pozón", 15, new double[]{10.4085, -75.4660}, new double[]{10.4060, -75.4630},
+                    new double[]{10.4040, -75.4660}, new double[]{10.4095, -75.4610}),
+            new Zona("Nelson Mandela", 11, new double[]{10.3725, -75.4835}, new double[]{10.3700, -75.4800},
+                    new double[]{10.3750, -75.4860}),
+            new Zona("Crespo", 5, new double[]{10.4450, -75.5175}, new double[]{10.4465, -75.5160},
+                    new double[]{10.4435, -75.5185}));
 
     private static final List<String> PLANTILLAS = List.of(
             "%s en %s: afecta el paso de carros y motos.",
@@ -375,14 +392,13 @@ public class DatosDemo implements CommandLineRunner {
         return ZONAS.get(0);
     }
 
-    // Unos 300 m alrededor del centro del barrio; si cayera fuera del área de servicio, se vuelve a sortear.
+    // Uno de los puntos de calle del barrio, movido al azar hasta DISPERSION grados en cada eje. Una distribución
+    // uniforme y acotada (no gaussiana): las colas de la gaussiana llevaban algunos daños al agua.
     private double[] puntoEn(Random random, Zona zona) {
-        for (int intento = 0; intento < 20; intento++) {
-            double latitud = zona.latitud() + random.nextGaussian() * 0.0027;
-            double longitud = zona.longitud() + random.nextGaussian() * 0.0027;
-            if (areaServicio.contiene(latitud, longitud)) return new double[]{latitud, longitud};
-        }
-        return new double[]{zona.latitud(), zona.longitud()};
+        double[] calle = zona.calles()[random.nextInt(zona.calles().length)];
+        double latitud = calle[0] + (random.nextDouble() * 2 - 1) * DISPERSION;
+        double longitud = calle[1] + (random.nextDouble() * 2 - 1) * DISPERSION;
+        return areaServicio.contiene(latitud, longitud) ? new double[]{latitud, longitud} : calle;
     }
 
     // Las primeras categorías del catálogo pesan más, para que el top de categorías no salga parejo.

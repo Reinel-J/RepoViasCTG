@@ -1,12 +1,13 @@
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useRef } from 'react'
-import type { LeafletEventHandlerFnMap, Marker as MarcadorLeaflet } from 'leaflet'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { LatLngBounds, LeafletEventHandlerFnMap, Marker as MarcadorLeaflet } from 'leaflet'
 import { NavLink } from 'react-router'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import { imagenCategoria, textoEstado, urlFoto } from '../api/reporteVista'
 import type { ReporteMapaResponse } from '../api/types'
 import { ATRIBUCION_OSM, CARTAGENA, TESELAS_OSM } from './mapaBase'
-import { pinEstado } from './pinMapa'
+import { agruparPorCelda } from './agrupacion'
+import { iconoGrupo, pinEstado } from './pinMapa'
 import { ZoomConRueda } from './ZoomConRueda'
 
 // Lo que el mapa dibuja de cada reporte: el mapa público pasa los de GET /reportes/mapa y el detalle, el suyo.
@@ -24,6 +25,10 @@ const ESPERA_CIERRE_MS = 250
 // la izquierda) y la atribución de OpenStreetMap (abajo).
 const MARGEN_VENTANITA_ARRIBA_IZQUIERDA: [number, number] = [56, 16]
 const MARGEN_VENTANITA_ABAJO_DERECHA: [number, number] = [16, 28]
+// Los reportes a menos de esta distancia en pantalla se juntan en un círculo con la cantidad (ver agrupacion.ts).
+const TAMANO_CELDA_PX = 70
+// Desde este zoom (nivel de cuadra) cada reporte tiene su pin, aunque estén muy cerca.
+const ZOOM_SIN_AGRUPAR = 18
 
 function resumirDescripcion(descripcion: string) {
   return descripcion.length > 120 ? `${descripcion.slice(0, 120)}…` : descripcion
@@ -138,7 +143,38 @@ function MarcadoresReportes({ reportes, enlaces }: Required<MapaReportesProps>) 
     popupclose: (event) => { if (abierto.current === event.target) abierto.current = null },
   }
 
-  return reportes.map((reporte) => {
+  // Solo se dibuja lo que se ve (con un margen para que al arrastrar no aparezcan huecos) y agrupado por zonas.
+  const [vista, setVista] = useState<{ zoom: number; limites: LatLngBounds }>(() => ({ zoom: map.getZoom(), limites: map.getBounds() }))
+  useEffect(() => {
+    const alMover = () => setVista({ zoom: map.getZoom(), limites: map.getBounds() })
+    map.on('moveend', alMover)
+    return () => { map.off('moveend', alMover) }
+  }, [map])
+  const grupos = useMemo(() => {
+    const visibles = vista.limites.pad(0.3)
+    const enPantalla = reportes.filter((reporte) => visibles.contains([reporte.latitud, reporte.longitud]))
+    return agruparPorCelda(enPantalla, (latitud, longitud) => map.project([latitud, longitud], vista.zoom),
+      vista.zoom >= ZOOM_SIN_AGRUPAR ? 0 : TAMANO_CELDA_PX)
+  }, [map, reportes, vista])
+
+  const acercar = (puntos: PuntoMapa[]) => {
+    map.fitBounds(puntos.map((punto) => [punto.latitud, punto.longitud] as [number, number]), { padding: [50, 50], maxZoom: ZOOM_SIN_AGRUPAR })
+  }
+
+  return grupos.map((grupo) => {
+    if (grupo.puntos.length > 1) {
+      const cantidad = grupo.puntos.length
+      return (
+        <Marker
+          key={grupo.clave}
+          position={[grupo.latitud, grupo.longitud]}
+          icon={iconoGrupo(cantidad)}
+          title={`${cantidad} reportes en esta zona: haz clic para acercar`}
+          eventHandlers={{ click: () => acercar(grupo.puntos) }}
+        />
+      )
+    }
+    const reporte = grupo.puntos[0]
     const foto = reporte.foto
     return (
       <Marker

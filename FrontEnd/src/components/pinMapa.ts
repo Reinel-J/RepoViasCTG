@@ -34,5 +34,23 @@ export function pinEstado(estado: EstadoReporte) {
   return pin
 }
 
+const iconosGrupo = new Map<number, L.DivIcon>()
+
+// Círculo de un grupo de reportes cercanos: más grande cuantos más reportes tiene. El HTML solo lleva un número.
+export function iconoGrupo(cantidad: number) {
+  let icono = iconosGrupo.get(cantidad)
+  if (!icono) {
+    const diametro = cantidad < 10 ? 34 : cantidad < 100 ? 40 : cantidad < 1000 ? 48 : 56
+    icono = L.divIcon({
+      className: 'mapa-grupo',
+      html: `<span>${cantidad.toLocaleString('es-CO')}</span>`,
+      iconSize: [diametro, diametro],
+      iconAnchor: [diametro / 2, diametro / 2],
+    })
+    iconosGrupo.set(cantidad, icono)
+  }
+  return icono
+}
+
 // El punto que se está marcando en el formulario: un reporte nuevo nace pendiente.
 export const PIN_NUEVO = crearPin(COLOR_ESTADO.PENDIENTE, 'Punto del reporte')

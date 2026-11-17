@@ -708,6 +708,8 @@ export function EditarReporte() {
 type FiltroMapa = "ACTIVOS" | "TODOS" | EstadoReporte
 const ESTADOS_ACTIVOS: EstadoReporte[] = ["PENDIENTE", "EN_REVISION", "EN_PROCESO"]
 const LEYENDA_MAPA: EstadoReporte[] = ["PENDIENTE", "EN_REVISION", "EN_PROCESO", "RESUELTO", "RECHAZADO"]
+// La lista lateral muestra los más recientes: miles de enlaces trababan la página y nadie los recorre a mano.
+const MAX_LISTA_MAPA = 100
 
 export function Mapa() {
   const [carga, setCarga] = useState<{ fase: "cargando" } | { fase: "error"; mensaje: string } | { fase: "cargado"; reportes: ReporteMapaResponse[] }>({ fase: "cargando" })
@@ -740,7 +742,8 @@ export function Mapa() {
           {carga.fase === "cargando" && <p className="map-sidebar-note">Cargando reportes…</p>}
           {carga.fase === "error" && <div className="alert-panel error-panel">{carga.mensaje}</div>}
           {carga.fase === "cargado" && reportes.length === 0 && <p className="map-sidebar-note">No hay reportes con este filtro.</p>}
-          {reportes.map((reporte) => <NavLink to={`/reportes/${reporte.id}`} className="map-list-item" key={reporte.id}><span className="map-list-dot" style={{ background: COLOR_ESTADO[reporte.estado] }} /><div><strong>{reporte.categoria?.nombre ?? "Reporte ciudadano"}</strong><small>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(4)}, ${reporte.longitud.toFixed(4)}`}</small></div><Icon name="arrow" size={16} /></NavLink>)}
+          {reportes.length > MAX_LISTA_MAPA && <p className="map-sidebar-note">Mostrando los {MAX_LISTA_MAPA} más recientes. Filtra o acerca el mapa para ver el resto.</p>}
+          {reportes.slice(0, MAX_LISTA_MAPA).map((reporte) => <NavLink to={`/reportes/${reporte.id}`} className="map-list-item" key={reporte.id}><span className="map-list-dot" style={{ background: COLOR_ESTADO[reporte.estado] }} /><div><strong>{reporte.categoria?.nombre ?? "Reporte ciudadano"}</strong><small>{reporte.direccionOsm ?? `${reporte.latitud.toFixed(4)}, ${reporte.longitud.toFixed(4)}`}</small></div><Icon name="arrow" size={16} /></NavLink>)}
         </aside>
         <div className="interactive-map real-full-map">
           {carga.fase === "cargando" && <div className="loading-panel">Cargando mapa…</div>}

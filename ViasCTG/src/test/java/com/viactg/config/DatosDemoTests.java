@@ -22,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -250,6 +251,21 @@ class DatosDemoTests {
 
         assertThat(porBarrio.keySet()).containsExactlyInAnyOrderElementsOf(DatosDemo.ZONAS.stream().map(DatosDemo.Zona::barrio).toList());
         assertThat(porBarrio.values().stream().max(Long::compare).orElseThrow()).isGreaterThan(20);
+    }
+
+    // Los puntos de calle se comprobaron en tierra: un reporte lejos de ellos podría caer en el mar o la ciénaga.
+    @Test
+    void cadaReporteQuedaJuntoAUnaCalleDeSuBarrio() {
+        Map<String, DatosDemo.Zona> zonas = DatosDemo.ZONAS.stream().collect(Collectors.toMap(DatosDemo.Zona::barrio, zona -> zona));
+
+        assertThat(reportesGenerados()).allSatisfy(reporte -> {
+            assertThat(reporte.getUbicacion().getX()).isEqualTo(reporte.getLongitud());
+            assertThat(reporte.getUbicacion().getY()).isEqualTo(reporte.getLatitud());
+            assertThat(Arrays.stream(zonas.get(reporte.getBarrioOsm()).calles()))
+                    .as("%s (%s, %s)", reporte.getBarrioOsm(), reporte.getLatitud(), reporte.getLongitud())
+                    .anyMatch(calle -> Math.abs(reporte.getLatitud() - calle[0]) <= DatosDemo.DISPERSION
+                            && Math.abs(reporte.getLongitud() - calle[1]) <= DatosDemo.DISPERSION);
+        });
     }
     @Test
     void laParticipacionRespetaLasReglasDeLaApi() {
