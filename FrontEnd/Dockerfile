@@ -5,6 +5,8 @@ WORKDIR /app
 # Argumento que se inyecta desde docker-compose.yml
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
+ARG VITE_NOTIFICACIONES_INTERVALO_MS=60000
+ENV VITE_NOTIFICACIONES_INTERVALO_MS=${VITE_NOTIFICACIONES_INTERVALO_MS}
 
 # Copiamos primero los archivos de dependencias para aprovechar el cache de capas.
 COPY package.json package-lock.json ./

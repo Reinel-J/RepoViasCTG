@@ -1,0 +1,46 @@
+package com.viactg.config;
+
+import com.viactg.exception.BusinessRuleException;
+import com.viactg.exception.InvalidRequestException;
+import com.viactg.service.UsuarioService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
+/** Garantiza un administrador al arrancar si se definen ADMIN_EMAIL y ADMIN_PASSWORD. */
+@Component
+// Antes de DatosDemo, que usa el catálogo y el administrador.
+@Order(0)
+public class AdminInicial implements ApplicationRunner {
+    private static final Logger log = LoggerFactory.getLogger(AdminInicial.class);
+    private final UsuarioService usuarioService;
+    private final String email;
+    private final String password;
+
+    public AdminInicial(UsuarioService usuarioService, @Value("${app.admin.email:}") String email,
+                        @Value("${app.admin.password:}") String password) {
+        this.usuarioService = usuarioService;
+        this.email = email;
+        this.password = password;
+    }
+
+    @Override
+    public void run(ApplicationArguments args) {
+        if (email.isBlank() || password.isBlank()) return;
+        if (password.length() < 8) {
+            log.warn("ADMIN_PASSWORD debe tener al menos 8 caracteres; no se creó el administrador inicial");
+            return;
+        }
+        try {
+            usuarioService.asegurarAdministrador(email, password, "Administrador");
+            log.info("Administrador inicial asegurado: {}", email);
+        } catch (BusinessRuleException | InvalidRequestException invalida) {
+            // Por ejemplo, una contraseña de más de 72 bytes: se avisa sin impedir que arranque la API.
+            log.warn("No se creó el administrador inicial: {}", invalida.getMessage());
+        }
+    }
+}

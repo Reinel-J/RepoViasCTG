@@ -1,12 +1,17 @@
 # ViaCTG
 
-ViaCTG es una API REST para registrar y hacer seguimiento a daños viales de Cartagena. Usa Java 21, Spring Boot 3.3.4, Spring Data MongoDB, Spring Security y JWT.
+ViaCTG es una API REST para registrar y hacer seguimiento a daños viales de Cartagena. Usa Java 21, Spring Boot 3.3.13, Spring Data MongoDB, Spring Security y JWT.
 
 ## Requisitos y configuración
 
 - JDK 21 o superior.
-- MongoDB accesible desde la aplicación.
+- MongoDB accesible desde la aplicación (por defecto `mongodb://localhost:27017/viasctg_db`, o `MONGODB_URI`).
 - Un secreto JWT en Base64 de 32 bytes o más.
+- Opcional: PostgreSQL para la réplica secundaria (ver «Base secundaria en PostgreSQL»).
+
+La forma más simple fuera de Docker es copiar `local.properties.example` como `local.properties` (está en
+`.gitignore`) y completar el secreto JWT, el administrador local y la conexión a PostgreSQL. `./mvnw spring-boot:run`
+lo lee solo; cada línea reemplaza el valor de `application.properties`. También se puede trabajar con variables:
 
 ```bash
 export MONGODB_URI='mongodb://localhost:27017/viasctg_db'
@@ -14,15 +19,63 @@ export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
-No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email` y `confirmaciones(reporteId, usuarioId)`.
+Variables opcionales: `ADMIN_EMAIL` y `ADMIN_PASSWORD` (al arrancar crean ese usuario como `ADMIN`; si ya existe como ciudadano o moderador lo promueven, **le asignan `ADMIN_PASSWORD` y cierran sus sesiones**, porque otra persona pudo registrar antes ese correo; un administrador existente conserva su contraseña; esa cuenta queda con el correo verificado), `CORS_ALLOWED_ORIGINS` (orígenes permitidos separados por coma; por defecto `http://localhost:5173,http://localhost:3000`) , `UPLOADS_DIR` (carpeta de fotos; por defecto `uploads` relativa al directorio de ejecución), `SEGUIMIENTO_DIAS` (días sin cambios antes de preguntar «¿ya lo arreglaron?»; por defecto `30`) `SEGUIMIENTO_CRON` (hora de esa tarea, zona `America/Bogota`; por defecto `0 0 9 * * *`), `CIERRE_COMUNITARIO` (`false` por defecto; `true` permite que los votos cierren un reporte en proceso, ver «¿Ya lo arreglaron?») con `CIERRE_COMUNITARIO_MINIMO` (`3`), `CIERRE_COMUNITARIO_PROPORCION` (`0.75`) y `CIERRE_COMUNITARIO_GRACIA_HORAS` (`72`), `NOMINATIM_URL` y `NOMINATIM_USER_AGENT` (servidor e identificación para la geocodificación; la política de OpenStreetMap pide un User-Agent propio, idealmente con un correo de contacto; `NOMINATIM_URL` vacío la desactiva), `ZONA_HABILITADA`, `ZONA_NOMBRE`, `ZONA_LAT_MIN`, `ZONA_LAT_MAX`, `ZONA_LNG_MIN` y `ZONA_LNG_MAX` (área de servicio; por defecto Cartagena), `SEED_CATEGORIAS` (`true` por defecto: crea las 7 categorías del documento de visión más «Otro» si el catálogo está vacío; si ya existe, solo agrega «Otro» cuando falta) `SEED_DEMO` (`false` por defecto; `true` crea datos de demostración si hay menos de 20 reportes) con `SEED_DEMO_REPORTES` (`200`; con `10000` la base supera los 23 000 documentos, ver el README de la raíz), `METABASE_SITE_URL`, `METABASE_SECRET_KEY`, `METABASE_DASHBOARD_ID` y `METABASE_TOKEN_MINUTOS` (dashboard de Metabase del panel; ver `../docs/metabase.md`), `SWAGGER_ENABLED` (`false` oculta Swagger UI y `/v3/api-docs`) y `TRUSTED_PROXIES` (IP del proxy inverso cuyo `X-Forwarded-For` se acepta, como expresión regular; vacía por defecto: no se confía en ninguno).
+
+No se guardan credenciales en el repositorio. Mongo crea al iniciar los índices únicos de `usuarios.email`, `confirmaciones(reporteId, usuarioId)` y `seguimientos(reporteId, usuarioId)`, y los de consulta `reportes(estado, fechaCreacion)`, `reportes.fechaCreacion`, `reportes(usuarioId, fechaCreacion)`, `comentarios(reporteId, fecha)`, `notificaciones(usuarioId, fecha)` y `notificaciones(usuarioId, leida)`.
+
+`GET /actuator/health` (público, sin detalles) indica si la API y MongoDB responden; lo usa el healthcheck de Docker.
 
 ## Arquitectura
 
 El código se organiza bajo `com.viactg` por responsabilidad: `controller`, `service`, `repository`, `model`, `dto`, `mapper`, `security`, `exception` y `config`. Los controladores solo usan DTOs; los servicios concentran reglas de negocio y validan referencias MongoDB.
 
-`Calle` está embebida en `Barrio`, y `HistorialEstado` en `Reporte`. Las demás entidades tienen su propia colección.
+`Calle` está embebida en `Barrio`, y `HistorialEstado` en `Reporte`. La categoría de un reporte es una **referencia extendida**: `Reporte.categoria` guarda `{id, nombre}`, el `id` de la colección `categorias` más una copia del nombre para mostrar, filtrar y agrupar sin consultar el catálogo; si un administrador renombra la categoría, la copia se actualiza en todos sus reportes con un `updateMulti` (índice `categoria_fecha`). Las demás entidades tienen su propia colección. El nombre de un barrio es único sin distinguir tildes, mayúsculas ni espacios repetidos (`nombreClave`, índice único); las calles se agregan y quitan con `$push`/`$pull` atómicos desde sus propios endpoints. `PUT /api/barrios/{id}` solo cambia nombre y localidad (si el cuerpo trae `calles`, responde `400`): antes las reemplazaba y, como el panel no las envía, editar un barrio borraba todas sus calles.
 
 El cliente React vive en el directorio hermano `../FrontEnd`. Consume esta API en desarrollo desde `http://localhost:5173` y usa `http://localhost:8080/api` como URL base.
+
+## Base secundaria en PostgreSQL
+
+MongoDB es la base **principal**: la aplicación lee y escribe ahí. PostgreSQL es la base **secundaria**: una réplica
+relacional y normalizada que sirve para consultas SQL, reportes y analítica (Metabase, Power BI), sin tocar la
+operación. La aplicación nunca lee de PostgreSQL; si se cae, todo sigue funcionando.
+
+**Cómo se mantiene al día** (`ReplicaSqlService`):
+
+- *Cambio a cambio*: después de cada escritura en Mongo, el servicio que la hizo publica un `CambioReplicable`
+  (`ApplicationEventPublisher`). Un único hilo en segundo plano vuelve a leer ese documento y deja su fila igual con
+  `INSERT … ON CONFLICT DO UPDATE`, o la borra si el documento ya no existe. Las peticiones HTTP no esperan a PostgreSQL.
+- *Reconstrucción completa*: al arrancar, al cargar los datos de demostración, desde el panel o después de un error,
+  aplica las migraciones de Flyway, vacía las tablas y copia todas las colecciones por lotes de 500, en una sola
+  transacción. Si PostgreSQL no responde, se reintenta cada `SQL_REINTENTO_MS` (5 minutos).
+
+**Modelo relacional** (`src/main/resources/db/migration`, versionado con Flyway). Lo que en Mongo va embebido aquí es
+una tabla hija con llave foránea:
+
+| MongoDB (principal) | PostgreSQL (secundaria) |
+| --- | --- |
+| `usuarios` | `usuarios` (sin `passwordHash`) |
+| `categorias` | `categorias` |
+| `barrios` con `calles[]` embebidas | `barrios` 1—N `calles` |
+| `reportes` con `categoria {id, nombre}`, `fotos[]` e `historialEstados[]` embebidos | `reportes` (N—1 `usuarios`, N—1 `categorias`) 1—N `reporte_fotos` y 1—N `historial_estados` |
+| `comentarios`, `confirmaciones`, `seguimientos` | las mismas tablas, N—1 `reportes` y N—1 `usuarios` |
+| `auditoria` | `auditoria` |
+
+No se replican contraseñas, tokens ni notificaciones. Los id son los de Mongo, así una fila se encuentra en las dos
+bases. Las vistas `v_reportes_por_categoria`, `v_reportes_detalle` y `v_actividad_moderadores` (migración V2)
+resuelven con un JOIN lo que en Mongo necesita `$group`/`$unwind`.
+
+**Configuración**: `SQL_REPLICA_HABILITADA` (`false` por defecto; `true` en Docker), `SQL_URL`
+(`jdbc:postgresql://localhost:5432/viasctg_sql`), `SQL_USUARIO` (`viasctg`), `SQL_PASSWORD` y `SQL_REINTENTO_MS`.
+Fuera de Docker se pueden poner en `local.properties` (copia de `local.properties.example`, ignorado por git), que
+`./mvnw spring-boot:run` lee solo. Para crear la base y el usuario en un PostgreSQL local:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File sqlcrear-base-local.ps1
+```
+
+`GET /api/admin/replica-sql` (`ADMIN`) compara, tabla por tabla, los registros de Mongo con las filas de PostgreSQL;
+`POST /api/admin/replica-sql/reconstruir` (`ADMIN`, `202`) pide una reconstrucción completa. Ambas están en la
+pestaña **Base SQL** del panel.
 
 ## Geolocalización de reportes
 
@@ -32,20 +85,60 @@ Al crear o actualizar un reporte, las coordenadas son obligatorias y se validan 
 
 - Latitud: entre `-90` y `90`.
 - Longitud: entre `-180` y `180`.
+- Además deben caer dentro del área de servicio (`AreaServicio`, por defecto un rectángulo que cubre Cartagena, sus corregimientos cercanos, Barú y las Islas del Rosario); fuera de ella la API responde `409`.
 
 Ejemplo de cuerpo para crear o actualizar un reporte:
 
 ```json
 {
-  "calleId": "id-de-la-calle",
-  "categoriaId": "id-de-la-categoria",
+  "categoriaId": "665f1c2e8a4b2d0012ab34cd",
   "descripcion": "Hueco de gran tamaño cerca de la intersección.",
-  "fotoUrl": "https://ejemplo.com/foto.jpg",
   "latitud": 10.391,
-  "longitud": -75.479,
-  "prioridad": "ALTA"
+  "longitud": -75.479
 }
 ```
+
+`categoriaId` (solo al crear) es el id de una categoría **activa** del catálogo (`GET /api/categorias`); si no existe responde `404` y si está desactivada, `409`. El reporte la guarda embebida como `categoria: {id, nombre}` y así la devuelve la API. Para los daños que no encajan en ninguna está la categoría «Otro». El catálogo no admite nombres duplicados (sin distinguir mayúsculas, tildes ni espacios) y las categorías no se borran: se desactivan, y los reportes que ya la tenían la conservan. Antes la categoría era texto libre en `categoriaId`; al arrancar, `MigracionCategoriaReporte` pasa esos reportes a la categoría del catálogo con el mismo nombre o, si no hay ninguna, a «Otro». La prioridad no la envía el ciudadano: todo reporte inicia en `MEDIA` y solo `ADMIN` o `MODERADOR` la modifican al cambiar el estado (`prioridad` opcional en `PATCH /api/admin/reportes/{id}/estado`). La edición (`PUT`) solo aplica a reportes `PENDIENTE` y solo recibe descripción y coordenadas.
+
+### Dirección (OpenStreetMap)
+
+El backend resuelve `direccionOsm` («vía, barrio») y `barrioOsm` con Nominatim (geocodificación inversa). Se hace de forma asíncrona: la respuesta de `POST /api/reportes` trae ambos en `null` y se completan segundos después, solo si el reporte sigue en las mismas coordenadas. Si cambian las coordenadas en un `PUT`, se recalculan.
+
+`GET /api/geocoding/inverso?lat=..&lng=..` es público y sirve para previsualizar la ubicación: devuelve `{direccionOsm, barrioOsm, dentroDelArea}`. Respeta la política de Nominatim: como máximo una petición por segundo para todo el servidor (con un turno reservado sin bloquear hilos: si la cola supera unos 2 s devuelve la dirección en `null` en lugar de esperar), caché de 5 000 puntos (celdas de ~11 m) y 30 consultas por minuto por IP.
+
+### Listado paginado, mapa y filtros
+
+`GET /api/reportes` (público) devuelve una página, del más reciente al más antiguo:
+
+```text
+GET /api/reportes?estado=PENDIENTE&categoria=Hueco&barrio=Manga&q=colegio&pagina=0&tamano=20
+```
+
+```json
+{"contenido": [/* ReporteResponse */], "pagina": 0, "tamano": 20, "totalElementos": 45, "totalPaginas": 3}
+```
+
+- `pagina` empieza en 0 (por defecto 0) y `tamano` va de 1 a 100 (por defecto 20); una página después de la última
+  devuelve `contenido` vacío con los totales. El `_id` desempata los reportes creados en el mismo instante (índice
+  `fecha_id`), así que ninguno se repite ni se salta entre páginas.
+- `categoria` es el id de la categoría. `barrio` compara el valor completo y `q` busca dentro del nombre de la
+  categoría, la descripción, la dirección y el barrio; ninguno de los dos distingue mayúsculas, tildes ni espacios
+  repetidos («inundacion» encuentra «Inundación»). Máximo 100 caracteres cada uno. La búsqueda es literal: los caracteres especiales no funcionan como expresión regular.
+- `GET /api/reportes/filtros` devuelve `{categorias, barrios}`: las categorías (`{id, nombre}`) y los barrios que
+  tiene algún reporte, sin repetir y en orden alfabético, para los selectores.
+- `GET /api/reportes/mapa?estado=` devuelve todos los puntos del mapa (hasta 5000, los más recientes) con solo
+  `id`, coordenadas, `estado`, `categoria` (`{id, nombre}`), `descripcion`, `direccionOsm`, `barrioOsm` y `foto` (la primera o
+  `null`), sin historial ni autor.
+
+### Comentarios y notificaciones
+
+`ComentarioResponse` incluye `usuarioNombre` (nombre del autor, `null` si el usuario ya no existe). Cada vez que un `ADMIN` o `MODERADOR` cambia el estado de un reporte, se crea una notificación para su autor (por ejemplo: «Tu reporte "…" cambió a en revisión»), visible en `GET /api/notificaciones`. Cuando el reporte se resuelve o se rechaza, también se avisa a quienes lo confirmaron. `PATCH /api/notificaciones/leidas` marca todas como leídas y `GET /api/notificaciones/sin-leer` devuelve solo el conteo (`{"total": 3}`), pensado para que el frontend lo consulte cada minuto sin descargar la lista.
+
+Solo el autor de un comentario puede editarlo; el autor o un moderador pueden eliminarlo. El autor de un reporte no puede confirmarlo y los reportes resueltos o rechazados no admiten confirmaciones.
+
+### Fotos
+
+`POST /api/reportes/{id}/fotos` (`multipart/form-data`, clave `archivos`) acepta hasta 3 imágenes JPEG, PNG o WEBP de máximo 5 MB cada una. Solo el propietario puede subirlas. Se guardan en `UPLOADS_DIR` y se sirven desde `/uploads/**`; las rutas quedan en el arreglo `fotos` del reporte.
 
 La consulta pública de reportes cercanos usa este índice geoespacial:
 
@@ -57,31 +150,117 @@ GET /api/reportes/cercanos?lat=10.391&lng=-75.479&radioKm=2&estado=PENDIENTE
 `ReporteResponse` ordenada por cercanía. El frontend la puede consumir para mostrar
 marcadores en un mapa Leaflet/OpenStreetMap.
 
+## Funciones inspiradas en FixMyStreet
+
+### Posibles duplicados
+
+`GET /api/reportes/posibles-duplicados?lat=..&lng=..` (público) devuelve hasta 5 reportes **activos**
+(`PENDIENTE`, `EN_REVISION`, `EN_PROCESO`) a menos de 100 m, del más cercano al más lejano, como
+`{reporte, distanciaMetros, confirmaciones}`. El formulario de creación lo usa para ofrecer «Es el mismo:
+confirmar» en vez de crear un reporte repetido (`DuplicadoService`).
+
+### «¿Ya lo arreglaron?»
+
+- `POST /api/reportes/{id}/seguimiento` con `{"arreglado": true|false}` registra o cambia el voto del usuario
+  (uno por usuario y reporte, colección `seguimientos`). Solo para reportes activos (si no, `409`).
+- `GET /api/reportes/{id}/seguimiento` (público) devuelve `{reporteId, arreglado, sigue, ultimaRespuesta, miRespuesta,
+  cierrePrevisto, progresoCierre}`. `arreglado` y `sigue` cuentan personas; `progresoCierre` (`{arreglado, sigue,
+  minimoVotos, proporcionMinima}`) son los votos tal como los cuenta la regla del cierre por la comunidad, o `null` si
+  está apagado o el reporte no está `EN_PROCESO`.
+- Por defecto los votos **no cambian el estado**: son una señal para el moderador, que los ve en
+  `GET /api/admin/reportes/seguimiento` (una agregación `$group` por reporte).
+- **Cierre por la comunidad** (opcional, `CIERRE_COMUNITARIO=true`): un reporte `EN_PROCESO` pasa a ser candidato a
+  cierre cuando, contando solo los votos emitidos desde que pasó a `EN_PROCESO`, hay al menos 3 votos «ya está
+  arreglado» y son al menos el 75 % (el voto del autor cuenta doble; `CierreComunitario` es la regla, pura y probada caso
+  por caso). Se avisa a los moderadores y `cierrePrevisto` indica cuándo se cerrará: si en 72 horas nadie vota «sigue
+  igual» (lo que puede romper la regla) ni un moderador usa `POST /api/admin/reportes/{id}/mantener-abierto`, la tarea
+  diaria lo pasa a `RESUELTO` con el comentario «Resuelto por la comunidad: …» y avisa como cualquier cierre.
+  «Mantener abierto» descarta la propuesta y desde ese momento solo cuentan los votos nuevos. Umbrales configurables con
+  `CIERRE_COMUNITARIO_MINIMO`, `CIERRE_COMUNITARIO_PROPORCION` y `CIERRE_COMUNITARIO_GRACIA_HORAS`.
+- Una tarea diaria (`SeguimientoService.tareaDiaria`) busca reportes activos sin cambios ni recordatorios en
+  `SEGUIMIENTO_DIAS` y avisa al autor y a quienes lo confirmaron, con notificación y correo. Cada reporte se
+  marca en `fechaUltimoSeguimiento` antes de avisar, así que dos ejecuciones no envían el mismo aviso.
+  La misma tarea aplica los cierres por la comunidad cuya espera venció. `POST /api/admin/reportes/seguimiento/recordatorios`
+  (`ADMIN`) la ejecuta en el momento y devuelve `{reportesRecordados, reportesCerrados}`.
+
+### Estadísticas
+
+`GET /api/admin/estadisticas` (`ADMIN` o `MODERADOR`) calcula en una sola agregación `$facet` sobre `reportes`:
+totales por estado, porcentaje resuelto (sin contar rechazados), días promedio hasta la primera respuesta y
+hasta resolver (a partir de `historialEstados`), creados y resueltos por mes en los últimos 12 meses (hora de
+Colombia), las 8 categorías con más reportes (agrupadas por `categoria.id`, con su nombre actual), la densidad de reportes
+activos en celdas de ~110 m (coordenadas redondeadas a 3 decimales), los activos por prioridad (`prioridadActivos`)
+y la fecha del pendiente más antiguo (`pendienteMasAntiguo`, `null` si no hay pendientes).
+
 ## Seguridad
 
 | Acción | Acceso |
 | --- | --- |
 | Registro y login | Público |
-| Consultar reportes, barrios y categorías | Público |
-| Crear/editar reportes, comentar, confirmar, consultar comentarios/confirmaciones y datos propios | Usuario autenticado |
-| Cambiar estado e historial de reportes | `ADMIN` o `MODERADOR` |
-| Administrar barrios y categorías; listar usuarios | `ADMIN` |
+| Consultar reportes, su resumen, posibles duplicados y votos de seguimiento, barrios y categorías; geocodificación inversa; `/uploads/**`; `/actuator/health` | Público |
+| Crear/editar reportes, comentar, confirmar, votar «¿ya lo arreglaron?», consultar comentarios/confirmaciones y datos propios | Usuario autenticado |
+| Cambiar estado e historial de reportes; votos de seguimiento de todos los reportes; estadísticas; URL firmada del dashboard de Metabase | `ADMIN` o `MODERADOR` |
+| Ejecutar los recordatorios de seguimiento en el momento | `ADMIN` |
+| Administrar barrios, calles y categorías; listar usuarios, cambiar su rol y activarlos/desactivarlos | `ADMIN` |
 
-El registro público crea un usuario `CIUDADANO`. La base migrada debe contar con un `ADMIN` inicial. Usa el JWT recibido en el encabezado `Authorization: Bearer <token>`.
+Los roles se exigen por URL en `SecurityConfig` (antes de leer el cuerpo, así que sin permiso la respuesta es `403` y no errores de validación) y otra vez con `@PreAuthorize` en los controladores. El registro público crea un usuario `CIUDADANO` con el correo sin confirmar. El primer `ADMIN` se crea con `ADMIN_EMAIL`/`ADMIN_PASSWORD`. Un administrador no puede cambiar su propio rol ni desactivarse. Los permisos se leen de la base en cada petición: un cambio de rol o una desactivación aplica de inmediato, incluso sobre tokens ya emitidos (un usuario desactivado recibe 401). Usa el JWT recibido en el encabezado `Authorization: Bearer <token>`.
+
+## Protección de cuentas
+
+- `security/LimitadorIntentos` cuenta intentos por clave en una ventana deslizante en memoria (sirve para una sola instancia). Verificar y registrar es una sola operación atómica, así que enviar intentos en paralelo no permite superar el máximo; el login cuenta cada intento antes de comparar la contraseña y lo borra si es correcta. Se aplica al login (20 por IP, 5 fallos por correo desde una misma IP y un techo de 50 intentos por correo / 15 min: así nadie puede bloquear una cuenta ajena desde su propia red; restablecer la contraseña quita los bloqueos de ese correo), registro (5 por IP / hora), recuperación y reenvío de la confirmación (5 por IP y 3 por correo / hora cada uno), cambio de contraseña (5 fallos / 15 min), creación de reportes (10 por usuario / hora), comentarios (20 por usuario / 10 min) y geocodificación pública (30 por IP / minuto). Excederlo responde `429`.
+- Usuarios y reportes se modifican con actualizaciones parciales atómicas (`$set`/`$inc`/`$push` con `findAndModify`), nunca reescribiendo el documento completo: un cambio de perfil no deshace una desactivación hecha a la vez, ni editar un reporte o subir fotos revierte un cambio de estado o su historial.
+- BCrypt solo usa 72 bytes: contraseñas más largas (las letras con tilde cuentan doble) se rechazan con `400` y un mensaje claro.
+- La IP de cada petición es la de la conexión: `X-Forwarded-For` se ignora salvo que la conexión venga de una IP que coincida con `TRUSTED_PROXIES` (expresión regular, por ejemplo `172\.18\.0\.5`; vacía por defecto). Antes Tomcat confiaba en cualquier red privada, y desde la red local se podían saltar todos los límites por IP. Si pones un proxy delante, fija ahí su IP y haz que solo él alcance el puerto del backend. Con `docker compose` ya viene así: el backend recibe todo a través del nginx del frontend (y del túnel de la demo), `TRUSTED_PROXIES` vale por defecto la red interna de Docker (`172.16.0.0/12`) y el puerto 8080 solo se publica en `127.0.0.1`. Sin esto, detrás del túnel todos los visitantes compartirían la IP de nginx (un solo bloqueo por intentos para todos) y Spring rechazaría los `POST` por CORS, porque vería `http` en vez del `https` del navegador.
+- El JWT incluye el claim `ver` con `Usuario.versionToken`; el filtro rechaza tokens con una versión distinta. Cambiar o restablecer la contraseña y `cerrar-sesiones` incrementan la versión.
+- Verificación del correo: el registro no inicia sesión; crea la cuenta con `emailVerificado=false` y envía `FRONTEND_URL/verificar-correo?token=…` (válido 48 horas, `app.email-verification.expiration-hours`; un solo uso; solo el SHA-256 se guarda en `tokens_verificacion`, índice TTL). `POST /api/auth/verificar` confirma el correo y devuelve el JWT. Hasta entonces el login responde `403` con la contraseña correcta (con una incorrecta, el `401` de siempre, así que no revela nada). `POST /api/auth/reenviar-verificacion` responde siempre `202` (3 por correo y 5 por IP / hora) e invalida el enlace anterior. Restablecer la contraseña también confirma el correo: si alguien registró un correo ajeno, su dueña recupera la cuenta con «¿Olvidaste tu contraseña?» y la contraseña del intruso deja de valer. Al arrancar, `MigracionEmailVerificado` marca como verificadas las cuentas anteriores a esta función.
+- La recuperación genera 32 bytes aleatorios, guarda solo su SHA-256 en `tokens_recuperacion` (índice TTL) y envía `FRONTEND_URL/restablecer?token=…`. Sin SMTP configurado (`SPRING_MAIL_HOST`), el enlace se registra en el log.
+
+## Errores
+
+Toda respuesta de error tiene el mismo cuerpo, con el mensaje en español y pensado para mostrarse tal cual:
+
+```json
+{"timestamp": "…", "status": 400, "error": "Bad Request",
+ "message": "La solicitud contiene campos inválidos",
+ "validationErrors": {"descripcion": "La descripción debe tener entre 10 y 2000 caracteres"}}
+```
+
+| Código | Cuándo |
+|--------|--------|
+| 400 | Campos inválidos (detalle por campo en `validationErrors`), JSON ilegible, parámetro faltante o con valor no válido, contraseña de más de 72 bytes, URL mal formada (también las que Tomcat rechaza antes de llegar a Spring) |
+| 401 | Sin token, token vencido o revocado, o credenciales incorrectas en el login |
+| 403 | Sesión válida sin permiso para la operación (se decide antes de validar el cuerpo) |
+| 404 | El recurso o la dirección no existe |
+| 405 / 415 | Método o tipo de contenido no admitido |
+| 409 | Regla de negocio (transición no permitida, máximo de fotos, duplicados…) |
+| 413 | Archivo de más de 5 MB |
+| 429 | Demasiados intentos (login, registro, recuperación, reportes, comentarios o geocodificación) |
+| 503 | Función que depende de un servicio sin configurar (el dashboard de Metabase sin URL, clave o id) |
+| 500 | Error no controlado (el detalle solo va al log) |
+
+Cada restricción de los DTO declara su `message`; al agregar una nueva hay que escribirlo, porque el texto por
+defecto de Bean Validation sale en inglés.
 
 ## Rutas principales
 
 | Recurso | Rutas |
 | --- | --- |
-| Autenticación | `POST /api/auth/registro`, `POST /api/auth/login` |
-| Perfil | `GET/PUT /api/usuarios/me`, `GET /api/usuarios` (`ADMIN`) |
-| Reportes | `GET/POST /api/reportes`, `GET /api/reportes/cercanos`, `GET/PUT /api/reportes/{id}` |
-| Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial` |
-| Barrios y calles | `GET/POST /api/barrios`, `GET/PUT/DELETE /api/barrios/{id}`, `POST /api/barrios/{id}/calles` |
+| Autenticación | `POST /api/auth/registro` (devuelve el usuario, sin token), `POST /api/auth/verificar` (`{"token"}`, devuelve el JWT), `POST /api/auth/reenviar-verificacion` (`{"email"}`, siempre `202`), `POST /api/auth/login`, `POST /api/auth/recuperar` (`{"email"}`, siempre `202`), `POST /api/auth/restablecer` (`{"token","passwordNueva"}`) |
+| Perfil y usuarios | `GET/PUT /api/usuarios/me`, `PUT /api/usuarios/me/password` (`{"passwordActual","passwordNueva"}`, devuelve un token nuevo), `POST /api/usuarios/me/cerrar-sesiones`; `GET /api/usuarios`, `PATCH /api/usuarios/{id}/rol` (`{"rol":"MODERADOR"}`), `PATCH /api/usuarios/{id}/activo?activo=false` (`ADMIN`) |
+| Reportes | `GET/POST /api/reportes` (GET paginado, del más reciente al más antiguo; `?estado=`, `?categoria=`, `?barrio=`, `?q=`, `?pagina=` y `?tamano=` opcionales), `GET /api/reportes/mapa` (puntos del mapa), `GET /api/reportes/filtros` (opciones de los selectores), `GET /api/reportes/mios` (los del usuario autenticado, del más reciente al más antiguo; `?estado=` opcional; exige sesión aunque los demás GET de reportes sean públicos), `GET /api/reportes/resumen` (cifras de la portada), `GET /api/reportes/cercanos` (radio máximo 50 km), `GET /api/reportes/posibles-duplicados`, `GET/PUT /api/reportes/{id}`, `POST /api/reportes/{id}/fotos` |
+| Seguimiento | `GET/POST /api/reportes/{reporteId}/seguimiento` |
+| Geocodificación | `GET /api/geocoding/inverso` |
+| Administración de reportes | `GET /api/admin/reportes/pendientes`, `PATCH /api/admin/reportes/{id}/estado`, `GET /api/admin/reportes/{id}/historial`, `GET /api/admin/reportes/seguimiento`, `POST /api/admin/reportes/seguimiento/recordatorios` (`ADMIN`) |
+| Réplica SQL | `GET /api/admin/replica-sql` (estado por tabla), `POST /api/admin/replica-sql/reconstruir` (`ADMIN`) |
+| Auditoría | `GET /api/admin/auditoria` (`ADMIN`; filtros opcionales `entidad`, `accion`, `actorId`, `desde`, `hasta`, `pagina` y `tamano`; incluye `REPORTE_CERRADO_POR_COMUNIDAD` para los cierres automáticos) |
+| Estadísticas | `GET /api/admin/estadisticas` |
+| Dashboard (Metabase) | `GET /api/admin/dashboard` (`{url, expiraEn}`: URL de embebido firmada con HS256; `503` sin configuración) |
+| Barrios y calles | `GET/POST /api/barrios`, `GET/PUT/DELETE /api/barrios/{id}`, `POST /api/barrios/{id}/calles`, `DELETE /api/barrios/{id}/calles/{calleId}` |
 | Categorías | `GET/POST /api/categorias`, `GET/PUT /api/categorias/{id}`, `PATCH /api/categorias/{id}/estado` |
 | Confirmaciones | `GET/POST /api/reportes/{reporteId}/confirmaciones`, `DELETE /api/reportes/{reporteId}/confirmaciones/me` |
 | Comentarios | `GET/POST /api/reportes/{reporteId}/comentarios`, `PUT/DELETE /api/comentarios/{id}` |
-| Notificaciones | `GET /api/notificaciones`, `PATCH /api/notificaciones/{id}/leida` |
+| Notificaciones | `GET /api/notificaciones`, `GET /api/notificaciones/sin-leer`, `PATCH /api/notificaciones/{id}/leida`, `PATCH /api/notificaciones/leidas` |
+| Salud | `GET /actuator/health` |
 
 La documentación interactiva está en `http://localhost:8080/swagger-ui/index.html`.
 
@@ -92,13 +271,17 @@ La documentación interactiva está en `http://localhost:8080/swagger-ui/index.h
 ./mvnw clean verify
 ```
 
+Las pruebas no necesitan MongoDB ni PostgreSQL: las de servicios usan Mockito y las de `controller/` levantan solo la capa web con
+`@WebMvcTest` (seguridad, filtro JWT y manejo de errores reales; servicios simulados).
+`ReplicaSqlRepositoryIntegracionTests` sí prueba el SQL contra un PostgreSQL real, pero solo si se define
+`SQL_TEST_URL` apuntando a una base de pruebas cuyo nombre termine en `_test` (la borra y la recrea), con
+`SQL_TEST_USUARIO` y `SQL_TEST_PASSWORD`; sin esas variables se omite.
+
 ## Desarrollo con frontend
 
-En una terminal, inicia la API con MongoDB local y un secreto JWT temporal:
+En una terminal, inicia la API (con `local.properties` completo, ver «Requisitos y configuración»):
 
 ```bash
-export MONGODB_URI='mongodb://localhost:27017/viasctg_db'
-export JWT_SECRET="$(openssl rand -base64 32)"
 ./mvnw spring-boot:run
 ```
 
@@ -114,4 +297,4 @@ La API queda disponible en `http://localhost:8080`, Swagger en
 `http://localhost:8080/swagger-ui/index.html` y Vite normalmente en
 `http://localhost:5173`.
 
-Consulta [HELP.md](HELP.md) para solucionar problemas comunes y [PROGRESS.md](PROGRESS.md) para conocer el trabajo pendiente.
+Consulta [PROGRESS.md](PROGRESS.md) para conocer el trabajo hecho y pendiente.

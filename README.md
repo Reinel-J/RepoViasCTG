@@ -1,94 +1,260 @@
-# ViaCTG
+# ViaCTG — Reporte ciudadano de daños viales en Cartagena
 
-ViaCTG es una plataforma para reportar y hacer seguimiento a daños viales (calles sin pavimentar o dañadas) en Cartagena, pensada para conductores y mototaxistas. Se basa en el modelo de [FixMyStreet](https://www.fixmystreet.com/): cualquier ciudadano reporta un daño marcándolo en un mapa, otros usuarios confirman que sigue vigente, y un administrador/moderador le da seguimiento hasta resolverlo.
+ViaCTG es una plataforma web para que la ciudadanía de Cartagena reporte daños en las vías (huecos, inundaciones,
+hundimientos, alcantarillas…) y siga su atención. Los ciudadanos crean reportes con ubicación en el mapa y fotos,
+confirman los de otros, comentan y responden «¿ya lo arreglaron?»; los moderadores y administradores revisan, priorizan y
+cambian el estado de cada caso, con historial, notificaciones, estadísticas y auditoría.
 
-Este repositorio es un **monorepo**: contiene el backend y el frontend como proyectos independientes que se ejecutan y despliegan por separado.
+| Capa | Tecnología |
+| --- | --- |
+| Frontend ([FrontEnd/](FrontEnd)) | React 19, TypeScript, Vite, React Router, Axios, Leaflet + OpenStreetMap, Tailwind |
+| Backend ([ViasCTG/](ViasCTG)) | Java 21, Spring Boot 3.3, Spring Security + JWT, Spring Data MongoDB, JDBC + Flyway |
+| Base principal | **MongoDB 7** (`viasctg_db`) |
+| Base secundaria | **PostgreSQL 17** (`viasctg_sql`): réplica relacional para SQL y analítica |
+| Analítica | Metabase embebido en el panel; guía equivalente en Power BI |
+| Infraestructura | Docker Compose, GitHub Actions (CI) |
 
+## Qué puede hacer cada rol
+
+| Rol | Funciones |
+| --- | --- |
+| Visitante | Ver reportes (listado paginado con búsqueda y filtros, mapa, detalle), cifras de la portada, registrarse |
+| Ciudadano | Crear reportes (punto en el mapa dentro de Cartagena, categoría del catálogo, descripción, hasta 3 fotos), ver si ya lo reportaron (a menos de 100 m), editar los suyos mientras están pendientes, confirmar, comentar, votar «¿ya lo arreglaron?», notificaciones, perfil |
+| Moderador | Panel: cola de reportes ordenable, cambio de estado individual o en lote con comentario y prioridad, historial, señales de la comunidad, estadísticas, dashboard |
+| Administrador | Todo lo anterior más usuarios (rol y activación), barrios y calles, categorías, auditoría y la réplica SQL |
+
+Flujo de un reporte: `PENDIENTE → EN_REVISION → EN_PROCESO → RESUELTO`, y `RECHAZADO` desde cualquier estado activo.
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+    subgraph Navegador
+        SPA["React + Vite<br/>(Leaflet / OpenStreetMap)"]
+    end
+    subgraph Servidor
+        NGINX["nginx<br/>(sirve la SPA y reenvía /api y /uploads)"]
+        API["API REST Spring Boot<br/>controller → service → repository"]
+        HILO["ReplicaSqlService<br/>(hilo en segundo plano)"]
+    end
+    MONGO[("MongoDB<br/>base principal")]
+    PG[("PostgreSQL<br/>base secundaria")]
+    MB["Metabase"]
+    NOM["Nominatim<br/>(OpenStreetMap)"]
+
+    SPA -- "HTTPS + JWT" --> NGINX --> API
+    API -- "lee y escribe" --> MONGO
+    API -- "CambioReplicable<br/>(evento tras cada escritura)" --> HILO
+    HILO -- "relee el documento" --> MONGO
+    HILO -- "INSERT … ON CONFLICT<br/>(Flyway crea el esquema)" --> PG
+    API -. "dirección de cada reporte" .-> NOM
+    MB -- "consultas" --> MONGO
+    SPA -. "iframe firmado" .-> MB
 ```
-ViasCTG./
-├── ViasCTG/      → Backend (API REST)
-└── FrontEnd/     → Frontend (aplicación web)
+
+- El backend sigue capas fijas bajo `com.viactg`: `controller` (solo DTOs), `service` (reglas de negocio, permisos y
+  validación de referencias), `repository`, `model`, `dto`/`mapper`, `security` (filtro JWT), `exception` (errores en
+  español con el mismo formato) y `config`.
+- Toda escritura sobre un documento existente es una actualización parcial atómica (`findAndModify` con `$set`, `$push`,
+  `$inc`) filtrando por el estado leído: dos moderadores a la vez no se pisan (el segundo recibe `409`).
+- Seguridad: BCrypt, JWT con versión revocable, roles leídos de la base en cada petición, permisos por URL y con
+  `@PreAuthorize`, límites de intentos (login, registro, reportes, comentarios) y verificación de correo.
+
+## Bases de datos
+
+### MongoDB (principal)
+
+La aplicación lee y escribe solo aquí. Lo que se consulta junto va **embebido**; lo que tiene vida propia es una
+colección aparte y se **referencia** por id:
+
+| Colección | Embebido | Referencia a | Índices destacados |
+| --- | --- | --- | --- |
+| `reportes` | `historialEstados[]`, `fotos[]`, `ubicacion` (GeoJSON), `categoria {id, nombre}` | `usuarios` (`usuarioId`), `categorias` (`categoria.id`) | `2dsphere`, `(estado, fechaCreacion)`, `(categoria.id, fechaCreacion)` |
+| `barrios` | `calles[]` | — | `nombreClave` único |
+| `usuarios` | — | — | `email` único |
+| `categorias` | — | — | — |
+| `comentarios`, `confirmaciones`, `seguimientos` | — | `reportes`, `usuarios` | únicos `(reporteId, usuarioId)` en confirmaciones y votos |
+| `notificaciones`, `auditoria` | — | `usuarios` | por usuario y fecha |
+| `tokens_recuperacion`, `tokens_verificacion` | — | `usuarios` | TTL (Mongo los borra al vencer) |
+
+La categoría del reporte es una **referencia extendida**: guarda el `id` del catálogo y una copia del `nombre`, así se
+muestra, filtra y agrupa sin consultar `categorias`; si un administrador la renombra, la copia se actualiza en todos
+sus reportes. Con los datos de demostración (`SEED_DEMO_REPORTES=10000`) la base tiene más de **23 000 documentos**.
+
+### PostgreSQL (secundaria)
+
+Una réplica relacional y normalizada que nunca lee la aplicación: sirve para consultas SQL, reportes y analítica. Si
+PostgreSQL se cae, todo sigue funcionando y la réplica se reintenta sola. Lo embebido en Mongo pasa a tablas hijas:
+
+```mermaid
+erDiagram
+    usuarios ||--o{ reportes : "crea"
+    categorias ||--o{ reportes : "clasifica"
+    reportes ||--o{ reporte_fotos : "fotos[]"
+    reportes ||--o{ historial_estados : "historialEstados[]"
+    usuarios ||--o{ historial_estados : "atiende"
+    reportes ||--o{ comentarios : "tiene"
+    reportes ||--o{ confirmaciones : "tiene"
+    reportes ||--o{ seguimientos : "tiene"
+    usuarios ||--o{ comentarios : "escribe"
+    usuarios ||--o{ confirmaciones : "confirma"
+    usuarios ||--o{ seguimientos : "vota"
+    barrios ||--o{ calles : "calles[]"
+    reportes {
+        varchar id PK
+        varchar usuario_id FK
+        varchar categoria_id FK
+        text descripcion
+        float latitud
+        float longitud
+        varchar estado
+        varchar prioridad
+        timestamptz fecha_creacion
+    }
+    historial_estados {
+        varchar id PK
+        varchar reporte_id FK
+        int orden
+        varchar usuario_admin_id FK
+        varchar estado_anterior
+        varchar estado_nuevo
+        timestamptz fecha
+    }
 ```
 
-## Backend — `ViasCTG/`
+Cada escritura en Mongo publica un evento (`CambioReplicable`); un hilo en segundo plano relee ese documento y lo copia
+con `INSERT … ON CONFLICT DO UPDATE`. Al arrancar (y desde la pestaña **Base SQL** del panel) la réplica se reconstruye
+completa. El esquema está versionado con Flyway (`ViasCTG/src/main/resources/db/migration`) e incluye las vistas
+`v_reportes_por_categoria`, `v_reportes_detalle` y `v_actividad_moderadores`. No se copian contraseñas ni tokens.
+Detalle en [ViasCTG/README.md](ViasCTG/README.md#base-secundaria-en-postgresql).
 
-API REST en **Java 21 + Spring Boot 3 + Spring Data MongoDB + Spring Security + JWT**.
+## Estructura del repositorio
 
-- Autenticación y autorización por rol (`CIUDADANO`, `MODERADOR`, `ADMIN`).
-- CRUD de reportes, barrios, calles, categorías, confirmaciones y comentarios.
-- Cambio de estado de reportes con historial embebido (`PENDIENTE → EN_REVISION → EN_PROCESO → RESUELTO / RECHAZADO`).
-- Geolocalización: cada reporte guarda latitud/longitud y un índice geoespacial (`2dsphere`) para consultar reportes cercanos a un punto.
-- Documentación interactiva vía Swagger UI (`/swagger-ui/index.html`).
+```text
+ViasCTG/             API Spring Boot (código, pruebas, colección de Postman, scripts SQL locales)
+FrontEnd/            Cliente React (pantallas públicas y panel de administración)
+docs/                Guías de Metabase y Power BI (con datos de ejemplo para Power BI)
+docker-compose.yml   Mongo, PostgreSQL, backend, frontend, Metabase y túnel opcional para la demo
+configurar-metabase.py, exportar-powerbi.py, demo-tunel.sh   Utilidades del dashboard y la demo pública
+```
 
-Instrucciones de instalación, variables de entorno y rutas disponibles: ver [`ViasCTG/README.md`](./ViasCTG/README.md).
+## Cómo ejecutarlo
 
-Arranque rápido:
+### Opción A: en el PC, sin Docker
+
+Requisitos: JDK 21, Node.js 20 o superior, MongoDB en `localhost:27017` y, para la base secundaria, PostgreSQL en
+`localhost:5432`.
+
+1. Configuración local: copia `ViasCTG/local.properties.example` como `ViasCTG/local.properties` (no se sube a git) y
+   completa el secreto JWT, el administrador local y la contraseña del usuario `viasctg` de PostgreSQL.
+2. Base secundaria (una vez): crea el usuario y la base en PostgreSQL; pide la contraseña del usuario `postgres`.
+
+   ```powershell
+   cd ViasCTG
+   powershell -ExecutionPolicy Bypass -File sql\crear-base-local.ps1
+   ```
+
+3. Backend (la primera vez, con datos de demostración; después basta `.\mvnw spring-boot:run`):
+
+   ```powershell
+   cd ViasCTG
+   $env:SEED_DEMO = 'true'; $env:SEED_DEMO_REPORTES = '10000'
+   .\mvnw spring-boot:run
+   ```
+
+4. Frontend, en otra terminal:
+
+   ```powershell
+   cd FrontEnd
+   npm install
+   npm run dev
+   ```
+
+Abre `http://localhost:5173` y entra al panel con el administrador de `local.properties`. Swagger queda en
+`http://localhost:8080/swagger-ui/index.html`.
+
+### Opción B: con Docker Compose
 
 ```bash
-cd ViasCTG
-export MONGODB_URI='mongodb://localhost:27017/viasctg_db'
-export JWT_SECRET="$(openssl rand -base64 32)"
-./mvnw spring-boot:run
+cp .env.example .env            # define JWT_SECRET y SQL_PASSWORD (openssl rand -base64 32)
+docker compose up -d --build    # Mongo, PostgreSQL, backend, frontend (http://localhost:5173) y Metabase (:3000)
 ```
 
-Por defecto corre en `http://localhost:8080`.
+## Datos de demostración
 
-## Frontend — `FrontEnd/`
+Con `SEED_DEMO=true` y menos de 20 reportes, el backend crea al arrancar `SEED_DEMO_REPORTES` reportes (200 por
+defecto) de los últimos 12 meses en nueve barrios reales (25 % pendientes, 15 % en revisión, 20 % en proceso, 30 %
+resueltos y 10 % rechazados), con historiales de transiciones válidas y fechas crecientes, y en proporción:
 
-Aplicación web en **React + TypeScript + Vite**, consume la API del backend.
+- un ciudadano demo por cada 40 reportes (mínimo 5; `ciudadanoN@demo.viasctg.local`) y 3 moderadores demo
+  (`moderadorN@demo.viasctg.local`), con el correo verificado y una contraseña aleatoria que nadie conoce;
+- comentarios (~0,45 por reporte), confirmaciones (~0,46, nunca del autor ni repetidas) y votos «¿ya lo arreglaron?»
+  (solo en reportes activos), con fechas dentro del tiempo en que el caso estuvo abierto.
 
-- Mapa interactivo con **Leaflet + OpenStreetMap** (sin API key) para marcar y visualizar reportes.
-- Autenticación con JWT guardado en el navegador y rutas protegidas por rol.
-- Páginas para crear/listar/consultar reportes, panel de administración y perfil de usuario.
-
-Arranque rápido:
+Con `SEED_DEMO_REPORTES=10000` la base queda con **más de 23 000 documentos** (10 000 reportes, 253 usuarios y unos
+4 500 comentarios, 4 600 confirmaciones y 4 000 votos); tarda unos 2 segundos. Se insertan por bloques de 1 000, sin
+geocodificar ni enviar notificaciones ni correos, y al final la réplica SQL se reconstruye una vez. La semilla es fija:
+siempre salen los mismos datos.
 
 ```bash
-cd FrontEnd
-npm install
-npm run dev
+# Cargarlos (con la base casi vacía)
+SEED_DEMO=true SEED_DEMO_REPORTES=10000 docker compose up -d backend
+docker compose logs backend | grep SEED_DEMO
+
+# Borrarlos: los reportes empiezan con "[DEMO]" y las cuentas usan @demo.viasctg.local
+docker compose exec mongo mongosh viasctg_db --eval '
+  const ids = db.reportes.find({descripcion: /^\[DEMO\]/}, {_id: 1}).toArray().map(r => r._id.toString());
+  ["comentarios", "confirmaciones", "seguimientos", "notificaciones"].forEach(c => db[c].deleteMany({reporteId: {$in: ids}}));
+  db.reportes.deleteMany({descripcion: /^\[DEMO\]/});
+  db.usuarios.deleteMany({email: /@demo\.viasctg\.local$/})'
 ```
 
-Por defecto corre en `http://localhost:5173` y espera que el backend esté disponible en `http://localhost:8080/api`.
+Después de borrarlos, pulsa «Reconstruir réplica» en la pestaña Base SQL del panel (o reinicia el backend) y deja
+`SEED_DEMO=false` en el `.env`: si no, se vuelven a crear en el siguiente arranque mientras haya menos de 20 reportes.
 
-## Requisitos generales
+## Dashboard (Metabase)
 
-- Java 21 (JDK)
-- Node.js 18+ y npm
-- MongoDB accesible (local o remoto)
-- Ambos servicios deben correr al mismo tiempo para que el frontend pueda consumir la API
+El panel tiene una pestaña **Dashboard** (moderador y admin) con un dashboard de [Metabase](https://www.metabase.com/)
+open source conectado a `viasctg_db`, mostrado en un iframe con **embebido estático firmado**: `GET /api/admin/dashboard`
+devuelve `{url, expiraEn}`, una URL con un JWT HS256 firmado con la clave de embebido de Metabase, que nunca sale del
+backend. El panel pide otra URL antes de que venza y el dashboard se actualiza cada minuto. Sin configuración, la API
+responde `503` «El dashboard no está configurado». El botón **Descargar estadísticas (.csv)** baja las cifras de la
+pestaña Estadísticas.
 
-## Estado del proyecto
+Para armarlo sigue [docs/metabase.md](docs/metabase.md) (conectar la base, ocultar colecciones sensibles, crear las ocho
+preguntas y publicar el dashboard) o, tras crear la cuenta de administrador de Metabase, `python3 configurar-metabase.py`,
+que hace el resto y escribe `METABASE_SECRET_KEY` y `METABASE_DASHBOARD_ID` en el `.env`. Hay una versión en Power BI de
+los mismos indicadores en [docs/powerbi.md](docs/powerbi.md), con `python3 exportar-powerbi.py` para exportar los datos.
 
-El avance detallado y las tareas pendientes de cada parte se documentan en su propio `PROGRESS.md`:
+| Variable | Por defecto | Para qué |
+| --- | --- | --- |
+| `METABASE_SITE_URL` | `http://localhost:3000` | Dirección de Metabase tal como la abre el navegador. |
+| `METABASE_SECRET_KEY` | vacía | Clave de embebido de *Admin › Embedding* de Metabase. |
+| `METABASE_DASHBOARD_ID` | vacía | Número del dashboard publicado (`/dashboard/<id>`). |
+| `METABASE_TOKEN_MINUTOS` | `10` | Vigencia de cada URL firmada. |
 
-- Backend: [`ViasCTG/PROGRESS.md`](./ViasCTG/PROGRESS.md)
-- Frontend: (por crear a medida que avance)
-
-## Docker
-
-Los tres servicios (MongoDB, backend y frontend) se orquestan con Docker Compose.
+## Pruebas
 
 ```bash
-# 1. Crea el archivo .env a partir del ejemplo
-cp .env.example .env
-
-# 2. Genera un secreto real y pégalo en .env
-openssl rand -base64 32
-# Edita .env → JWT_SECRET=<el-valor-generado>
-
-# 3. Levanta todo
-docker compose up --build
+cd ViasCTG && ./mvnw test          # backend: JUnit 5 + Mockito, MockMvc y, con SQL_TEST_URL, PostgreSQL real
+cd FrontEnd && npm test            # frontend: Vitest + Testing Library
 ```
 
-| Servicio | URL |
-|----------|-----|
-| Backend (Swagger) | http://localhost:8080/swagger-ui/index.html |
-| Frontend | http://localhost:5173 |
-| MongoDB | localhost:27017 |
+- **Servicios** (Mockito): reglas de negocio de reportes, estados, categorías, usuarios, autenticación, cierre por la
+  comunidad, estadísticas, réplica SQL y datos de demostración.
+- **Controladores** (`@WebMvcTest` con la seguridad real): qué rutas son públicas, cuáles exigen sesión o rol (401/403),
+  validaciones y errores en español, sin exponer detalles técnicos.
+- **Mapeo a MongoDB**: cómo se guarda la categoría embebida, con el conversor real de Spring Data.
+- **Integración con PostgreSQL** (`ReplicaSqlRepositoryIntegracionTests`): esquema de Flyway, upserts, llaves foráneas,
+  borrado en cascada y vistas, contra una base real; en la CI corre con un PostgreSQL desechable.
+- **Frontend**: utilidades, llamadas a la API y pantallas del panel (reportes, auditoría, dashboard, base SQL).
 
-Para detener: `docker compose down` (agrega `-v` para borrar los datos de Mongo).
+La CI de GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) corre en cada push las pruebas del
+backend y, en el frontend, lint, pruebas y build.
 
-## Autor
+## Más documentación
 
-Reinel José Villanueva Ayola — Tecnología en Desarrollo de Software, Tecnológico Comfenalco (Cartagena).
+- [ViasCTG/README.md](ViasCTG/README.md): API completa (rutas, seguridad, errores, configuración, réplica SQL).
+- [FrontEnd/README.md](FrontEnd/README.md): pantallas y organización del cliente.
+- [ViasCTG/postman/](ViasCTG/postman): colección de Postman con todas las rutas.
+- [docs/metabase.md](docs/metabase.md) y [docs/powerbi.md](docs/powerbi.md): analítica.

@@ -25,9 +25,7 @@ Primero levanta el backend desde su directorio:
 
 ```bash
 cd ../ViasCTG
-export MONGODB_URI='mongodb://localhost:27017/viasctg_db'
-export JWT_SECRET="$(openssl rand -base64 32)"
-./mvnw spring-boot:run
+./mvnw spring-boot:run   # con ViasCTG/local.properties completo (ver el README de la raíz)
 ```
 
 Después inicia el cliente:
@@ -46,11 +44,29 @@ npm run build
 
 ## Integración con la API
 
-El cliente Axios está configurado en `src/api/client.ts` con:
+El cliente Axios está configurado en `src/api/client.ts`. La URL base sale de la variable
+`VITE_API_URL` y, si no existe, es:
 
 ```text
 http://localhost:8080/api
 ```
+
+Esa es la URL de `npm run dev`. En la imagen de Docker (`docker compose`) el valor es `/api`, relativo: el nginx
+del frontend (`nginx.conf`) reenvía `/api` y `/uploads` al backend, así que el sitio completo queda en una sola
+dirección (`http://localhost:5173`), el navegador no hace peticiones a otro origen y un túnel o proxy delante solo
+necesita exponer ese puerto. nginx pasa al backend el host con su puerto y el esquema original
+(`X-Forwarded-Proto`), que Spring usa para reconocer las peticiones del mismo sitio.
+
+`VITE_NOTIFICACIONES_INTERVALO_MS` (opcional, por defecto `60000`) fija cada cuánto la campana consulta
+el número de notificaciones sin leer. Como `VITE_API_URL`, se fija al construir.
+
+Los errores del backend llegan como `ErrorResponse {status, message, validationErrors}` y el cliente
+los convierte en `error.message` (mensaje en español más el detalle de cada campo inválido), que las
+pantallas muestran tal cual. Si la respuesta no trae `message`, se usa un texto por código HTTP; nunca
+se muestra el genérico «Request failed with status code …».
+
+Si la API responde `401` con un token guardado (sesión vencida o inválida), el cliente limpia
+la sesión y redirige a `/login`.
 
 Si existe un token en `localStorage` bajo la clave `token`, lo envía como
 `Authorization: Bearer <token>`. La sesión completa se conserva bajo
@@ -58,20 +74,39 @@ Si existe un token en `localStorage` bajo la clave `token`, lo envía como
 
 Los módulos API disponibles están en `src/api/`:
 
-- `auth.ts`: login y registro.
-- `reportes.ts`: listado, detalle, creación, actualización y búsqueda cercana.
-- `barrios.ts` y `categorias.ts`: datos para el formulario de reporte.
+- `auth.ts`: login, registro, confirmación del correo (y su reenvío) y recuperación de contraseña.
+- `reportes.ts`: listado, detalle, creación, actualización, subida de fotos, búsqueda cercana y posibles duplicados.
+- `reporteVista.ts`: `cargarReportes` / `cargarReporte` sobre `reportes.ts`, que convierten el DTO en el
+  `Reporte` que pintan la portada y las pantallas públicas (texto y clase del estado, fecha relativa,
+  historial) y `fotoReporte`, que devuelve la URL de la primera foto o `null`.
+- `seguimiento.ts`: votos «¿ya lo arreglaron?» de un reporte.
+- `geocoding.ts`: previsualización de la dirección de un punto (OpenStreetMap/Nominatim).
+- `barrios.ts` y `categorias.ts`: catálogos disponibles en la API; el formulario de reporte ya no
+  los usa (la categoría es texto libre).
 - `comentarios.ts` y `confirmaciones.ts`: interacciones por reporte.
-- `admin.ts`: reportes pendientes y transición de estado.
+- `admin.ts`: reportes pendientes, transición de estado, historial, votos de seguimiento, estadísticas y gestión de usuarios.
+- `barrios.ts` y `categorias.ts` también incluyen las operaciones de administración.
+- `notificaciones.ts`: listado, conteo de no leídas (`contarSinLeer`, para la campana) y marcado como leída.
+- `usuarios.ts`: perfil propio y actualización de nombre y teléfono.
 
 ## Mapa y geolocalización
 
 `MapaSeleccionPunto` permite escoger las coordenadas pulsando el mapa o usando la
 ubicación del navegador. `MapaReportes` dibuja los reportes recibidos por la API
-como marcadores con estado y prioridad.
+como marcadores en forma de gota, al estilo de FixMyStreet, coloreados por estado
+(`pinMapa.ts`, SVG con los colores de `COLOR_ESTADO` en `mapaBase.ts`; la punta señala
+la coordenada exacta), y encuadra
+los reportes visibles al cargar o al cambiar un filtro. La ventanita de cada reporte
+se abre al pasar el mouse (o con un toque en el celular) y muestra la primera foto o,
+si no tiene, la ilustración de su categoría (`imagenCategoria`, SVG en
+`public/img/categorias/`) rotulada como «Imagen ilustrativa», junto con la categoría,
+el estado, la descripción, la dirección OSM y el enlace al detalle. Si la ventanita no cabe, el mapa se
+desplaza para mostrarla entera sin tapar los botones de zoom ni la atribución, y se cierra igual al alejar el
+mouse. El mapa vuelve a encuadrar los reportes cuando cambia de tamaño (un `ResizeObserver`), mientras la
+persona no lo haya movido: así el marcador del detalle queda centrado en cualquier ancho.
 
 Los mapas usan tiles de OpenStreetMap y conservan la atribución visible
-`© OpenStreetMap contributors`. Esta opción es apropiada para la demo; para un
+`© OpenStreetMap` con enlace a su página de derechos. Esta opción es apropiada para la demo; para un
 despliegue con tráfico relevante se debe contratar un proveedor de tiles o alojar
 los propios.
 
@@ -85,16 +120,117 @@ GET /api/reportes/cercanos?lat=10.391&lng=-75.479&radioKm=2&estado=PENDIENTE
 
 ## Pantallas implementadas
 
-- Inicio de sesión y registro.
-- Lista de reportes con filtro por estado.
-- Formulario de creación con ubicación geográfica.
-- Detalle con mapa, comentarios y confirmaciones para usuarios autenticados.
-- Mapa general de reportes.
-- Panel de moderación para revisar reportes pendientes.
+Las rutas se declaran en `src/app/routes.tsx`. La portada está en `src/app/pages/Home.tsx` y el resto de
+pantallas son exports de `src/app/pages/Screens.tsx`, que el router carga bajo demanda por nombre:
 
-Las pantallas y componentes están preparados en `src/pages` y `src/components`.
-La integración final de las rutas en `App.tsx` queda pendiente; mientras no se
-complete, la aplicación muestra la pantalla inicial de Vite.
+| Ruta | Pantalla | Acceso |
+|------|----------|--------|
+| `/` | Inicio con estadísticas y reportes recientes, siempre calculados con datos reales de la API | Público |
+| `/login`, `/registro` | Inicio de sesión y registro (con la sesión ya iniciada redirigen a la página de origen o al inicio) | Público |
+| `/recuperar`, `/restablecer?token=` | Solicitar enlace y crear contraseña nueva | Público |
+| `/verificar-correo?token=` | Confirmar el correo con un clic (inicia la sesión) | Público |
+| `/reportes` | Lista con búsqueda sin tildes y filtros por estado (incluye rechazados), categoría y barrio; los filtros van en la URL (`?estado=&categoria=&barrio=&q=`), así que sobreviven al volver atrás y se pueden compartir | Público |
+| `/reportes/:id` | Detalle con foto, mapa, dirección, comentarios, confirmaciones y línea de tiempo con cada cambio de estado | Público (comentar y confirmar requieren sesión) |
+| `/mapa` | Mapa general con filtros por estado (por defecto, daños activos), categoría y barrio, y la lista de lo visible en la barra lateral | Público |
+| `/reportes/nuevo` | Formulario en 3 pasos: ubicación en el mapa, categoría libre con descripción y hasta 3 fotos, y revisión | Sesión iniciada |
+| `/reportes/:id/editar` | Editar descripción y ubicación de un reporte propio `PENDIENTE` | Sesión iniciada |
+| `/mis-reportes` | Reportes creados por el usuario (`GET /reportes/mios`), con pestañas por estado y enlace para editar los `PENDIENTE` | Sesión iniciada |
+| `/notificaciones` | Notificaciones del usuario, con marcado como leída | Sesión iniciada |
+| `/perfil` | Editar nombre y teléfono, cambiar contraseña y cerrar sesión en todos los dispositivos | Sesión iniciada |
+| `/admin` | Panel de administración por pestañas (ver abajo) | `MODERADOR` o `ADMIN` |
+
+Notas de comportamiento:
+
+- Al crear un reporte, las fotos se suben en una segunda petición (`POST /api/reportes/{id}/fotos`). El
+  formulario valida antes el tipo, el peso (5 MB) y el máximo de 3, y permite quitar cada foto. Si el reporte
+  se crea pero la subida falla, se abre igual el detalle con el aviso «El reporte se creó, pero no se pudieron
+  subir las fotos», para que reenviar el formulario no lo duplique.
+- Un reporte sin fotos muestra un placeholder «Sin fotografía»; nunca una imagen de stock.
+- La línea de tiempo del detalle empieza en «Reporte recibido» y lista cada entrada de `historialEstados`
+  (estado nuevo, comentario del moderador y fecha), de la más antigua a la más reciente.
+- El detalle solo depende de la petición del reporte: si fallan comentarios, confirmaciones o seguimiento,
+  se muestra igual con un aviso de lo que no se pudo cargar.
+- `/mapa` distingue cargando, error y cargado; si ningún reporte coincide con los filtros (o la base está
+  vacía) muestra el mapa centrado en Cartagena y el aviso «No hay reportes con este filtro».
+- Al marcar el punto, el formulario consulta `GET /api/reportes/posibles-duplicados` y, si hay reportes
+  activos a menos de 100 m, muestra «¿Ya lo reportaron?» (primero los de la misma categoría, comparada sin
+  mayúsculas ni tildes) con la opción «Es el mismo: confirmar», que confirma el existente y abre su detalle.
+- El detalle muestra la tarjeta «¿Ya lo arreglaron?» con los votos de la comunidad; con sesión se responde
+  «Ya está arreglado» o «Sigue igual»; la tarjeta se oculta en reportes `RESUELTO` o `RECHAZADO`. Los conteos
+  grandes son personas; con el cierre por la comunidad activo y el reporte en proceso, debajo se explican los votos
+  tal como los cuenta la regla (`progresoCierre`: solo desde `EN_PROCESO`, el del autor doble) y lo que exige.
+- El backend resuelve la dirección de forma asíncrona, así que un reporte recién creado puede
+  llegar con `direccionOsm` en `null`; mientras tanto se muestran las coordenadas.
+- Al cambiar la contraseña el backend devuelve un token nuevo y `renovarSesion` lo guarda, así que la sesión actual sigue abierta y las demás se cierran.
+- Los comentarios muestran el nombre real del autor (`usuarioNombre`, que entrega el backend).
+- La lista (`/reportes`) pide páginas de 12 a `GET /api/reportes`: el servidor aplica el estado, la categoría, el
+  barrio y la búsqueda (sin tildes ni mayúsculas). Los filtros y la página van en la URL (`?pagina=` empieza en 1);
+  cambiar un filtro vuelve a la primera página y la búsqueda consulta 300 ms después de la última tecla
+  (`utils/useValorDiferido.ts`). Las opciones de los selectores salen de `GET /api/reportes/filtros`.
+- El mapa usa `GET /api/reportes/mapa` (puntos livianos, hasta 5000) y filtra en el cliente; la pestaña Reportes del
+  panel también pagina en el servidor (10 por página) y el Resumen sale de `GET /admin/estadisticas`.
+- Las notificaciones las genera el backend cuando un moderador cambia el estado de un reporte.
+- La campana de la cabecera (`components/CampanaNotificaciones.tsx`, en la portada y en `PortalShell`) muestra
+  las no leídas (tope «9+») con `GET /notificaciones/sin-leer`: consulta al montarse, al cambiar de página, al
+  volver a la pestaña, al marcar notificaciones como leídas (evento de `components/notificacionesEventos.ts`) y
+  cada `VITE_NOTIFICACIONES_INTERVALO_MS` solo con la pestaña visible; si el backend falla, la espera se duplica
+  hasta 5 minutos. En pantallas de 980 px o menos sigue visible junto al botón del menú (el menú desplegable no
+  muestra el número de no leídas).
+- Las confirmaciones (eliminar, rechazar, cambiar rol, desactivar, cerrar sesiones) y la edición de comentarios
+  usan `components/Dialogo.tsx` con el hook `useDialogo`, sobre un `<dialog>` nativo: no `window.confirm` ni
+  `window.prompt`, que congelan la página. Esc o un clic fuera cancelan y el foco empieza en «Cancelar».
+- Las fotos de la portada (Centro Histórico, de Leandro Loureiro en Unsplash) y del login y el registro se sirven
+  desde `public/img/` en WebP. Antes se cargaban desde `images.unsplash.com`: dependían de esa URL y le enviaban la
+  IP de cada visitante.
+- Con sesión iniciada, la cabecera muestra «Mis reportes» (en la portada, junto a «Cómo funciona»), y el menú
+  lateral de la cuenta reúne Mi perfil, Mis reportes y Notificaciones.
+  Al guardar el perfil se actualiza también el nombre mostrado en la barra superior.
+- Cada pantalla se carga bajo demanda (`lazy` del router) y Leaflet solo se descarga al abrir un
+  mapa (`components/MapasDiferidos.tsx`), así que la carga inicial de la portada pesa ~370 kB sin
+  comprimir y ~120 kB con gzip. Antes Leaflet y su CSS se precargaban en todas las páginas por la regla
+  de `manualChunks`.
+
+## Panel de administración
+
+Vive en `src/pages/admin/`. La pestaña activa va en la URL (`/admin?seccion=reportes&estado=PENDIENTE`),
+así que se puede enlazar directamente.
+
+| Pestaña | Rol | Qué permite |
+|---------|-----|-------------|
+| Resumen | Moderador y admin | Totales, pendientes, activos con prioridad alta, % atendido, antigüedad del pendiente más viejo y distribución por estado y prioridad. Los indicadores enlazan a Reportes filtrado |
+| Reportes | Moderador y admin | Todos los reportes con filtro por estado, búsqueda y paginación; mover al siguiente estado (`PENDIENTE → EN_REVISION → EN_PROCESO → RESUELTO`, o `RECHAZADO`) fijando prioridad y comentario; ver el historial; etiqueta «Comunidad: ya arreglado / sigue igual» según los votos |
+| Estadísticas | Moderador y admin | Días promedio hasta la primera respuesta y hasta resolver, % resuelto, columnas de creados y resueltos por mes (con tooltip y vista de tabla), categorías con más reportes y mapa de densidad de daños activos |
+| Dashboard | Moderador y admin | Dashboard de Metabase en un iframe con la URL firmada de `GET /admin/dashboard`; pide otra antes de que venza y con «Actualizar»; si la API responde error (por ejemplo 503 sin configurar) muestra su mensaje. «Abrir en Metabase» solo para admin. «Descargar estadísticas (.csv)» baja las cifras de `GET /admin/estadisticas` en formato largo (`seccion,elemento,medida,valor`, UTF-8 con BOM), aunque Metabase no esté configurado. Guía: `../docs/metabase.md` |
+| Usuarios | Admin | Buscar y filtrar por rol, cambiar el rol y activar/desactivar cuentas (no sobre uno mismo) |
+| Barrios | Admin | Crear, editar y eliminar barrios; agregar y quitar calles |
+| Categorías | Admin | Crear, editar, activar y desactivar (no se eliminan) |
+| Auditoría | Admin | Consultar acciones administrativas por entidad, acción y rango de fechas; incluye usuarios, reportes, barrios, categorías y tareas de seguimiento |
+
+Las transiciones permitidas están en `src/pages/admin/estados.ts` y deben coincidir con
+`ReporteService.validarTransicion` del backend. Las acciones destructivas piden confirmación con el diálogo
+propio, y el resultado de cada acción sobre un reporte aparece dentro de su tarjeta (arriba solo cuando el reporte
+sale del filtro y desaparece). «Ejecutar tarea diaria» (recordatorios y cierres por la comunidad, solo admin) está en
+la pestaña Reportes.
+
+## Rendimiento
+
+- Los mapas (Leaflet y su CSS) se cargan con `import()` dinámico desde `src/components/MapasDiferidos.tsx`:
+  la portada, el listado y el login no los descargan. No importes `MapaReportes`, `MapaSeleccionPunto` ni
+  `MapaDensidad` directamente desde una pantalla; usa los de `MapasDiferidos`.
+- La portada usa `GET /reportes/resumen` y `GET /reportes?tamano=3` en lugar de descargar todos los reportes; la
+  lista y el panel piden páginas y el mapa, puntos sin historial ni autor.
+- `src/utils/imagenes.ts` reduce las fotos a 1600 px y las vuelve a codificar en JPEG antes de subirlas, lo
+  que además elimina sus metadatos EXIF (ubicación GPS, modelo del teléfono).
+- nginx comprime con gzip y cachea un año los assets con hash.
+
+## Pendiente
+
+- Mapa por zona visible (bbox) en lugar de hasta 5000 puntos; paginación de comentarios y notificaciones.
+- Pruebas de extremo a extremo (hoy hay pruebas unitarias con Vitest y de componentes con Testing Library, como
+  `DashboardAdmin.test.tsx`, que corren en jsdom con `// @vitest-environment jsdom`).
+- El token JWT se guarda en `localStorage`, expuesto a XSS; agregar una Content-Security-Policy en nginx y
+  considerar cookies `HttpOnly`.
+- En móvil, la tarjeta para confirmar un reporte queda al final, debajo de los comentarios.
 
 ## Roles
 
@@ -107,9 +243,24 @@ complete, la aplicación muestra la pantalla inicial de Vite.
 
 ```text
 src/
-├── api/         # Cliente Axios, tipos y módulos REST
-├── components/  # Mapas y corrección de iconos Leaflet
-├── context/     # Sesión y autenticación
-├── pages/       # Pantallas de la aplicación
-└── routes/      # Protección por sesión y rol
+├── api/            # Cliente Axios, tipos, módulos REST y reporteVista.ts (normalización para la vista)
+├── app/
+│   ├── routes.tsx  # Rutas (carga diferida por nombre de export)
+│   ├── pages/      # Home.tsx (portada) y Screens.tsx (todas las demás pantallas y su PortalShell)
+│   └── components/ # UI.tsx: iconos y etiquetas que usa el panel de administración
+├── components/     # Mapas y corrección de iconos Leaflet
+├── context/        # Sesión: AuthContext (proveedor), useAuth (hook) y authContextValue
+├── pages/admin/    # Panel de administración (pestañas)
+├── routes/         # Protección por sesión y rol
+└── index.css       # Único archivo de estilos
+```
+
+`src/App.tsx` solo reexporta `src/app/App.tsx`, que monta el router.
+
+## Verificación
+
+```bash
+npm run lint
+npm test        # Vitest
+npm run build
 ```

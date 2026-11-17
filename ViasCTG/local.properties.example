@@ -1,0 +1,18 @@
+# Copia este archivo como "local.properties" (en esta misma carpeta, ViasCTG) para correr el backend con
+# ./mvnw spring-boot:run sin exportar variables. local.properties está en .gitignore: no se sube a git.
+# Cada línea reemplaza el valor de application.properties, también el que vendría de una variable como JWT_SECRET o
+# SQL_PASSWORD: si prefieres usar la variable, borra la línea. En Docker este archivo no existe y mandan las variables.
+
+# Secreto para firmar los JWT (Base64 de 32 bytes o más). Genera uno con: openssl rand -base64 32
+app.jwt.secret=pega-aqui-un-secreto-generado
+
+# Administrador local: se crea (o promueve) al arrancar. Úsalo para entrar al panel.
+app.admin.email=admin@viasctg.local
+app.admin.password=cambia-esta-contrasena
+
+# Réplica secundaria en PostgreSQL (la principal es MongoDB). Crea la base y el usuario con:
+#   powershell -ExecutionPolicy Bypass -File sql\crear-base-local.ps1
+app.sql.habilitada=true
+app.sql.url=jdbc:postgresql://localhost:5432/viasctg_sql
+app.sql.usuario=viasctg
+app.sql.password=cambia-esta-contrasena

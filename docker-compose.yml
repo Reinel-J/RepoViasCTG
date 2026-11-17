@@ -2,10 +2,37 @@ services:
   mongo:
     image: mongo:7
     restart: unless-stopped
+    # Solo accesible desde esta máquina: MongoDB corre sin usuario ni contraseña y Docker publica los puertos
+    # saltándose firewalls como UFW. El backend lo alcanza por la red interna de Compose (mongo:27017).
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # Base secundaria: réplica relacional de MongoDB (ver ViasCTG/README.md, «Base secundaria en PostgreSQL»).
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: viasctg_sql
+      POSTGRES_USER: viasctg
+      POSTGRES_PASSWORD: "${SQL_PASSWORD:?Define SQL_PASSWORD en el archivo .env (openssl rand -base64 18)}"
+    # Solo desde este PC, en el 5433 para no chocar con un PostgreSQL instalado en Windows (que usa el 5432).
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "viasctg", "-d", "viasctg_sql"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   backend:
     build:
@@ -13,22 +40,117 @@ services:
     restart: unless-stopped
     environment:
       MONGODB_URI: mongodb://mongo:27017/viasctg_db
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: "${JWT_SECRET:?Define JWT_SECRET en el archivo .env (openssl rand -base64 32)}"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      UPLOADS_DIR: /app/uploads
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      NOMINATIM_USER_AGENT: "${NOMINATIM_USER_AGENT:-ViaCTG/1.0 (+https://github.com/Reinel-J/RepoViasCTG)}"
+      ZONA_HABILITADA: ${ZONA_HABILITADA:-true}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      # El backend siempre recibe las peticiones a través del nginx del frontend (y, con la demo, del túnel), ambos
+      # en la red interna de Docker (172.16.0.0/12). Solo de esas IP se aceptan X-Forwarded-For (IP real del visitante,
+      # para los límites de intentos) y X-Forwarded-Proto (https, para que Spring no confunda el sitio con otro origen).
+      # Comillas simples para que YAML conserve las barras; la expresión no usa llaves porque Compose las tomaría
+      # como el cierre de ${...}.
+      TRUSTED_PROXIES: '${TRUSTED_PROXIES:-172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+}'
+      CIERRE_COMUNITARIO: ${CIERRE_COMUNITARIO:-false}
+      # Dashboard de Metabase en el panel (docs/metabase.md). La clave de embebido nunca sale del backend.
+      METABASE_SITE_URL: ${METABASE_SITE_URL:-http://localhost:3000}
+      METABASE_SECRET_KEY: ${METABASE_SECRET_KEY:-}
+      METABASE_DASHBOARD_ID: ${METABASE_DASHBOARD_ID:-}
+      METABASE_TOKEN_MINUTOS: ${METABASE_TOKEN_MINUTOS:-10}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      SEED_DEMO_REPORTES: ${SEED_DEMO_REPORTES:-200}
+      # Réplica en PostgreSQL. Si la base no responde, la API sigue funcionando y la réplica se reintenta sola.
+      SQL_REPLICA_HABILITADA: ${SQL_REPLICA_HABILITADA:-true}
+      SQL_URL: jdbc:postgresql://postgres:5432/viasctg_sql
+      SQL_USUARIO: viasctg
+      SQL_PASSWORD: "${SQL_PASSWORD:?Define SQL_PASSWORD en el archivo .env (openssl rand -base64 18)}"
+    # Solo desde este PC (Swagger, Postman, npm run dev): el sitio llega al backend por el nginx del frontend. Así nadie
+    # de la red local puede hablarle directo y hacerse pasar por un proxy de confianza con un X-Forwarded-For falso.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
 
   frontend:
     build:
       context: ./FrontEnd
       args:
-        VITE_API_URL: http://localhost:8080/api
+        # Relativa: el nginx del frontend reenvía /api al backend (ver FrontEnd/nginx.conf).
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_NOTIFICACIONES_INTERVALO_MS: ${VITE_NOTIFICACIONES_INTERVALO_MS:-60000}
     restart: unless-stopped
     ports:
       - "5173:80"
     depends_on:
       - backend
 
+  # Metabase (edición open source) para el dashboard del panel de administración; lee la misma base viasctg_db.
+  # Se configura desde su interfaz siguiendo docs/metabase.md.
+  metabase:
+    image: metabase/metabase:v0.64.4.3
+    restart: unless-stopped
+    environment:
+      # Base interna de Metabase (usuarios, preguntas, dashboards) en un archivo H2 dentro del volumen metabase_data.
+      # En producción se recomienda PostgreSQL (MB_DB_TYPE=postgres y MB_DB_HOST, MB_DB_DBNAME, MB_DB_USER, MB_DB_PASS).
+      MB_DB_TYPE: h2
+      MB_DB_FILE: /metabase-data/metabase.db
+      MB_SITE_URL: ${METABASE_SITE_URL:-http://localhost:3000}
+      # Embebido estático firmado (en esta versión, «guest embeds»): el backend firma la URL del dashboard.
+      MB_ENABLE_EMBEDDING_STATIC: "true"
+      MB_REPORT_TIMEZONE: America/Bogota
+      MB_ANON_TRACKING_ENABLED: "false"
+    # El iframe del panel lo carga el navegador, así que Metabase debe ser alcanzable en este puerto.
+    ports:
+      - "3000:3000"
+    volumes:
+      - metabase_data:/metabase-data
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "-s", "-o", "/dev/null", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      # El primer arranque crea la base interna y tarda un par de minutos.
+      start_period: 120s
+
+  # Túnel rápido de Cloudflare para mostrar la demo desde internet sin abrir puertos ni contratar un servidor.
+  # Solo arranca con el perfil: docker compose --profile tunel up -d. La dirección pública (https://….trycloudflare.com)
+  # aparece en: docker compose logs tunel. Cambia cada vez que el túnel se reinicia y deja de funcionar al apagar el PC.
+  tunel:
+    image: cloudflare/cloudflared:2026.10.5
+    profiles: ["tunel"]
+    # Apunta al nginx del frontend, que reenvía /api y /uploads al backend: una sola dirección para todo el sitio.
+    command: tunnel --no-autoupdate --url http://frontend:80
+    restart: unless-stopped
+    depends_on:
+      - frontend
+
 volumes:
   mongo_data:
+  postgres_data:
+  uploads_data:
+  metabase_data:

@@ -1,71 +1,281 @@
 package com.viactg.service;
 
+import com.viactg.dto.CategoriaReporteResponse;
+import com.viactg.dto.OpcionesFiltroResponse;
+import com.viactg.dto.CambioEstadoLoteRequest;
+import com.viactg.dto.CambioEstadoLoteResponse;
 import com.viactg.dto.ReporteActualizarRequest;
 import com.viactg.dto.ReporteCrearRequest;
 import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.ForbiddenOperationException;
 import com.viactg.exception.ResourceNotFoundException;
-import com.viactg.model.Categoria;
+import com.viactg.model.CategoriaReporte;
+import com.viactg.model.Confirmacion;
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.HistorialEstado;
+import com.viactg.model.PrioridadReporte;
 import com.viactg.model.Reporte;
-import com.viactg.repository.BarrioRepository;
-import com.viactg.repository.CategoriaRepository;
+import com.viactg.repository.ConfirmacionRepository;
 import com.viactg.repository.ReporteRepository;
 import com.viactg.repository.UsuarioRepository;
+import com.viactg.security.LimitadorIntentos;
+import org.bson.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.text.Collator;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.LinkedHashSet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+/**
+ * Reportes: creación, edición, fotos y cambios de estado. Toda modificación de un reporte existente es una
+ * actualización parcial atómica ({@code findAndModify}/{@code updateFirst}); nunca se reescribe el documento
+ * completo con {@code save()}, porque eso podría deshacer un cambio de estado (y su historial) hecho al mismo
+ * tiempo por un moderador, o la dirección que guarda la geocodificación en segundo plano.
+ */
 @Service
 public class ReporteService {
+    private static final Logger log = LoggerFactory.getLogger(ReporteService.class);
+    private static final int MAX_FOTOS = 3;
+    private static final long MAX_TAMANO_FOTO_BYTES = 5L * 1024 * 1024;
+    static final double MAX_RADIO_KM = 50;
+    static final int MAX_RESULTADOS_CERCANOS = 500;
+    // Protección contra spam: un ciudadano puede reportar varios daños de un recorrido, pero no cientos.
+    static final int MAX_REPORTES_POR_HORA = 10;
+    private static final Sort MAS_RECIENTES = Sort.by(Sort.Direction.DESC, "fechaCreacion");
+    private static final Sort MAS_RECIENTES_ESTABLE = Sort.by(Sort.Direction.DESC, "fechaCreacion", "_id");
+    private static final List<String> CAMPOS_BUSQUEDA = List.of("categoria.nombre", "descripcion", "direccionOsm", "barrioOsm");
+    static final int MAX_REPORTES_MAPA = 5000;
+
+    /**
+     * Filtros del listado público; cualquiera puede ser null (o vacío, en los de texto) para no filtrar por él.
+     * {@code categoria} es el id de la categoría en el catálogo.
+     */
+    public record FiltroReportes(EstadoReporte estado, String categoria, String barrio, String texto) {
+    }
+
+    /** Los reportes de una página y cuántos cumplen el filtro en total. */
+    public record Pagina(List<Reporte> contenido, long total) {
+    }
+
     private final ReporteRepository reporteRepository;
     private final UsuarioRepository usuarioRepository;
-    private final BarrioRepository barrioRepository;
-    private final CategoriaRepository categoriaRepository;
     private final UsuarioService usuarioService;
     private final MongoTemplate mongoTemplate;
+    private final GeocodingService geocodingService;
+    private final NotificacionService notificacionService;
+    private final CategoriaService categoriaService;
+    private final ConfirmacionRepository confirmacionRepository;
+    private final LimitadorIntentos limitador;
+    private final AreaServicio areaServicio;
+    private final AuditoriaService auditoriaService;
+    private final Path uploadsDirectory;
+    private final ApplicationEventPublisher eventos;
+    // Un solo hilo: Nominatim limita a 1 petición/s y así no se bloquea la petición HTTP del usuario.
+    private final ExecutorService geocodingExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread hilo = new Thread(runnable, "geocoding-direccion");
+        hilo.setDaemon(true);
+        return hilo;
+    });
 
     public ReporteService(ReporteRepository reporteRepository, UsuarioRepository usuarioRepository,
-                          BarrioRepository barrioRepository, CategoriaRepository categoriaRepository,
-                          UsuarioService usuarioService, MongoTemplate mongoTemplate) {
+                          UsuarioService usuarioService, MongoTemplate mongoTemplate, GeocodingService geocodingService,
+                          NotificacionService notificacionService, CategoriaService categoriaService,
+                          ConfirmacionRepository confirmacionRepository, LimitadorIntentos limitador,
+                          AreaServicio areaServicio, @Value("${app.uploads.dir:uploads}") String uploadsDirectory, AuditoriaService auditoriaService,
+                          ApplicationEventPublisher eventos) {
         this.reporteRepository = reporteRepository;
         this.usuarioRepository = usuarioRepository;
-        this.barrioRepository = barrioRepository;
-        this.categoriaRepository = categoriaRepository;
         this.usuarioService = usuarioService;
         this.mongoTemplate = mongoTemplate;
+        this.geocodingService = geocodingService;
+        this.notificacionService = notificacionService;
+        this.categoriaService = categoriaService;
+        this.confirmacionRepository = confirmacionRepository;
+        this.limitador = limitador;
+        this.areaServicio = areaServicio;
+        this.uploadsDirectory = Path.of(uploadsDirectory);
+        this.auditoriaService = auditoriaService;
+        this.eventos = eventos;
     }
 
     public Reporte crear(ReporteCrearRequest request, String usuarioId) {
-        validarReferencias(usuarioId, request.calleId(), request.categoriaId());
+        validarReferencias(usuarioId);
+        areaServicio.validar(request.latitud(), request.longitud());
+        // Antes del límite de intentos: una categoría inválida no debe gastar uno de los reportes por hora.
+        CategoriaReporte categoria = categoriaService.paraReporte(request.categoriaId());
+        limitador.consumir("reportes-usuario:" + usuarioId, MAX_REPORTES_POR_HORA, Duration.ofHours(1));
         Instant ahora = Instant.now();
-        return reporteRepository.save(Reporte.builder().usuarioId(usuarioId).calleId(request.calleId())
-                .categoriaId(request.categoriaId()).descripcion(request.descripcion().trim()).fotoUrl(request.fotoUrl())
+        Reporte guardado = reporteRepository.save(Reporte.builder().usuarioId(usuarioId)
+                .categoria(categoria)
+                .descripcion(request.descripcion().trim())
                 .latitud(request.latitud()).longitud(request.longitud())
-                .ubicacion(new GeoJsonPoint(request.longitud(), request.latitud())).prioridad(request.prioridad())
+                .ubicacion(new GeoJsonPoint(request.longitud(), request.latitud())).prioridad(PrioridadReporte.MEDIA)
                 .estado(EstadoReporte.PENDIENTE).fechaCreacion(ahora).fechaActualizacion(ahora).build());
+        eventos.publishEvent(CambioReplicable.reporte(guardado.getId()));
+        resolverDireccionAsync(guardado.getId(), guardado.getLatitud(), guardado.getLongitud());
+        return guardado;
     }
 
-    public List<Reporte> listar(EstadoReporte estado) { return estado == null ? reporteRepository.findAll() : reporteRepository.findByEstado(estado); }
+    private void resolverDireccionAsync(String reporteId, double latitud, double longitud) {
+        geocodingExecutor.execute(() -> {
+            try {
+                GeocodingService.DireccionOsm direccion = geocodingService.resolverEnSegundoPlano(latitud, longitud);
+                if (direccion == null || direccion.vacia()) return;
+                // Solo si el reporte sigue en esas coordenadas: si lo movieron, la nueva ubicación pide su propia dirección.
+                Query query = Query.query(Criteria.where("_id").is(reporteId).and("latitud").is(latitud).and("longitud").is(longitud));
+                long cambiados = mongoTemplate.updateFirst(query, new Update().set("direccionOsm", direccion.direccion())
+                        .set("barrioOsm", direccion.barrio()), Reporte.class).getModifiedCount();
+                if (cambiados > 0) eventos.publishEvent(CambioReplicable.reporte(reporteId));
+            } catch (RuntimeException exception) {
+                log.warn("No fue posible resolver la dirección del reporte {}", reporteId, exception);
+            }
+        });
+    }
+
+    /**
+     * Una página del listado público, del más reciente al más antiguo. Los filtros de categoría y barrio comparan el
+     * valor completo y la búsqueda de texto busca en categoría, descripción, dirección y barrio; ninguno distingue
+     * mayúsculas ni tildes. El {@code _id} desempata reportes creados en el mismo instante, para que ninguno se
+     * repita ni se salte entre una página y la siguiente.
+     */
+    public Pagina listar(FiltroReportes filtro, int pagina, int tamano) {
+        Query query = consultaFiltrada(filtro);
+        long total = mongoTemplate.count(query, Reporte.class);
+        long desde = (long) pagina * tamano;
+        if (desde >= total) return new Pagina(List.of(), total);
+        query.with(MAS_RECIENTES_ESTABLE).skip(desde).limit(tamano);
+        return new Pagina(mongoTemplate.find(query, Reporte.class), total);
+    }
+
+    private static Query consultaFiltrada(FiltroReportes filtro) {
+        Query query = new Query();
+        if (filtro.estado() != null) query.addCriteria(Criteria.where("estado").is(filtro.estado()));
+        if (tieneTexto(filtro.categoria())) {
+            query.addCriteria(Criteria.where("categoria.id").is(filtro.categoria().trim()));
+        }
+        if (tieneTexto(filtro.barrio())) {
+            query.addCriteria(Criteria.where("barrioOsm").regex(PatronTexto.igual(filtro.barrio()), "i"));
+        }
+        if (tieneTexto(filtro.texto())) {
+            String patron = PatronTexto.contiene(filtro.texto());
+            query.addCriteria(new Criteria().orOperator(CAMPOS_BUSQUEDA.stream()
+                    .map(campo -> Criteria.where(campo).regex(patron, "i")).toList()));
+        }
+        return query;
+    }
+
+    private static boolean tieneTexto(String texto) {
+        return texto != null && !texto.isBlank();
+    }
+
+    /**
+     * Reportes para el mapa público, del más reciente al más antiguo, con solo los campos que dibuja el mapa y su
+     * primera foto. Como mucho {@link #MAX_REPORTES_MAPA}.
+     */
+    public List<Reporte> listarParaMapa(EstadoReporte estado) {
+        Query query = new Query().with(MAS_RECIENTES_ESTABLE).limit(MAX_REPORTES_MAPA);
+        if (estado != null) query.addCriteria(Criteria.where("estado").is(estado));
+        query.fields().include("latitud", "longitud", "estado", "categoria", "descripcion", "direccionOsm", "barrioOsm")
+                .slice("fotos", 1);
+        return mongoTemplate.find(query, Reporte.class);
+    }
+
+    /** Opciones de los filtros de categoría y barrio: las que tiene algún reporte, sin repetir variantes de escritura. */
+    public OpcionesFiltroResponse opcionesFiltro() {
+        return new OpcionesFiltroResponse(categoriasConReportes(), valoresDistintos("barrioOsm"));
+    }
+
+    // Una entrada por id de categoría (con su nombre actual), en orden alfabético.
+    private List<CategoriaReporteResponse> categoriasConReportes() {
+        Aggregation agregacion = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("categoria.id").ne(null)),
+                Aggregation.group("categoria.id").first("categoria.nombre").as("nombre"));
+        Collator orden = Collator.getInstance(Locale.forLanguageTag("es"));
+        return mongoTemplate.aggregate(agregacion, Reporte.class, Document.class).getMappedResults().stream()
+                .map(grupo -> new CategoriaReporteResponse(grupo.getString("_id"), grupo.getString("nombre")))
+                .filter(categoria -> tieneTexto(categoria.nombre()))
+                .sorted((a, b) -> orden.compare(a.nombre(), b.nombre()))
+                .toList();
+    }
+
+    private List<String> valoresDistintos(String campo) {
+        Map<String, String> unicos = new HashMap<>();
+        for (String valor : mongoTemplate.findDistinct(new Query(), campo, Reporte.class, String.class)) {
+            if (!tieneTexto(valor)) continue;
+            String limpio = valor.trim();
+            unicos.putIfAbsent(CategoriaService.claveComparacion(limpio), limpio);
+        }
+        Collator orden = Collator.getInstance(Locale.forLanguageTag("es"));
+        return unicos.values().stream().sorted(orden).toList();
+    }
+
+    /** Todos los reportes (de un estado, si se indica), del más reciente al más antiguo. */
+    public List<Reporte> listar(EstadoReporte estado) {
+        Query query = new Query().with(MAS_RECIENTES);
+        if (estado != null) query.addCriteria(Criteria.where("estado").is(estado));
+        return mongoTemplate.find(query, Reporte.class);
+    }
+
+    /** Reportes creados por el usuario, del más reciente al más antiguo; {@code estado} null devuelve todos. */
+    public List<Reporte> listarDeUsuario(String usuarioId, EstadoReporte estado) {
+        Query query = Query.query(Criteria.where("usuarioId").is(usuarioId)).with(MAS_RECIENTES);
+        if (estado != null) query.addCriteria(Criteria.where("estado").is(estado));
+        return mongoTemplate.find(query, Reporte.class);
+    }
+
+    /** Cifras de la portada con conteos en la base de datos. */
+    public Resumen calcularResumen(Instant ahora) {
+        Map<EstadoReporte, Long> porEstado = new EnumMap<>(EstadoReporte.class);
+        for (EstadoReporte estado : EstadoReporte.values()) {
+            porEstado.put(estado, reporteRepository.countByEstado(estado));
+        }
+        long total = porEstado.values().stream().mapToLong(Long::longValue).sum();
+        long ultimas24Horas = reporteRepository.countByFechaCreacionGreaterThanEqual(ahora.minus(Duration.ofDays(1)));
+        long barrios = mongoTemplate.findDistinct(new Query(Criteria.where("barrioOsm").ne(null)), "barrioOsm",
+                Reporte.class, String.class).size();
+        return new Resumen(total, porEstado, ultimas24Horas, barrios);
+    }
 
     public List<Reporte> listarCercanos(double latitud, double longitud, double radioKm, EstadoReporte estado) {
         if (radioKm <= 0) {
             throw new BusinessRuleException("El radio de búsqueda debe ser mayor a cero");
+        }
+        if (radioKm > MAX_RADIO_KM) {
+            throw new BusinessRuleException("El radio de búsqueda no puede superar " + (int) MAX_RADIO_KM + " km");
         }
         GeoJsonPoint punto = new GeoJsonPoint(longitud, latitud);
         Criteria criteria = Criteria.where("ubicacion").nearSphere(punto).maxDistance(radioKm * 1000);
         if (estado != null) {
             criteria.and("estado").is(estado);
         }
-        return mongoTemplate.find(Query.query(criteria), Reporte.class);
+        return mongoTemplate.find(Query.query(criteria).limit(MAX_RESULTADOS_CERCANOS), Reporte.class);
     }
 
     public Reporte buscarPorId(String id) {
@@ -78,40 +288,270 @@ public class ReporteService {
         if (reporte.getEstado() != EstadoReporte.PENDIENTE) {
             throw new BusinessRuleException("Solo se pueden editar reportes pendientes");
         }
-        reporte.setDescripcion(request.descripcion().trim());
-        reporte.setFotoUrl(request.fotoUrl());
-        reporte.setLatitud(request.latitud());
-        reporte.setLongitud(request.longitud());
-        reporte.setUbicacion(new GeoJsonPoint(request.longitud(), request.latitud()));
-        reporte.setPrioridad(request.prioridad());
-        reporte.setFechaActualizacion(Instant.now());
-        return reporteRepository.save(reporte);
+        areaServicio.validar(request.latitud(), request.longitud());
+        // Se comparan valores, no referencias: latitud y longitud son Double.
+        boolean cambioUbicacion = !Objects.equals(reporte.getLatitud(), request.latitud())
+                || !Objects.equals(reporte.getLongitud(), request.longitud());
+        Update update = new Update().set("descripcion", request.descripcion().trim()).set("fechaActualizacion", Instant.now());
+        if (cambioUbicacion) {
+            update.set("latitud", request.latitud()).set("longitud", request.longitud())
+                    .set("ubicacion", new GeoJsonPoint(request.longitud(), request.latitud()))
+                    .unset("direccionOsm").unset("barrioOsm");
+        }
+        // El filtro por estado evita pisar un cambio de estado que un moderador haga entre la lectura y la escritura.
+        Reporte actualizado = mongoTemplate.findAndModify(
+                Query.query(Criteria.where("_id").is(reporteId).and("estado").is(EstadoReporte.PENDIENTE)),
+                update, FindAndModifyOptions.options().returnNew(true), Reporte.class);
+        if (actualizado == null) {
+            throw new BusinessRuleException("Solo se pueden editar reportes pendientes");
+        }
+        eventos.publishEvent(CambioReplicable.reporte(reporteId));
+        if (cambioUbicacion) {
+            resolverDireccionAsync(actualizado.getId(), request.latitud(), request.longitud());
+        }
+        return actualizado;
     }
 
-    public Reporte cambiarEstadoReporte(String reporteId, EstadoReporte nuevoEstado, String adminId, String comentario) {
+    public Reporte subirFotos(String reporteId, List<MultipartFile> archivos, String usuarioId) {
+        Reporte reporte = buscarPorId(reporteId);
+        if (!reporte.getUsuarioId().equals(usuarioId)) {
+            throw new ForbiddenOperationException("Solo el propietario puede subir fotos al reporte");
+        }
+        if (archivos == null || archivos.isEmpty()) {
+            throw new BusinessRuleException("Debes enviar al menos una foto");
+        }
+        int fotosActuales = reporte.getFotos() == null ? 0 : reporte.getFotos().size();
+        if (fotosActuales + archivos.size() > MAX_FOTOS) {
+            throw new BusinessRuleException("Un reporte puede tener como máximo 3 fotos");
+        }
+
+        List<ArchivoValidado> archivosValidados = archivos.stream().map(this::validarFoto).toList();
+        List<Path> escritos = new ArrayList<>();
+        List<String> nuevasFotos = new ArrayList<>();
+        try {
+            Files.createDirectories(uploadsDirectory);
+            for (ArchivoValidado archivo : archivosValidados) {
+                String nombre = UUID.randomUUID() + archivo.extension();
+                Path destino = uploadsDirectory.resolve(nombre);
+                Files.write(destino, archivo.contenido());
+                escritos.add(destino);
+                nuevasFotos.add("/uploads/" + nombre);
+            }
+        } catch (IOException exception) {
+            borrarArchivos(escritos);
+            log.error("No fue posible guardar las fotos del reporte {} en {}", reporteId, uploadsDirectory.toAbsolutePath(), exception);
+            throw new BusinessRuleException("No fue posible guardar las fotos");
+        }
+
+        // Atómico: solo se agregan si el arreglo todavía tiene cupo (el índice MAX - n no existe), así dos subidas
+        // simultáneas no superan el máximo ni se pisan entre sí.
+        Query query = Query.query(Criteria.where("_id").is(reporteId).and("usuarioId").is(usuarioId)
+                .and("fotos." + (MAX_FOTOS - nuevasFotos.size())).exists(false));
+        Update update = new Update().push("fotos").each(nuevasFotos.toArray()).set("fechaActualizacion", Instant.now());
+        Reporte actualizado;
+        try {
+            actualizado = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), Reporte.class);
+        } catch (RuntimeException exception) {
+            borrarArchivos(escritos);
+            throw exception;
+        }
+        if (actualizado == null) {
+            borrarArchivos(escritos);
+            throw new BusinessRuleException("Un reporte puede tener como máximo 3 fotos");
+        }
+        eventos.publishEvent(CambioReplicable.reporte(reporteId));
+        return actualizado;
+    }
+
+    private void borrarArchivos(List<Path> archivos) {
+        for (Path archivo : archivos) {
+            try {
+                Files.deleteIfExists(archivo);
+            } catch (IOException exception) {
+                log.warn("No fue posible borrar la foto huérfana {}", archivo, exception);
+            }
+        }
+    }
+
+    public Reporte cambiarEstadoReporte(String reporteId, EstadoReporte nuevoEstado, String adminId, String comentario, PrioridadReporte prioridad) {
         if (!usuarioService.esAdministradorOModerador(adminId)) {
             throw new ForbiddenOperationException("Solo un administrador o moderador puede cambiar el estado");
         }
         Reporte reporte = buscarPorId(reporteId);
         validarTransicion(reporte.getEstado(), nuevoEstado);
-        Instant ahora = Instant.now();
-        HistorialEstado historial = new HistorialEstado(UUID.randomUUID().toString(), adminId, reporte.getEstado(), nuevoEstado, comentario, ahora);
-        Query query = Query.query(Criteria.where("_id").is(reporteId).and("estado").is(reporte.getEstado()));
-        Update update = new Update().set("estado", nuevoEstado).set("fechaActualizacion", ahora).push("historialEstados", historial);
-        Reporte actualizado = mongoTemplate.findAndModify(query, update,
-                org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true), Reporte.class);
-        if (actualizado == null) throw new BusinessRuleException("El reporte cambió de estado; vuelve a intentarlo");
+        Reporte actualizado = aplicarCambioEstado(reporte, nuevoEstado, adminId, comentario, prioridad);
+        auditoriaService.registrar(adminId, "REPORTE_ESTADO_CAMBIADO", "REPORTE", reporteId,
+                reporte.getEstado() + " → " + nuevoEstado);
         return actualizado;
+    }
+
+    /**
+     * Cambia cada reporte de forma independiente. Un error no revierte los anteriores ni impide procesar los demás;
+     * el moderador recibe el motivo para decidir qué hacer con los que quedaron pendientes.
+     */
+    public CambioEstadoLoteResponse cambiarEstadoLote(CambioEstadoLoteRequest request, String adminId) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        for (String id : request.ids()) {
+            if (id != null && !id.isBlank()) ids.add(id.trim());
+        }
+        List<String> actualizados = new ArrayList<>();
+        List<CambioEstadoLoteResponse.Fallo> fallidos = new ArrayList<>();
+        for (String id : ids) {
+            try {
+                cambiarEstadoReporte(id, request.nuevoEstado(), adminId, request.comentario(), request.prioridad());
+                actualizados.add(id);
+            } catch (RuntimeException exception) {
+                String motivo = exception.getMessage();
+                fallidos.add(new CambioEstadoLoteResponse.Fallo(id,
+                        motivo == null || motivo.isBlank() ? "No fue posible actualizar el reporte" : motivo));
+            }
+        }
+        return new CambioEstadoLoteResponse(actualizados, fallidos);
+    }
+
+    /**
+     * Cierre automático por los votos «¿ya lo arreglaron?» (lo decide SeguimientoService). Solo desde EN_PROCESO; en el
+     * historial queda sin moderador ({@code usuarioAdminId} null) y con el comentario que explica los votos.
+     */
+    public Reporte cerrarPorLaComunidad(String reporteId, String comentario) {
+        Reporte reporte = buscarPorId(reporteId);
+        if (reporte.getEstado() != EstadoReporte.EN_PROCESO) {
+            throw new BusinessRuleException("Solo un reporte en proceso puede cerrarse por los votos de la comunidad");
+        }
+        Reporte actualizado = aplicarCambioEstado(reporte, EstadoReporte.RESUELTO, null, comentario, null);
+        auditoriaService.registrar(AuditoriaService.ACTOR_SISTEMA, "REPORTE_CERRADO_POR_COMUNIDAD", "REPORTE",
+                reporteId, "EN_PROCESO → RESUELTO");
+        return actualizado;
+    }
+
+    // Filtra por el estado leído: si otro cambio llegó antes, no se pisa y se responde 409.
+    private Reporte aplicarCambioEstado(Reporte reporte, EstadoReporte nuevoEstado, String adminId, String comentario, PrioridadReporte prioridad) {
+        Instant ahora = Instant.now();
+        String comentarioLimpio = comentario == null || comentario.isBlank() ? null : comentario.trim();
+        HistorialEstado historial = new HistorialEstado(UUID.randomUUID().toString(), adminId, reporte.getEstado(), nuevoEstado, comentarioLimpio, ahora);
+        Query query = Query.query(Criteria.where("_id").is(reporte.getId()).and("estado").is(reporte.getEstado()));
+        // Una propuesta de cierre por la comunidad solo tiene sentido mientras el reporte sigue en proceso.
+        Update update = new Update().set("estado", nuevoEstado).set("fechaActualizacion", ahora).push("historialEstados", historial)
+                .unset("cierreComunitarioDesde");
+        if (prioridad != null) {
+            update.set("prioridad", prioridad);
+        }
+        Reporte actualizado = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), Reporte.class);
+        if (actualizado == null) throw new BusinessRuleException("El reporte cambió de estado; vuelve a intentarlo");
+        eventos.publishEvent(CambioReplicable.reporte(actualizado.getId()));
+        notificarCambioEstado(actualizado, nuevoEstado);
+        return actualizado;
+    }
+    // Notifica al autor cuando cambia el estado del reporte.
+    private void notificarCambioEstado(Reporte reporte, EstadoReporte nuevoEstado) {
+        try {
+            notificacionService.crear(reporte.getUsuarioId(), reporte.getId(),
+                    "Tu reporte \"" + resumen(reporte.getDescripcion()) + "\" cambió a " + etiqueta(nuevoEstado));
+        } catch (RuntimeException exception) {
+            log.warn("No fue posible crear la notificación del reporte {}", reporte.getId(), exception);
+        }
+        if (!nuevoEstado.esActivo()) {
+            notificarConfirmantes(reporte, nuevoEstado);
+        }
+    }
+
+    // Al cerrarse el caso también se avisa a quienes confirmaron el daño: también les importa el resultado.
+    private void notificarConfirmantes(Reporte reporte, EstadoReporte nuevoEstado) {
+        try {
+            String mensaje = "El daño que confirmaste (\"" + resumen(reporte.getDescripcion()) + "\") quedó "
+                    + etiqueta(nuevoEstado);
+            confirmacionRepository.findByReporteId(reporte.getId()).stream()
+                    .map(Confirmacion::getUsuarioId)
+                    .filter(usuarioId -> usuarioId != null && !usuarioId.equals(reporte.getUsuarioId()))
+                    .distinct()
+                    .forEach(usuarioId -> notificacionService.crear(usuarioId, reporte.getId(), mensaje));
+        } catch (RuntimeException exception) {
+            log.warn("No fue posible notificar a quienes confirmaron el reporte {}", reporte.getId(), exception);
+        }
+    }
+
+    private String etiqueta(EstadoReporte estado) {
+        return switch (estado) {
+            case PENDIENTE -> "pendiente";
+            case EN_REVISION -> "en revisión";
+            case EN_PROCESO -> "en proceso";
+            case RESUELTO -> "resuelto";
+            case RECHAZADO -> "rechazado";
+        };
+    }
+
+    private String resumen(String descripcion) {
+        if (descripcion == null) return "";
+        return descripcion.length() <= 60 ? descripcion : descripcion.substring(0, 57) + "...";
     }
 
     public List<HistorialEstado> historial(String reporteId) { return buscarPorId(reporteId).getHistorialEstados(); }
 
-    private void validarReferencias(String usuarioId, String calleId, String categoriaId) {
+    private void validarReferencias(String usuarioId) {
         if (!usuarioRepository.existsById(usuarioId)) throw new ResourceNotFoundException("Usuario no encontrado: " + usuarioId);
-        if (barrioRepository.findByCallesId(calleId).isEmpty()) throw new ResourceNotFoundException("Calle no encontrada: " + calleId);
-        Categoria categoria = categoriaRepository.findById(categoriaId)
-                .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada: " + categoriaId));
-        if (!categoria.isActiva()) throw new BusinessRuleException("La categoría indicada está inactiva");
+    }
+
+    private ArchivoValidado validarFoto(MultipartFile archivo) {
+        if (archivo.isEmpty()) {
+            throw new BusinessRuleException("No se permiten archivos vacíos");
+        }
+        if (archivo.getSize() > MAX_TAMANO_FOTO_BYTES) {
+            throw new BusinessRuleException("Cada foto puede pesar como máximo 5 MB");
+        }
+        try {
+            byte[] contenido = archivo.getBytes();
+            TipoImagen tipo = detectarTipoImagen(contenido);
+            String extension = extensionOriginal(archivo.getOriginalFilename());
+            if (tipo == null || !tipo.aceptaExtension(extension)) {
+                throw new BusinessRuleException("Solo se permiten imágenes JPEG, PNG o WEBP válidas");
+            }
+            return new ArchivoValidado(contenido, extension);
+        } catch (IOException exception) {
+            throw new BusinessRuleException("No fue posible leer una de las fotos");
+        }
+    }
+
+    private TipoImagen detectarTipoImagen(byte[] contenido) {
+        if (contenido.length >= 3 && (contenido[0] & 0xFF) == 0xFF && (contenido[1] & 0xFF) == 0xD8 && (contenido[2] & 0xFF) == 0xFF) {
+            return TipoImagen.JPEG;
+        }
+        if (contenido.length >= 8 && (contenido[0] & 0xFF) == 0x89 && contenido[1] == 0x50 && contenido[2] == 0x4E
+                && contenido[3] == 0x47 && contenido[4] == 0x0D && contenido[5] == 0x0A && contenido[6] == 0x1A && contenido[7] == 0x0A) {
+            return TipoImagen.PNG;
+        }
+        if (contenido.length >= 12 && contenido[0] == 'R' && contenido[1] == 'I' && contenido[2] == 'F' && contenido[3] == 'F'
+                && contenido[8] == 'W' && contenido[9] == 'E' && contenido[10] == 'B' && contenido[11] == 'P') {
+            return TipoImagen.WEBP;
+        }
+        return null;
+    }
+
+    private String extensionOriginal(String nombreOriginal) {
+        if (nombreOriginal == null) {
+            throw new BusinessRuleException("La foto debe conservar una extensión válida");
+        }
+        int ultimoPunto = nombreOriginal.lastIndexOf('.');
+        if (ultimoPunto < 0 || ultimoPunto == nombreOriginal.length() - 1) {
+            throw new BusinessRuleException("La foto debe conservar una extensión válida");
+        }
+        return nombreOriginal.substring(ultimoPunto).toLowerCase(Locale.ROOT);
+    }
+
+    private record ArchivoValidado(byte[] contenido, String extension) {
+    }
+
+    private enum TipoImagen {
+        JPEG(List.of(".jpg", ".jpeg")), PNG(List.of(".png")), WEBP(List.of(".webp"));
+
+        private final List<String> extensiones;
+
+        TipoImagen(List<String> extensiones) {
+            this.extensiones = extensiones;
+        }
+
+        boolean aceptaExtension(String extension) {
+            return extensiones.contains(extension);
+        }
     }
 
     private void validarPropietarioOPrivilegiado(Reporte reporte, String usuarioId) {
@@ -121,12 +561,20 @@ public class ReporteService {
     }
 
     private void validarTransicion(EstadoReporte actual, EstadoReporte nuevo) {
-        boolean valida = switch (actual) {
+        if (!esTransicionValida(actual, nuevo)) throw new BusinessRuleException("Transición de estado no permitida: " + actual + " a " + nuevo);
+    }
+
+    /** Flujo de estados de un reporte; también lo usan los datos de demostración (config/DatosDemo). */
+    public static boolean esTransicionValida(EstadoReporte actual, EstadoReporte nuevo) {
+        return switch (actual) {
             case PENDIENTE -> nuevo == EstadoReporte.EN_REVISION || nuevo == EstadoReporte.RECHAZADO;
             case EN_REVISION -> nuevo == EstadoReporte.EN_PROCESO || nuevo == EstadoReporte.RECHAZADO;
             case EN_PROCESO -> nuevo == EstadoReporte.RESUELTO || nuevo == EstadoReporte.RECHAZADO;
             case RESUELTO, RECHAZADO -> false;
         };
-        if (!valida) throw new BusinessRuleException("Transición de estado no permitida: " + actual + " a " + nuevo);
+    }
+
+    /** Cifras públicas de la portada. */
+    public record Resumen(long total, Map<EstadoReporte, Long> porEstado, long creadosUltimas24Horas, long barrios) {
     }
 }

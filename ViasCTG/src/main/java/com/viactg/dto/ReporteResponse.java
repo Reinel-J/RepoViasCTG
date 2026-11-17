@@ -2,11 +2,12 @@ package com.viactg.dto;
 
 import com.viactg.model.EstadoReporte;
 import com.viactg.model.PrioridadReporte;
+
 import java.time.Instant;
 import java.util.List;
 
-public record ReporteResponse(String id, String usuarioId, String calleId, String categoriaId,
-                              String descripcion, String fotoUrl, Double latitud, Double longitud,
+public record ReporteResponse(String id, String usuarioId, String calleId, CategoriaReporteResponse categoria, String direccionOsm,
+                              String barrioOsm, String descripcion, List<String> fotos, Double latitud, Double longitud,
                               EstadoReporte estado, PrioridadReporte prioridad, Instant fechaCreacion,
                               Instant fechaActualizacion, List<HistorialEstadoResponse> historialEstados) {
 }

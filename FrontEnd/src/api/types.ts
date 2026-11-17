@@ -16,6 +16,7 @@ export interface UsuarioResponse {
   telefono: string | null
   rol: Rol
   activo: boolean
+  emailVerificado: boolean
   fechaRegistro: string
 }
 
@@ -37,22 +38,24 @@ export interface UsuarioRegistroRequest {
   telefono?: string
 }
 
+// Categoría tal como queda embebida en el reporte: el id del catálogo y su nombre (se actualiza si se renombra).
+export interface CategoriaReporte {
+  id: string
+  nombre: string
+}
+
 export interface ReporteCrearRequest {
-  calleId: string
+  // Id de una categoría activa del catálogo (GET /categorias).
   categoriaId: string
   descripcion: string
-  fotoUrl?: string
   latitud: number
   longitud: number
-  prioridad: PrioridadReporte
 }
 
 export interface ReporteActualizarRequest {
   descripcion: string
-  fotoUrl?: string
   latitud: number
   longitud: number
-  prioridad: PrioridadReporte
 }
 
 export interface ComentarioCrearRequest {
@@ -62,7 +65,11 @@ export interface ComentarioCrearRequest {
 export interface CambioEstadoRequest {
   nuevoEstado: EstadoReporte
   comentario?: string
+  prioridad?: PrioridadReporte
 }
+export interface CambioEstadoLoteRequest extends CambioEstadoRequest { ids: string[] }
+export interface CambioEstadoLoteResponse { actualizados: string[]; fallidos: { id: string; motivo: string }[] }
+export interface RegistroAuditoriaResponse { id: string; fecha: string; actorId: string; actorNombre: string; accion: string; entidad: string; entidadId: string; detalle: string }
 
 export interface HistorialEstadoResponse {
   id: string
@@ -76,10 +83,13 @@ export interface HistorialEstadoResponse {
 export interface ReporteResponse {
   id: string
   usuarioId: string
-  calleId: string
-  categoriaId: string
+  calleId: string | null
+  categoria: CategoriaReporte | null
+  direccionOsm: string | null
+  // Barrio según OpenStreetMap; null en reportes antiguos o si no se pudo resolver.
+  barrioOsm: string | null
   descripcion: string
-  fotoUrl: string | null
+  fotos: string[]
   latitud: number
   longitud: number
   estado: EstadoReporte
@@ -87,6 +97,102 @@ export interface ReporteResponse {
   fechaCreacion: string
   fechaActualizacion: string
   historialEstados: HistorialEstadoResponse[]
+}
+
+// Una página de GET /reportes. `pagina` empieza en 0; `totalElementos` cuenta todos los que cumplen el filtro.
+export interface PaginaResponse<T> {
+  contenido: T[]
+  pagina: number
+  tamano: number
+  totalElementos: number
+  totalPaginas: number
+}
+
+// Punto del mapa público (GET /reportes/mapa): sin historial ni autor; `foto` es la primera o null.
+export interface ReporteMapaResponse {
+  id: string
+  latitud: number
+  longitud: number
+  estado: EstadoReporte
+  categoria: CategoriaReporte | null
+  descripcion: string
+  direccionOsm: string | null
+  barrioOsm: string | null
+  foto: string | null
+}
+
+// Opciones de los selectores de categoría y barrio (GET /reportes/filtros), sin repetidos y en orden alfabético.
+// La categoría se filtra por su id.
+export interface OpcionesFiltroResponse {
+  categorias: CategoriaReporte[]
+  barrios: string[]
+}
+
+// Cifras públicas de la portada (GET /reportes/resumen).
+export interface ResumenReportesResponse {
+  total: number
+  porEstado: Record<EstadoReporte, number>
+  creadosUltimas24Horas: number
+  barrios: number
+}
+
+export interface GeocodingInversoResponse {
+  direccionOsm: string | null
+  barrioOsm: string | null
+  // false si el punto está fuera del área de servicio (Cartagena): el backend rechazaría el reporte.
+  dentroDelArea: boolean
+}
+
+export interface PosibleDuplicadoResponse {
+  reporte: ReporteResponse
+  distanciaMetros: number
+  confirmaciones: number
+}
+
+export interface SeguimientoResumenResponse {
+  reporteId: string
+  arreglado: number
+  sigue: number
+  ultimaRespuesta: string | null
+  // null si el usuario no ha respondido o no inició sesión.
+  miRespuesta: boolean | null
+  // Cuándo se cerrará solo por los votos (cierre por la comunidad); null si no hay propuesta de cierre.
+  cierrePrevisto: string | null
+  // arreglado y sigue cuentan personas; esto son los votos según la regla del cierre (solo desde EN_PROCESO o el
+  // último «mantener abierto», el del autor doble). null si el cierre está apagado o el reporte no está en proceso.
+  progresoCierre: ProgresoCierre | null
+}
+
+export interface ProgresoCierre {
+  arreglado: number
+  sigue: number
+  minimoVotos: number
+  proporcionMinima: number
+}
+
+export interface EstadisticasResponse {
+  total: number
+  porEstado: Record<EstadoReporte, number>
+  // Sobre los reportes no rechazados; null si no hay ninguno.
+  porcentajeResuelto: number | null
+  diasPrimeraRespuesta: number | null
+  diasResolucion: number | null
+  // Últimos 12 meses, del más antiguo al actual; mes en formato yyyy-MM.
+  meses: { mes: string; creados: number; resueltos: number }[]
+  // Las categorías con más reportes, agrupadas por el id del catálogo.
+  categorias: { id: string; nombre: string; total: number; resueltos: number }[]
+  // Celdas de ~110 m con los reportes activos que contienen.
+  densidad: { latitud: number; longitud: number; total: number }[]
+  // Reportes activos por prioridad.
+  prioridadActivos: Record<PrioridadReporte, number>
+  // Fecha de creación del pendiente más antiguo; null si no hay pendientes.
+  pendienteMasAntiguo: string | null
+}
+
+// URL firmada del dashboard de Metabase para el iframe del panel; deja de valer en expiraEn.
+export interface DashboardResponse {
+  url: string
+  expiraEn: string
 }
 
 export interface CalleResponse {
@@ -113,6 +219,7 @@ export interface ComentarioResponse {
   id: string
   reporteId: string
   usuarioId: string
+  usuarioNombre: string | null
   texto: string
   fecha: string
   editado: boolean
@@ -123,4 +230,46 @@ export interface ConfirmacionResponse {
   reporteId: string
   usuarioId: string
   fecha: string
+}
+
+export interface UsuarioActualizacionRequest {
+  nombre?: string
+  telefono?: string
+}
+
+export interface NotificacionResponse {
+  id: string
+  usuarioId: string
+  reporteId: string | null
+  mensaje: string
+  leida: boolean
+  fecha: string
+}
+
+export interface BarrioRequest {
+  nombre: string
+  localidad: string
+}
+
+export interface CalleRequest {
+  nombre: string
+  codigoPostal: string
+}
+
+export interface CategoriaRequest {
+  nombre: string
+  descripcion?: string
+}
+
+// Estado de la base secundaria (réplica en PostgreSQL), GET /admin/replica-sql. `sql` es null si PostgreSQL no responde
+// o la réplica está deshabilitada.
+export interface EstadoReplicaResponse {
+  habilitada: boolean
+  conectada: boolean
+  pendienteReconstruir: boolean
+  ultimaSincronizacion: string | null
+  ultimaReconstruccion: string | null
+  ultimoError: string | null
+  ultimoErrorEn: string | null
+  tablas: { nombre: string; mongo: number; sql: number | null }[]
 }

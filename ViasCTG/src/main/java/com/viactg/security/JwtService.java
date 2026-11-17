@@ -24,7 +24,8 @@ public class JwtService {
     public String generarToken(UsuarioPrincipal principal) {
         Date ahora = new Date();
         return Jwts.builder().subject(principal.getUsername()).claim("uid", principal.getId())
-                .claim("rol", principal.getUsuario().getRol().name()).issuedAt(ahora)
+                .claim("rol", principal.getUsuario().getRol().name())
+                .claim("ver", principal.getUsuario().getVersionToken()).issuedAt(ahora)
                 .expiration(new Date(ahora.getTime() + expirationMs)).signWith(secretKey).compact();
     }
 
@@ -32,7 +33,10 @@ public class JwtService {
 
     public boolean esValido(String token, UserDetails userDetails) {
         Claims claims = claims(token);
-        return claims.getSubject().equalsIgnoreCase(userDetails.getUsername()) && claims.getExpiration().after(new Date());
+        Integer version = claims.get("ver", Integer.class);
+        int versionActual = userDetails instanceof UsuarioPrincipal principal ? principal.getUsuario().getVersionToken() : 0;
+        return claims.getSubject().equalsIgnoreCase(userDetails.getUsername()) && claims.getExpiration().after(new Date())
+                && (version == null ? 0 : version) == versionActual;
     }
 
     private Claims claims(String token) {

@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Spring Boot)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ViasCTG
+    # PostgreSQL desechable para ReplicaSqlRepositoryIntegracionTests (la réplica SQL); se borra al terminar el job.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: viasctg_sql_test
+          POSTGRES_USER: viasctg
+          POSTGRES_PASSWORD: solo-para-la-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U viasctg -d viasctg_sql_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Compilar y ejecutar pruebas
+        env:
+          SQL_TEST_URL: jdbc:postgresql://localhost:5432/viasctg_sql_test
+          SQL_TEST_USUARIO: viasctg
+          SQL_TEST_PASSWORD: solo-para-la-ci
+        # Las pruebas no cargan el contexto de Spring, pero JWT_SECRET es obligatorio en la configuración.
+        run: |
+          export JWT_SECRET="$(openssl rand -base64 32)"
+          sh mvnw -B -ntp verify
+
+  frontend:
+    name: Frontend (React + Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: FrontEnd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: FrontEnd/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

@@ -5,10 +5,14 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.GeoSpatialIndexType;
 import org.springframework.data.mongodb.core.index.GeoSpatialIndexed;
+import org.springframework.data.mongodb.core.index.IndexDirection;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
@@ -17,6 +21,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "reportes")
+// Páginas del listado: del más reciente al más antiguo, y el _id desempata los creados en el mismo instante.
+@CompoundIndex(name = "fecha_id", def = "{'fechaCreacion': -1, '_id': -1}")
+// Listados públicos y del panel: por estado y del más reciente al más antiguo.
+@CompoundIndex(name = "estado_fecha", def = "{'estado': 1, 'fechaCreacion': -1}")
+// "Mis reportes": los de un autor, del más reciente al más antiguo.
+@CompoundIndex(name = "usuario_fecha", def = "{'usuarioId': 1, 'fechaCreacion': -1}")
+// Filtro por categoría del listado y propagación de un renombre del catálogo (updateMulti por categoria.id).
+@CompoundIndex(name = "categoria_fecha", def = "{'categoria.id': 1, 'fechaCreacion': -1}")
 @Getter
 @Setter
 @Builder
@@ -28,9 +40,15 @@ public class Reporte {
     private String id;
     private String usuarioId;
     private String calleId;
-    private String categoriaId;
+    // Referencia extendida al catálogo: id de la categoría y copia de su nombre (ver CategoriaReporte).
+    private CategoriaReporte categoria;
+    private String direccionOsm;
+    // Barrio según OpenStreetMap (neighbourhood/suburb), resuelto junto con la dirección; null si no se conoce.
+    private String barrioOsm;
     private String descripcion;
-    private String fotoUrl;
+    @Size(max = 3)
+    @Builder.Default
+    private List<String> fotos = new ArrayList<>();
     private Double latitud;
     private Double longitud;
 
@@ -39,8 +57,15 @@ public class Reporte {
 
     private EstadoReporte estado;
     private PrioridadReporte prioridad;
+    @Indexed(direction = IndexDirection.DESCENDING)
     private Instant fechaCreacion;
     private Instant fechaActualizacion;
+    // Último recordatorio "¿ya lo arreglaron?" enviado; null si nunca se envió.
+    private Instant fechaUltimoSeguimiento;
+    // Cierre por la comunidad (solo EN_PROCESO): desde cuándo los votos lo proponen, null si no lo proponen; y el último
+    // «mantener abierto» de un moderador, desde el cual vuelven a contarse los votos.
+    private Instant cierreComunitarioDesde;
+    private Instant cierreComunitarioVetadoEn;
 
     @Field("historialEstados")
     @Builder.Default
