@@ -79,7 +79,7 @@ colección aparte y se **referencia** por id:
 
 La categoría del reporte es una **referencia extendida**: guarda el `id` del catálogo y una copia del `nombre`, así se
 muestra, filtra y agrupa sin consultar `categorias`; si un administrador la renombra, la copia se actualiza en todos
-sus reportes. Con los datos de demostración (`SEED_DEMO_REPORTES=10000`) la base tiene más de **23 000 documentos**.
+sus reportes. Con los datos de demostración, que vienen activados, la base tiene más de **23 000 documentos**.
 
 ### PostgreSQL (secundaria)
 
@@ -154,11 +154,10 @@ Requisitos: JDK 21, Node.js 20 o superior, MongoDB en `localhost:27017` y, para 
    powershell -ExecutionPolicy Bypass -File sql\crear-base-local.ps1
    ```
 
-3. Backend (la primera vez, con datos de demostración; después basta `.\mvnw spring-boot:run`):
+3. Backend. El primer arranque crea los datos de demostración (más de 23 000 documentos, ver más abajo):
 
    ```powershell
    cd ViasCTG
-   $env:SEED_DEMO = 'true'; $env:SEED_DEMO_REPORTES = '10000'
    .\mvnw spring-boot:run
    ```
 
@@ -180,25 +179,29 @@ cp .env.example .env            # define JWT_SECRET y SQL_PASSWORD (openssl rand
 docker compose up -d --build    # Mongo, PostgreSQL, backend, frontend (http://localhost:5173) y Metabase (:3000)
 ```
 
+En los dos casos, el primer arranque llena las bases con los datos de demostración.
+
 ## Datos de demostración
 
-Con `SEED_DEMO=true` y menos de 20 reportes, el backend crea al arrancar `SEED_DEMO_REPORTES` reportes (200 por
-defecto) de los últimos 12 meses en nueve barrios reales (25 % pendientes, 15 % en revisión, 20 % en proceso, 30 %
-resueltos y 10 % rechazados), con historiales de transiciones válidas y fechas crecientes, y en proporción:
+**Vienen activados** (`SEED_DEMO=true`, `SEED_DEMO_REPORTES=10000`) para que el proyecto se pueda evaluar con datos
+apenas se ejecuta. Solo actúan si la base tiene menos de 20 reportes: nunca duplican datos ni tocan una base que ya
+tenga información. En un despliegue real, pon `SEED_DEMO=false`.
+
+Al arrancar, el backend crea `SEED_DEMO_REPORTES` reportes de los últimos 12 meses en nueve barrios reales (25 %
+pendientes, 15 % en revisión, 20 % en proceso, 30 % resueltos y 10 % rechazados), con historiales de transiciones válidas y fechas crecientes, y en proporción:
 
 - un ciudadano demo por cada 40 reportes (mínimo 5; `ciudadanoN@demo.viasctg.local`) y 3 moderadores demo
   (`moderadorN@demo.viasctg.local`), con el correo verificado y una contraseña aleatoria que nadie conoce;
 - comentarios (~0,45 por reporte), confirmaciones (~0,46, nunca del autor ni repetidas) y votos «¿ya lo arreglaron?»
   (solo en reportes activos), con fechas dentro del tiempo en que el caso estuvo abierto.
 
-Con `SEED_DEMO_REPORTES=10000` la base queda con **más de 23 000 documentos** (10 000 reportes, 253 usuarios y unos
+Con los 10 000 reportes por defecto la base queda con **más de 23 000 documentos** (10 000 reportes, 253 usuarios y unos
 4 500 comentarios, 4 600 confirmaciones y 4 000 votos); tarda unos 2 segundos. Se insertan por bloques de 1 000, sin
 geocodificar ni enviar notificaciones ni correos, y al final la réplica SQL se reconstruye una vez. La semilla es fija:
 siempre salen los mismos datos.
 
 ```bash
-# Cargarlos (con la base casi vacía)
-SEED_DEMO=true SEED_DEMO_REPORTES=10000 docker compose up -d backend
+# Ver cuántos se crearon
 docker compose logs backend | grep SEED_DEMO
 
 # Borrarlos: los reportes empiezan con "[DEMO]" y las cuentas usan @demo.viasctg.local
