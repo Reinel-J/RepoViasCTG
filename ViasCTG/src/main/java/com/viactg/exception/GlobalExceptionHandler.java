@@ -82,6 +82,11 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), Map.of());
     }
 
+    @ExceptionHandler(CredencialGoogleException.class)
+    public ResponseEntity<ErrorResponse> handleCredencialGoogle(CredencialGoogleException exception) {
+        return response(HttpStatus.UNAUTHORIZED, exception.getMessage(), Map.of());
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException exception) {
         return response(HttpStatus.UNAUTHORIZED, "El correo o la contraseña no son correctos, o la cuenta está desactivada", Map.of());

@@ -3,6 +3,7 @@ package com.viactg.service;
 import com.viactg.dto.UsuarioActualizacionRequest;
 import com.viactg.dto.UsuarioRegistroRequest;
 import com.viactg.exception.BusinessRuleException;
+import com.viactg.exception.ForbiddenOperationException;
 import com.viactg.exception.InvalidRequestException;
 import com.viactg.model.Rol;
 import com.viactg.model.Usuario;
@@ -183,5 +184,104 @@ class UsuarioServiceTests {
         // 40 eñes son 40 caracteres pero 80 bytes en UTF-8.
         assertThatThrownBy(() -> UsuarioService.validarLongitudPassword("ñ".repeat(40)))
                 .isInstanceOf(InvalidRequestException.class).hasMessageContaining("72");
+    }
+
+    // --- Iniciar sesión con Google ---
+
+    private Usuario conCorreo(boolean verificado, String googleId) {
+        return Usuario.builder().id("u-1").nombre("Ana").email("ana@gmail.com").passwordHash("hash-de-ana").rol(Rol.MODERADOR)
+                .activo(true).emailVerificado(verificado).googleId(googleId).build();
+    }
+
+    @Test
+    void googleEntraALaCuentaYaVinculadaSinModificarla() {
+        Usuario vinculada = conCorreo(true, "sub-1");
+        when(usuarioRepository.findByGoogleId("sub-1")).thenReturn(Optional.of(vinculada));
+
+        assertThat(service.accederConGoogle("sub-1", "ana@gmail.com", "Ana")).isSameAs(vinculada);
+        verify(usuarioRepository, never()).save(any());
+        verify(mongoTemplate, never()).findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Usuario.class));
+    }
+
+    @Test
+    void googleVinculaUnaCuentaConfirmadaSinTocarSuContrasenaNiSuRol() {
+        when(usuarioRepository.findByGoogleId("sub-1")).thenReturn(Optional.empty());
+        when(usuarioRepository.findByEmail("ana@gmail.com")).thenReturn(Optional.of(conCorreo(true, null)));
+        devolverAlActualizar(conCorreo(true, "sub-1"));
+
+        assertThat(service.accederConGoogle("sub-1", "ana@gmail.com", "Ana Pérez").getRol()).isEqualTo(Rol.MODERADOR);
+
+        Document cambios = capturarActualizacion().getUpdateObject();
+        assertThat(cambios.get("$set", Document.class)).containsOnlyKeys("googleId").containsEntry("googleId", "sub-1");
+        assertThat(cambios).doesNotContainKey("$inc");
+    }
+
+    @Test
+    void googleRecuperaUnaCuentaSinConfirmarDescartandoLaContrasenaYLasSesiones() {
+        when(usuarioRepository.findByGoogleId("sub-1")).thenReturn(Optional.empty());
+        when(usuarioRepository.findByEmail("ana@gmail.com")).thenReturn(Optional.of(conCorreo(false, null)));
+        when(passwordEncoder.encode(any())).thenReturn("hash-aleatorio");
+        devolverAlActualizar(conCorreo(true, "sub-1"));
+
+        service.accederConGoogle("sub-1", "ana@gmail.com", "Ana Pérez");
+
+        Document cambios = capturarActualizacion().getUpdateObject();
+        assertThat(cambios.get("$set", Document.class)).containsEntry("googleId", "sub-1").containsEntry("emailVerificado", true)
+                .containsEntry("nombre", "Ana Pérez").containsEntry("passwordHash", "hash-aleatorio");
+        assertThat(cambios.get("$inc", Document.class)).containsEntry("versionToken", 1);
+    }
+
+    @Test
+    void googleCreaUnaCiudadanaConfirmadaSiNoHayCuenta() {
+        when(usuarioRepository.findByGoogleId("sub-1")).thenReturn(Optional.empty());
+        when(usuarioRepository.findByEmail("ana@gmail.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(any())).thenReturn("hash-aleatorio");
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        Usuario creada = service.accederConGoogle("sub-1", "ana@gmail.com", "  Ana Pérez ");
+
+        assertThat(creada.getRol()).isEqualTo(Rol.CIUDADANO);
+        assertThat(creada.isEmailVerificado()).isTrue();
+        assertThat(creada.isActivo()).isTrue();
+        assertThat(creada.getGoogleId()).isEqualTo("sub-1");
+        assertThat(creada.getNombre()).isEqualTo("Ana Pérez");
+        assertThat(creada.getPasswordHash()).isEqualTo("hash-aleatorio");
+    }
+
+    @Test
+    void googleSinNombreUsaLaParteDelCorreoYRecortaLosNombresLargos() {
+        assertThat(UsuarioService.nombreDesdeGoogle(null, "ana.perez@gmail.com")).isEqualTo("ana.perez");
+        assertThat(UsuarioService.nombreDesdeGoogle(" ", "ana@gmail.com")).isEqualTo("ana");
+        assertThat(UsuarioService.nombreDesdeGoogle("a".repeat(150), "ana@gmail.com")).hasSize(100);
+    }
+
+    @Test
+    void googleNoEntraAUnaCuentaVinculadaAOtraCuentaDeGoogle() {
+        when(usuarioRepository.findByGoogleId("sub-2")).thenReturn(Optional.empty());
+        when(usuarioRepository.findByEmail("ana@gmail.com")).thenReturn(Optional.of(conCorreo(true, "sub-1")));
+
+        assertThatThrownBy(() -> service.accederConGoogle("sub-2", "ana@gmail.com", "Ana"))
+                .isInstanceOf(ForbiddenOperationException.class);
+        verify(mongoTemplate, never()).findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Usuario.class));
+    }
+
+    @Test
+    void googleNoEntraAUnaCuentaDesactivada() {
+        Usuario desactivada = conCorreo(true, "sub-1");
+        desactivada.setActivo(false);
+        when(usuarioRepository.findByGoogleId("sub-1")).thenReturn(Optional.of(desactivada));
+
+        assertThatThrownBy(() -> service.accederConGoogle("sub-1", "ana@gmail.com", "Ana"))
+                .isInstanceOf(ForbiddenOperationException.class).hasMessageContaining("desactivada");
+    }
+
+    @Test
+    void googleConDosPrimerosAccesosSimultaneosDevuelveLaCuentaQueCreoElOtro() {
+        Usuario creadaPorElOtro = conCorreo(true, "sub-1");
+        when(usuarioRepository.findByGoogleId("sub-1")).thenReturn(Optional.empty(), Optional.of(creadaPorElOtro));
+        when(usuarioRepository.findByEmail("ana@gmail.com")).thenReturn(Optional.empty());
+        when(usuarioRepository.save(any(Usuario.class))).thenThrow(new org.springframework.dao.DuplicateKeyException("E11000"));
+
+        assertThat(service.accederConGoogle("sub-1", "ana@gmail.com", "Ana")).isSameAs(creadaPorElOtro);
     }
 }

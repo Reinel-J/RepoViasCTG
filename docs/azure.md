@@ -75,6 +75,7 @@ Valores que hay que poner en el `.env` (los demás pueden quedar como vienen):
 | `METABASE_SITE_URL` | `/metabase` (ya viene así). |
 | `SEED_DEMO` | `true` para mostrar la demo con datos; `false` en un despliegue real. |
 | `SWAGGER_ENABLED` | `false` para no publicar la documentación de la API. |
+| `GOOGLE_CLIENT_ID` | Opcional, para «Continuar con Google». Agrega `https://<tu-dominio>` a los orígenes autorizados del Client ID ([google.md](google.md)). |
 
 `METABASE_SECRET_KEY` y `METABASE_DASHBOARD_ID` se dejan **vacíos**: los pone `metabase-setup`.
 
@@ -122,4 +123,5 @@ Los datos quedan en los volúmenes de Docker (`mongo_data`, `postgres_data`, `up
 | «El dashboard no está configurado» | `metabase-setup` todavía no termina (tarda unos minutos en el primer arranque) o falló: `docker compose logs metabase-setup`. Para repetirlo: `docker compose up metabase-setup`. |
 | El dashboard sale en blanco | `METABASE_SITE_URL` no es `/metabase` o `FRONTEND_URL` no es la dirección `https://` del sitio. Corrige el `.env` y ejecuta `docker compose --profile https up -d`. |
 | Los enlaces de los correos apuntan a `localhost` | `FRONTEND_URL` sigue en `http://localhost:5173`. |
+| El botón de Google da «origin_mismatch» | Falta `https://<tu-dominio>` en *Authorized JavaScript origins* del Client ID ([google.md](google.md)). |
 | La VM se queda sin memoria | Usa un tamaño de 8 GB (Standard_B2ms) o mayor. |

@@ -101,6 +101,13 @@
   `METABASE_SITE_URL` vale `/metabase` (relativa), así que el iframe carga en la misma dirección del sitio en local,
   en una VM o con el túnel (antes apuntaba a `localhost:3000` y fuera del PC no cargaba). El puerto 3000 queda solo
   en `127.0.0.1`. Perfil `https` con Caddy (Let's Encrypt automático para `DOMINIO`) y guía `docs/azure.md`.
+- Iniciar sesión con Google (18 de noviembre de 2026): botón «Continuar con Google» (Google Identity Services) en el
+  login y el registro, visible solo si el backend tiene `GOOGLE_CLIENT_ID` (`GET /api/auth/google`). `POST
+  /api/auth/google` verifica el ID token (firma RS256 con las claves de Google, emisor, `aud` igual al Client ID y
+  vigencia, con `spring-security-oauth2-jose`), exige el correo verificado en Google y responde la misma sesión JWT. Las
+  cuentas se vinculan por `googleId` (índice único disperso) o por correo. Una cuenta sin confirmar se recupera como al
+  restablecer la contraseña: se descarta la contraseña y se cierran sus sesiones. Si no hay cuenta, se crea una de
+  ciudadano. Límite de 20 intentos cada 15 min por IP. Guía en `docs/google.md`.
 
 ## Pendiente recomendado
 

@@ -1,6 +1,8 @@
 package com.viactg.controller;
 
 import com.viactg.dto.AuthResponse;
+import com.viactg.dto.GoogleConfigResponse;
+import com.viactg.dto.GoogleLoginRequest;
 import com.viactg.dto.LoginRequest;
 import com.viactg.dto.RecuperarPasswordRequest;
 import com.viactg.dto.ReenviarVerificacionRequest;
@@ -12,11 +14,13 @@ import com.viactg.mapper.UsuarioMapper;
 import com.viactg.model.Usuario;
 import com.viactg.security.JwtService;
 import com.viactg.security.UsuarioPrincipal;
+import com.viactg.service.AccesoGoogleService;
 import com.viactg.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,11 +33,14 @@ public class AuthController {
     private final AuthService authService;
     private final UsuarioMapper usuarioMapper;
     private final JwtService jwtService;
+    private final AccesoGoogleService accesoGoogleService;
 
-    public AuthController(AuthService authService, UsuarioMapper usuarioMapper, JwtService jwtService) {
+    public AuthController(AuthService authService, UsuarioMapper usuarioMapper, JwtService jwtService,
+                          AccesoGoogleService accesoGoogleService) {
         this.authService = authService;
         this.usuarioMapper = usuarioMapper;
         this.jwtService = jwtService;
+        this.accesoGoogleService = accesoGoogleService;
     }
 
     // Sin token: la sesión empieza al confirmar el correo con el enlace enviado (POST /verificar).
@@ -55,6 +62,18 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
         return respuesta(authService.login(request.email(), request.password(), http.getRemoteAddr()));
+    }
+
+    // El frontend lo consulta para saber si mostrar el botón «Continuar con Google» (sin recompilarlo).
+    @GetMapping("/google")
+    public GoogleConfigResponse configuracionGoogle() {
+        return new GoogleConfigResponse(accesoGoogleService.clientId());
+    }
+
+    // Entra o crea la cuenta con el ID token de Google; la respuesta es la misma del login con contraseña.
+    @PostMapping("/google")
+    public AuthResponse loginGoogle(@Valid @RequestBody GoogleLoginRequest request, HttpServletRequest http) {
+        return respuesta(accesoGoogleService.acceder(request.credencial(), http.getRemoteAddr()));
     }
 
     @PostMapping("/recuperar") @ResponseStatus(HttpStatus.ACCEPTED)

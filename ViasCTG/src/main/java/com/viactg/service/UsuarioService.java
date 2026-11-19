@@ -4,6 +4,7 @@ import com.viactg.dto.UsuarioActualizacionRequest;
 import com.viactg.dto.UsuarioRegistroRequest;
 import com.viactg.exception.BusinessRuleException;
 import com.viactg.exception.DuplicateResourceException;
+import com.viactg.exception.ForbiddenOperationException;
 import com.viactg.exception.InvalidRequestException;
 import com.viactg.exception.ResourceNotFoundException;
 import com.viactg.model.Rol;
@@ -22,7 +23,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -41,12 +44,14 @@ public class UsuarioService {
     private static final Logger log = LoggerFactory.getLogger(UsuarioService.class);
     /** BCrypt solo procesa los primeros 72 bytes de la contraseña. */
     static final int MAX_BYTES_PASSWORD = 72;
+    private static final int MAX_NOMBRE = 100;
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final MongoTemplate mongoTemplate;
     private final AuditoriaService auditoriaService;
     private final ApplicationEventPublisher eventos;
+    private final SecureRandom random = new SecureRandom();
 
     public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, MongoTemplate mongoTemplate, AuditoriaService auditoriaService,
                           ApplicationEventPublisher eventos) {
@@ -142,6 +147,76 @@ public class UsuarioService {
 
     public Usuario marcarEmailVerificado(String id) {
         return actualizarCampos(id, new Update().set("emailVerificado", true));
+    }
+
+    /**
+     * Cuenta para quien entra con Google (correo ya verificado por Google y normalizado). Busca primero la cuenta
+     * vinculada a ese {@code googleId}; si no hay, la del mismo correo, y si tampoco, crea una de ciudadano.
+     * <ul>
+     *   <li>Cuenta con el correo confirmado: se vincula y conserva su contraseña, su rol y sus datos.</li>
+     *   <li>Cuenta sin confirmar: pudo registrarla otra persona con este correo (igual que al restablecer la
+     *   contraseña). Se confirma, se descarta su contraseña y se cierran sus sesiones.</li>
+     *   <li>Cuenta nueva: sin contraseña utilizable; si la quiere, la crea con «¿Olvidaste tu contraseña?».</li>
+     * </ul>
+     */
+    public Usuario accederConGoogle(String googleId, String email, String nombreGoogle) {
+        try {
+            return vincularOCrearConGoogle(googleId, email, nombreGoogle);
+        } catch (DuplicateKeyException carrera) {
+            // Dos primeros accesos simultáneos: el índice único rechaza la segunda cuenta, que ahora ya existe.
+            return vincularOCrearConGoogle(googleId, email, nombreGoogle);
+        }
+    }
+
+    private Usuario vincularOCrearConGoogle(String googleId, String email, String nombreGoogle) {
+        Optional<Usuario> vinculada = usuarioRepository.findByGoogleId(googleId);
+        if (vinculada.isPresent()) {
+            return activa(vinculada.get());
+        }
+        Optional<Usuario> mismoCorreo = usuarioRepository.findByEmail(email);
+        if (mismoCorreo.isEmpty()) {
+            return avisar(usuarioRepository.save(Usuario.builder().nombre(nombreDesdeGoogle(nombreGoogle, email)).email(email)
+                    .googleId(googleId).passwordHash(passwordInutilizable()).rol(Rol.CIUDADANO).activo(true)
+                    .emailVerificado(true).fechaRegistro(Instant.now()).build()));
+        }
+        Usuario existente = activa(mismoCorreo.get());
+        if (existente.getGoogleId() != null) {
+            // Otra cuenta de Google con el mismo correo (por ejemplo, un correo de empresa que se reasignó).
+            throw new ForbiddenOperationException("Este correo ya está vinculado a otra cuenta de Google. Inicia sesión "
+                    + "con tu contraseña o con la cuenta de Google de siempre.");
+        }
+        if (existente.isEmailVerificado()) {
+            log.info("La cuenta {} se vinculó con Google", email);
+            return actualizarCampos(existente.getId(), new Update().set("googleId", googleId));
+        }
+        log.warn("La cuenta {} estaba sin confirmar y se recuperó con Google: se descartó su contraseña y se cerraron sus "
+                + "sesiones", email);
+        return actualizarCampos(existente.getId(), new Update().set("googleId", googleId).set("emailVerificado", true)
+                .set("nombre", nombreDesdeGoogle(nombreGoogle, email)).set("passwordHash", passwordInutilizable())
+                .inc("versionToken", 1));
+    }
+
+    private static Usuario activa(Usuario usuario) {
+        if (!usuario.isActivo()) {
+            // Quien entra con Google ya demostró que el correo es suyo: se le puede decir por qué no entra.
+            throw new ForbiddenOperationException("Esta cuenta está desactivada. Si crees que es un error, escribe al "
+                    + "equipo de ViaCTG.");
+        }
+        return usuario;
+    }
+
+    /** El nombre que muestra Google (el registro admite hasta 100 caracteres); sin él, lo que va antes de la @. */
+    static String nombreDesdeGoogle(String nombreGoogle, String email) {
+        String nombre = nombreGoogle == null || nombreGoogle.isBlank() ? email.substring(0, email.indexOf('@')) : nombreGoogle.strip();
+        return nombre.length() > MAX_NOMBRE ? nombre.substring(0, MAX_NOMBRE) : nombre;
+    }
+
+    // Hash de un secreto aleatorio que nadie conoce: con contraseña vacía o null, BCrypt fallaría o el login
+    // tardaría menos y revelaría qué cuentas entran solo con Google.
+    private String passwordInutilizable() {
+        byte[] bytes = new byte[32];
+        random.nextBytes(bytes);
+        return passwordEncoder.encode(Base64.getEncoder().encodeToString(bytes));
     }
 
     public Usuario actualizarPassword(String id, String passwordNueva) {

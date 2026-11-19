@@ -1,10 +1,22 @@
 import { isAxiosError } from 'axios'
 import client from './client'
-import type { AuthResponse, LoginRequest, UsuarioRegistroRequest, UsuarioResponse } from './types'
+import type { AuthResponse, GoogleConfigResponse, LoginRequest, UsuarioRegistroRequest, UsuarioResponse } from './types'
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const request: LoginRequest = { email, password }
   const response = await client.post<AuthResponse>('/auth/login', request)
+  return response.data
+}
+
+/** Client ID para el botón de Google; viene del backend para no tener que recompilar el frontend al cambiarlo. */
+export async function configuracionGoogle(): Promise<GoogleConfigResponse> {
+  const response = await client.get<GoogleConfigResponse>('/auth/google')
+  return response.data
+}
+
+/** Entra (o crea la cuenta) con el ID token que entrega el botón de Google. */
+export async function loginGoogle(credencial: string): Promise<AuthResponse> {
+  const response = await client.post<AuthResponse>('/auth/google', { credencial })
   return response.data
 }
 

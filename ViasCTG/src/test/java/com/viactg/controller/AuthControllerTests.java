@@ -3,6 +3,7 @@ package com.viactg.controller;
 import com.jayway.jsonpath.JsonPath;
 import com.viactg.dto.UsuarioRegistroRequest;
 import com.viactg.exception.BusinessRuleException;
+import com.viactg.exception.CredencialGoogleException;
 import com.viactg.exception.ForbiddenOperationException;
 import com.viactg.exception.InvalidRequestException;
 import com.viactg.exception.TooManyRequestsException;
@@ -22,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -205,5 +207,59 @@ class AuthControllerTests extends ControllerTestBase {
                 .andExpect(jsonPath("$.validationErrors.passwordNueva").value("La contraseña nueva debe tener entre 8 y 72 caracteres"));
 
         verifyNoInteractions(authService);
+    }
+
+    @Test
+    void laConfiguracionDeGoogleEsPublicaYTraeElClientId() throws Exception {
+        when(accesoGoogleService.clientId()).thenReturn("123.apps.googleusercontent.com");
+
+        mvc.perform(get("/api/auth/google"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").value("123.apps.googleusercontent.com"));
+    }
+
+    @Test
+    void sinGoogleConfiguradoElClientIdEsNull() throws Exception {
+        mvc.perform(get("/api/auth/google"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").doesNotExist());
+    }
+
+    @Test
+    void entrarConGoogleDevuelveLaSesionYPasaLaIp() throws Exception {
+        Usuario anaGoogle = ana();
+        anaGoogle.setGoogleId("sub-1");
+        when(accesoGoogleService.acceder("id-token-de-google", "203.0.113.7")).thenReturn(anaGoogle);
+
+        String cuerpo = mvc.perform(post("/api/auth/google").with(DESDE_IP).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"credencial\":\"id-token-de-google\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipo").value("Bearer"))
+                .andExpect(jsonPath("$.usuario.email").value("ana@correo.com"))
+                .andExpect(jsonPath("$.usuario.cuentaGoogle").value(true))
+                .andExpect(jsonPath("$.usuario.googleId").doesNotExist())
+                .andExpect(jsonPath("$.usuario.passwordHash").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(jwtService.extraerEmail(JsonPath.read(cuerpo, "$.token"))).isEqualTo("ana@correo.com");
+    }
+
+    @Test
+    void unaCredencialDeGoogleInvalidaDevuelve401ConSuPropioMensaje() throws Exception {
+        when(accesoGoogleService.acceder(anyString(), anyString()))
+                .thenThrow(new CredencialGoogleException("La sesión de Google no es válida o ya venció. Intenta de nuevo."));
+
+        mvc.perform(post("/api/auth/google").contentType(MediaType.APPLICATION_JSON).content("{\"credencial\":\"x\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("La sesión de Google no es válida o ya venció. Intenta de nuevo."));
+    }
+
+    @Test
+    void entrarConGoogleSinCredencialDevuelve400() throws Exception {
+        mvc.perform(post("/api/auth/google").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors.credencial").value("Falta la credencial de Google"));
+
+        verifyNoInteractions(accesoGoogleService);
     }
 }

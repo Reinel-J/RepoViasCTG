@@ -18,6 +18,7 @@ import com.viactg.security.JwtService;
 import com.viactg.security.LimitadorIntentos;
 import com.viactg.security.MongoUserDetailsService;
 import com.viactg.security.UsuarioPrincipal;
+import com.viactg.service.AccesoGoogleService;
 import com.viactg.service.AreaServicio;
 import com.viactg.service.AuthService;
 import com.viactg.service.AuditoriaService;
@@ -67,6 +68,7 @@ abstract class ControllerTestBase {
     @MockBean protected LimitadorIntentos limitador;
     @MockBean protected AreaServicio areaServicio;
     @MockBean protected AuthService authService;
+    @MockBean protected AccesoGoogleService accesoGoogleService;
     @MockBean protected AuditoriaService auditoriaService;
     @MockBean protected BarrioService barrioService;
     @MockBean protected CategoriaService categoriaService;

@@ -39,4 +39,8 @@ public class Usuario {
     private Instant fechaRegistro;
     // Se incrementa para invalidar todos los JWT emitidos antes (cerrar sesiones, cambio de contraseña).
     private int versionToken;
+    // «sub» de la cuenta de Google vinculada (no cambia aunque cambie el correo); null si nunca entró con Google.
+    // sparse: las cuentas sin Google no llevan el campo y no chocan en el índice único.
+    @Indexed(unique = true, sparse = true)
+    private String googleId;
 }

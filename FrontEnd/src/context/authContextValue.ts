@@ -11,6 +11,8 @@ export interface AuthSession {
 export interface AuthContextValue {
   session: AuthSession | null
   login: (email: string, password: string) => Promise<void>
+  /** Inicia sesión con el ID token del botón de Google (crea la cuenta si no existe). */
+  loginGoogle: (credencial: string) => Promise<void>
   logout: () => void
   actualizarNombre: (nombre: string) => void
   /** Guarda el token nuevo que devuelve el backend al cambiar la contraseña o al confirmar el correo. */

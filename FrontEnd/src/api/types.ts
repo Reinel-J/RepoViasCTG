@@ -18,6 +18,13 @@ export interface UsuarioResponse {
   activo: boolean
   emailVerificado: boolean
   fechaRegistro: string
+  /** La cuenta está vinculada con Google (entró al menos una vez con «Continuar con Google»). */
+  cuentaGoogle: boolean
+}
+
+/** clientId null: el inicio de sesión con Google no está configurado en el backend. */
+export interface GoogleConfigResponse {
+  clientId: string | null
 }
 
 export interface AuthResponse {

@@ -12,6 +12,8 @@ public interface UsuarioRepository extends MongoRepository<Usuario, String> {
 
     Optional<Usuario> findByEmail(String email);
 
+    Optional<Usuario> findByGoogleId(String googleId);
+
     boolean existsByEmail(String email);
 
     List<Usuario> findByRolInAndActivoTrue(Collection<Rol> roles);

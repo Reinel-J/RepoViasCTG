@@ -12,6 +12,7 @@ import * as seguimientoApi from "../../api/seguimiento"
 import * as usuariosApi from "../../api/usuarios"
 import type { CategoriaReporte, ComentarioResponse, ConfirmacionResponse, EstadoReporte, NotificacionResponse, OpcionesFiltroResponse, PaginaResponse, PosibleDuplicadoResponse, ProgresoCierre, ReporteMapaResponse, ReporteResponse, SeguimientoResumenResponse, UsuarioResponse } from "../../api/types"
 import { useAuth } from "../../context/useAuth"
+import { BotonGoogle } from "../../components/BotonGoogle"
 import { CampanaNotificaciones } from "../../components/CampanaNotificaciones"
 import { CampoContrasena } from "../../components/CampoContrasena"
 import { Dialogo } from "../../components/Dialogo"
@@ -757,7 +758,7 @@ export function Mapa() {
 }
 
 export function Login() {
-  const { session, login } = useAuth()
+  const { session, login, loginGoogle } = useAuth()
   const navigate = useNavigate()
   const desde = (useLocation().state as { desde?: string } | null)?.desde
   const [email, setEmail] = useState("")
@@ -780,18 +781,31 @@ export function Login() {
       setEnviando(false)
     }
   }
+  async function entrarConGoogle(credencial: string) {
+    setEnviando(true)
+    setError("")
+    setSinConfirmar(false)
+    try {
+      await loginGoogle(credencial)
+      navigate(rutaSegura(desde), { replace: true })
+    } catch (exception) {
+      setError(mensajeDe(exception, "No fue posible entrar con Google."))
+    } finally {
+      setEnviando(false)
+    }
+  }
   // Con la sesión ya iniciada (también justo después de entrar) no tiene sentido mostrar el formulario.
   if (session) return <Navigate to={rutaSegura(desde)} replace />
   return (
     <div className="auth-page">
       <div className="auth-image"><NavLink to="/" className="auth-back">← Volver al inicio</NavLink><div><span>Cartagena se mueve</span><h1>Tu voz también<br />abre caminos.</h1><p>Únete a una comunidad que cuida cada calle, cada barrio y cada trayecto.</p></div></div>
-      <div className="auth-panel"><Logo /><form className="auth-form" onSubmit={enviar}><span className="section-kicker">Bienvenido de vuelta</span><h2>Inicia sesión</h2><p>Consulta tus reportes y sigue sus avances.</p><label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="tu@correo.com" required /></label><label>Contraseña<CampoContrasena autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required /></label><div className="form-inline"><span /><NavLink to="/recuperar">¿Olvidaste tu contraseña?</NavLink></div>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{sinConfirmar && <ReenviarConfirmacion email={email} />}<button className="primary-button full" disabled={enviando}>{enviando ? "Entrando…" : "Entrar a VíaCTG"} <Icon name="arrow" /></button><span className="auth-switch">¿Aún no tienes cuenta? <NavLink to="/registro" state={{ desde }}>Crear cuenta</NavLink></span></form></div>
+      <div className="auth-panel"><Logo /><form className="auth-form" onSubmit={enviar}><span className="section-kicker">Bienvenido de vuelta</span><h2>Inicia sesión</h2><p>Consulta tus reportes y sigue sus avances.</p><label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="tu@correo.com" required /></label><label>Contraseña<CampoContrasena autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required /></label><div className="form-inline"><span /><NavLink to="/recuperar">¿Olvidaste tu contraseña?</NavLink></div>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}{sinConfirmar && <ReenviarConfirmacion email={email} />}<button className="primary-button full" disabled={enviando}>{enviando ? "Entrando…" : "Entrar a VíaCTG"} <Icon name="arrow" /></button><BotonGoogle texto="signin_with" onCredencial={entrarConGoogle} /><span className="auth-switch">¿Aún no tienes cuenta? <NavLink to="/registro" state={{ desde }}>Crear cuenta</NavLink></span></form></div>
     </div>
   )
 }
 
 export function Registro() {
-  const { session } = useAuth()
+  const { session, loginGoogle } = useAuth()
   const desde = (useLocation().state as { desde?: string } | null)?.desde
   const [nombre, setNombre] = useState("")
   const [email, setEmail] = useState("")
@@ -812,8 +826,21 @@ export function Registro() {
       setEnviando(false)
     }
   }
+  // Con Google no hace falta confirmar el correo (Google ya lo verificó): la sesión empieza de una vez y el
+  // <Navigate> de abajo lleva a donde iba.
+  async function registrarConGoogle(credencial: string) {
+    setEnviando(true)
+    setError("")
+    try {
+      await loginGoogle(credencial)
+    } catch (exception) {
+      setError(mensajeDe(exception, "No fue posible crear la cuenta con Google."))
+    } finally {
+      setEnviando(false)
+    }
+  }
   if (session) return <Navigate to={rutaSegura(desde)} replace />
-  return <div className="auth-page"><div className="auth-image"><NavLink to="/" className="auth-back">← Volver al inicio</NavLink><div><span>Súmate a la comunidad</span><h1>Una calle mejor empieza contigo.</h1><p>Reporta, confirma y sigue los problemas de tu barrio.</p></div></div><div className="auth-panel"><Logo />{registrada ? <div className="auth-form"><span className="section-kicker">Último paso</span><h2>Confirma tu correo</h2><p>Te enviamos un enlace a <strong>{registrada}</strong>. Ábrelo para activar tu cuenta: vence en 48 horas. Si no lo ves, revisa la carpeta de correo no deseado.</p><ReenviarConfirmacion email={registrada} /><span className="auth-switch">¿Ya lo confirmaste? <NavLink to="/login" state={{ desde }}>Inicia sesión</NavLink></span></div> : <form className="auth-form" onSubmit={enviar}><span className="section-kicker">Nueva cuenta</span><h2>Únete a VíaCTG</h2><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Contraseña<CampoContrasena autoComplete="new-password" minLength={8} maxLength={72} value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}<button className="primary-button full" disabled={enviando}>{enviando ? "Creando cuenta…" : "Crear mi cuenta"} <Icon name="arrow" /></button><span className="auth-switch">¿Ya tienes cuenta? <NavLink to="/login" state={{ desde }}>Inicia sesión</NavLink></span></form>}</div></div>
+  return <div className="auth-page"><div className="auth-image"><NavLink to="/" className="auth-back">← Volver al inicio</NavLink><div><span>Súmate a la comunidad</span><h1>Una calle mejor empieza contigo.</h1><p>Reporta, confirma y sigue los problemas de tu barrio.</p></div></div><div className="auth-panel"><Logo />{registrada ? <div className="auth-form"><span className="section-kicker">Último paso</span><h2>Confirma tu correo</h2><p>Te enviamos un enlace a <strong>{registrada}</strong>. Ábrelo para activar tu cuenta: vence en 48 horas. Si no lo ves, revisa la carpeta de correo no deseado.</p><ReenviarConfirmacion email={registrada} /><span className="auth-switch">¿Ya lo confirmaste? <NavLink to="/login" state={{ desde }}>Inicia sesión</NavLink></span></div> : <form className="auth-form" onSubmit={enviar}><span className="section-kicker">Nueva cuenta</span><h2>Únete a VíaCTG</h2><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Contraseña<CampoContrasena autoComplete="new-password" minLength={8} maxLength={72} value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{error && <div className="alert-panel error-panel" role="alert">{error}</div>}<button className="primary-button full" disabled={enviando}>{enviando ? "Creando cuenta…" : "Crear mi cuenta"} <Icon name="arrow" /></button><BotonGoogle texto="signup_with" onCredencial={registrarConGoogle} /><span className="auth-switch">¿Ya tienes cuenta? <NavLink to="/login" state={{ desde }}>Inicia sesión</NavLink></span></form>}</div></div>
 }
 
 // Pide otro enlace de confirmación. El backend responde igual exista o no la cuenta, así que el aviso es condicional.
@@ -1014,7 +1041,7 @@ export function Perfil() {
       navigate("/login")
     } catch (exception) { setAvisoSeguridad({ tipo: "error", texto: mensajeDe(exception, "No fue posible cerrar las sesiones.") }) }
   }
-  return <PortalShell eyebrow="Tu espacio ciudadano" title="Mi perfil"><Dialogo dialogo={dialogo} /><section className="account-layout"><CuentaNav /><div className="profile-stack">{errorCarga && <div className="alert-panel error-panel" role="alert">{errorCarga}</div>}<div className="profile-card"><div className="profile-intro"><div className="avatar">{nombre.slice(0, 2).toUpperCase()}</div><div><h2>{usuario?.nombre ?? "Cargando…"}</h2><span>{usuario?.rol} · {usuario?.email}</span></div></div><form className="profile-form" onSubmit={guardar}><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input className="readonly-field" value={usuario?.email ?? ""} readOnly aria-describedby="correo-fijo" /><small id="correo-fijo" className="field-hint">El correo no se puede cambiar.</small></label><label>Teléfono<input type="tel" autoComplete="tel" value={telefono} onChange={(event) => setTelefono(event.target.value)} placeholder="Opcional" /></label><MensajeFormulario aviso={avisoDatos} /><button className="primary-button">Guardar cambios</button></form></div><div className="profile-card"><div className="content-heading"><div><h2>Seguridad</h2><p>Cambiar la contraseña invalida las demás sesiones.</p></div></div><form className="profile-form" onSubmit={cambiarClave}><label>Contraseña actual<CampoContrasena autoComplete="current-password" value={actual} onChange={(event) => setActual(event.target.value)} required /></label><label>Nueva contraseña<CampoContrasena autoComplete="new-password" minLength={8} maxLength={72} value={nueva} onChange={(event) => setNueva(event.target.value)} required /></label><label>Confirmar contraseña<CampoContrasena autoComplete="new-password" minLength={8} maxLength={72} value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required /></label><MensajeFormulario aviso={avisoSeguridad} /><button className="primary-button">Cambiar contraseña</button></form><button className="danger-link" onClick={cerrarTodo}>Cerrar sesiones en todos los dispositivos</button></div></div></section></PortalShell>
+  return <PortalShell eyebrow="Tu espacio ciudadano" title="Mi perfil"><Dialogo dialogo={dialogo} /><section className="account-layout"><CuentaNav /><div className="profile-stack">{errorCarga && <div className="alert-panel error-panel" role="alert">{errorCarga}</div>}<div className="profile-card"><div className="profile-intro"><div className="avatar">{nombre.slice(0, 2).toUpperCase()}</div><div><h2>{usuario?.nombre ?? "Cargando…"}</h2><span>{usuario?.rol} · {usuario?.email}</span></div></div><form className="profile-form" onSubmit={guardar}><label>Nombre completo<input autoComplete="name" value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required /></label><label>Correo electrónico<input className="readonly-field" value={usuario?.email ?? ""} readOnly aria-describedby="correo-fijo" /><small id="correo-fijo" className="field-hint">El correo no se puede cambiar.</small></label><label>Teléfono<input type="tel" autoComplete="tel" value={telefono} onChange={(event) => setTelefono(event.target.value)} placeholder="Opcional" /></label><MensajeFormulario aviso={avisoDatos} /><button className="primary-button">Guardar cambios</button></form></div><div className="profile-card"><div className="content-heading"><div><h2>Seguridad</h2><p>Cambiar la contraseña invalida las demás sesiones.</p>{usuario?.cuentaGoogle && <p>Tu cuenta está vinculada con Google. Si siempre entras con Google y no tienes contraseña, puedes crear una con «¿Olvidaste tu contraseña?» en la página de inicio de sesión.</p>}</div></div><form className="profile-form" onSubmit={cambiarClave}><label>Contraseña actual<CampoContrasena autoComplete="current-password" value={actual} onChange={(event) => setActual(event.target.value)} required /></label><label>Nueva contraseña<CampoContrasena autoComplete="new-password" minLength={8} maxLength={72} value={nueva} onChange={(event) => setNueva(event.target.value)} required /></label><label>Confirmar contraseña<CampoContrasena autoComplete="new-password" minLength={8} maxLength={72} value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} required /></label><MensajeFormulario aviso={avisoSeguridad} /><button className="primary-button">Cambiar contraseña</button></form><button className="danger-link" onClick={cerrarTodo}>Cerrar sesiones en todos los dispositivos</button></div></div></section></PortalShell>
 }
 
 export function Admin() {

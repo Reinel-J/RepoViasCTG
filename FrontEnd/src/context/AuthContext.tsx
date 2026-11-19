@@ -44,6 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     guardarSesion(await authApi.login(email, password))
   }
 
+  async function loginGoogle(credencial: string) {
+    guardarSesion(await authApi.loginGoogle(credencial))
+  }
+
   function logout() {
     localStorage.removeItem('token')
     localStorage.removeItem(SESSION_STORAGE_KEY)
@@ -59,5 +63,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  return <AuthContext.Provider value={{ session, login, logout, actualizarNombre, renovarSesion: guardarSesion }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ session, login, loginGoogle, logout, actualizarNombre, renovarSesion: guardarSesion }}>{children}</AuthContext.Provider>
 }

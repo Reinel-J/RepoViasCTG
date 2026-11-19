@@ -133,7 +133,7 @@ Detalle en [ViasCTG/README.md](ViasCTG/README.md#base-secundaria-en-postgresql).
 ```text
 ViasCTG/             API Spring Boot (código, pruebas, colección de Postman, scripts SQL locales)
 FrontEnd/            Cliente React (pantallas públicas y panel de administración)
-docs/                Guías de Metabase, Power BI (con datos de ejemplo) y despliegue en Azure
+docs/                Guías de Metabase, Power BI (con datos de ejemplo), despliegue en Azure e inicio de sesión con Google
 docker-compose.yml   Mongo, PostgreSQL, backend, frontend, Metabase y túnel opcional para la demo
 configurar-metabase.py, exportar-powerbi.py, demo-tunel.sh   Utilidades del dashboard y la demo pública
 ```
@@ -221,6 +221,13 @@ docker compose exec mongo mongosh viasctg_db --eval '
 Después de borrarlos, pulsa «Reconstruir réplica» en la pestaña Base SQL del panel (o reinicia el backend) y deja
 `SEED_DEMO=false` en el `.env`: si no, se vuelven a crear en el siguiente arranque mientras haya menos de 20 reportes.
 
+## Iniciar sesión con Google
+
+Con `GOOGLE_CLIENT_ID` en el `.env`, el login y el registro muestran **Continuar con Google**. El backend verifica el ID
+token de Google (firma, emisor, Client ID y vigencia) y abre la misma sesión que el login con contraseña. Una cuenta con
+ese correo se vincula y, si no existe, se crea como ciudadano con el correo ya confirmado. Sin la variable, el botón no
+aparece. Para crear el Client ID y ver las reglas de vinculación: [docs/google.md](docs/google.md).
+
 ## Dashboard (Metabase)
 
 El panel tiene una pestaña **Dashboard** (moderador y admin) con un dashboard de [Metabase](https://www.metabase.com/)
@@ -272,3 +279,4 @@ backend y, en el frontend, lint, pruebas y build.
 - [ViasCTG/postman/](ViasCTG/postman): colección de Postman con todas las rutas.
 - [docs/metabase.md](docs/metabase.md) y [docs/powerbi.md](docs/powerbi.md): analítica.
 - [docs/azure.md](docs/azure.md): publicar el proyecto en una VM de Azure con HTTPS.
+- [docs/google.md](docs/google.md): «Continuar con Google» (crear el Client ID y cómo se vinculan las cuentas).
