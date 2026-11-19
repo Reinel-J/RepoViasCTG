@@ -4,6 +4,7 @@ import type { DashboardResponse } from "../../api/types"
 import { descargarCsv } from "../../utils/csv"
 import { estadisticasACsv, nombreArchivoEstadisticas } from "./estadisticasCsv"
 import { mensajeError } from "./estados"
+import { inicioMetabase } from "./metabase"
 
 // Se pide una URL nueva un minuto antes de que venza la firmada: vencida, el dashboard deja de cargar sus datos.
 const MARGEN_RENOVACION_MS = 60_000
@@ -59,7 +60,7 @@ export function DashboardAdmin({ esAdmin }: { esAdmin: boolean }) {
       <div className="dashboard-toolbar">
         <button className="button button-ghost button-small" onClick={actualizar} disabled={cargando}>{cargando ? "Actualizando…" : "Actualizar"}</button>
         <button className="button button-ghost button-small" onClick={descargarEstadisticas}>Descargar estadísticas (.csv)</button>
-        {esAdmin && dashboard && <a href={new URL(dashboard.url).origin} target="_blank" rel="noopener noreferrer">Abrir en Metabase</a>}
+        {esAdmin && dashboard && <a href={inicioMetabase(dashboard.url)} target="_blank" rel="noopener noreferrer">Abrir en Metabase</a>}
         {descarga && <span role="status">{descarga}</span>}
       </div>
       {error && <p className="alert error" role="alert">{error}</p>}

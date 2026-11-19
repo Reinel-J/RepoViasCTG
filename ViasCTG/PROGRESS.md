@@ -90,6 +90,17 @@
   antes de consultar el backend; el cambio se verificó con `@WebMvcTest` (fecha local sin zona: 400; instante con `Z`:
   200). Se agregaron pruebas para `AuditoriaService`, los filtros y la paginación del panel, y la selección y resultado
   de las acciones en lote.
+- Dashboard automático (18 de noviembre de 2026): el servicio `metabase-setup` de docker compose
+  (`configurar-metabase.py --auto`) crea la cuenta de administrador de Metabase, arma y publica el dashboard y deja la
+  clave de embebido y su número en el volumen `metabase_config`, que el backend lee en cada petición
+  (`METABASE_CONFIG_DIR`). Es idempotente y respeta la configuración a mano del `.env`. Antes, cada instalación
+  respondía 503 «El dashboard no está configurado» a todos los administradores hasta seguir la guía a mano. También
+  se corrigió que `configurar-metabase.py` fallara al leer una clave de embebido ya existente (Metabase la devuelve
+  como texto plano).
+- Dashboard en servidores (18 de noviembre de 2026): el nginx del frontend publica Metabase en `/metabase/` y
+  `METABASE_SITE_URL` vale `/metabase` (relativa), así que el iframe carga en la misma dirección del sitio en local,
+  en una VM o con el túnel (antes apuntaba a `localhost:3000` y fuera del PC no cargaba). El puerto 3000 queda solo
+  en `127.0.0.1`. Perfil `https` con Caddy (Let's Encrypt automático para `DOMINIO`) y guía `docs/azure.md`.
 
 ## Pendiente recomendado
 

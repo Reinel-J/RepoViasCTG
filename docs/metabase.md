@@ -8,11 +8,42 @@ moderadores y administradores y la clave de embebido nunca llega al navegador.
 Metabase se configura desde su propia interfaz; los nombres de menú de esta guía son los de la interfaz en inglés
 (si la eliges en español, los menús son los mismos con otros nombres).
 
+## Con docker compose: automático
+
+`docker compose up -d` deja el dashboard listo sin pasos manuales. El servicio `metabase-setup` corre en cada arranque
+(cuando Metabase y el backend están sanos), hace los pasos 1 a 6 con `configurar-metabase.py --auto` y termina:
+
+- En un Metabase recién instalado crea la cuenta de administrador de Metabase, conecta `viasctg_db`, oculta las
+  colecciones sensibles, crea las ocho preguntas y el dashboard y lo publica para embeber.
+- Deja la clave de embebido y el número del dashboard en el volumen `metabase_config`; el backend los lee de ahí en
+  cada petición, sin reiniciarse. Así **todos los administradores y moderadores** ven la pestaña Dashboard en
+  cualquier máquina donde se levante el proyecto.
+- Si el dashboard ya existe, solo lo comprueba: no duplica preguntas ni dashboards. Si se borra el volumen
+  `metabase_data`, lo vuelve a armar en el siguiente arranque.
+- Si el `.env` ya trae `METABASE_SECRET_KEY` y `METABASE_DASHBOARD_ID` (configuración a mano), no hace nada y el
+  backend usa esos valores.
+
+Lo que hizo queda en `docker compose logs metabase-setup`; para repetirlo: `docker compose up metabase-setup`.
+
+**Cuenta de administrador de Metabase** (para editar el dashboard con «Abrir en Metabase»): el correo es
+`METABASE_ADMIN_EMAIL` o, si está vacío, el de `ADMIN_EMAIL`. La contraseña es `METABASE_ADMIN_PASSWORD` o, si está
+vacía, una aleatoria que se guarda en el volumen y que el backend no puede leer. Para verla:
+
+```bash
+docker compose run --rm --no-deps --entrypoint cat metabase-setup /metabase-config/admin-password
+```
+
+Cámbiala después desde Metabase si quieres. Si Metabase ya tenía una cuenta creada a mano, `metabase-setup` no puede
+entrar: pon esa cuenta en `METABASE_ADMIN_EMAIL` y `METABASE_ADMIN_PASSWORD` del `.env` o configúralo con los pasos
+de abajo.
+
+Los pasos siguientes explican qué hace y sirven para configurarlo a mano (por ejemplo, sin Docker).
+
 ## 1. Primer arranque
 
 1. Levanta todo con `docker compose up -d` (o solo `docker compose up -d metabase`). El primer arranque tarda un par de
    minutos mientras Metabase crea su base interna; `docker compose ps metabase` debe decir `healthy`.
-2. Abre <http://localhost:3000> y sigue el asistente.
+2. Abre <http://localhost:5173/metabase/> y sigue el asistente.
 3. Crea la cuenta de administrador de Metabase con una **contraseña fuerte y única** (por ejemplo, de 16 caracteres o
    más, generada por un gestor de contraseñas). Esta cuenta puede leer toda la base de datos; no es la de ViaCTG.
 4. En *Add your data* puedes saltar el paso y agregar la base en el punto 2.
@@ -67,7 +98,7 @@ Guarda y espera a que termine la sincronización: en *Browse data › ViaCTG* de
 
 ## 4. Las preguntas
 
-> **Atajo:** con la cuenta de administrador de Metabase ya creada (paso 1), `python3 configurar-metabase.py` (en la raíz
+> **Atajo** (sin docker compose; con él no hace falta, ver arriba)**:** con la cuenta de administrador de Metabase ya creada (paso 1), `python3 configurar-metabase.py` (en la raíz
 > del repositorio) hace los pasos 2 a 6: conecta la base si falta, oculta las colecciones sensibles, crea estas ocho
 > preguntas y el dashboard, lo publica para embeber y escribe `METABASE_SECRET_KEY` y `METABASE_DASHBOARD_ID` en el
 > `.env`. Pide tu correo y tu contraseña de Metabase (sin mostrarla ni guardarla) y toma las consultas de esta guía.
@@ -261,15 +292,18 @@ moderador fija la prioridad al cambiar el estado.
 3. Abre el dashboard › icono *Share* › *Embed* › autenticación **Guest** (embebido estático firmado). Si agregaste los
    filtros, márcalos como **Editable** (los bloqueados exigirían un valor en el token, y el backend no envía ninguno).
    Pulsa **Publish**.
-4. Copia el número del dashboard de su URL (`http://localhost:3000/dashboard/2-viactg-…` → `2`) en
+4. Copia el número del dashboard de su URL (`http://localhost:5173/metabase/dashboard/2-viactg-…` → `2`) en
    `METABASE_DASHBOARD_ID`.
 5. Recrea el backend para que lea las variables: `docker compose up -d backend`. En el panel, la pestaña **Dashboard**
    debe mostrarlo. Si dice «El dashboard no está configurado» (503), falta alguna de las tres variables, el id no es un
    número o la clave está incompleta (el log del backend lo indica, sin mostrar la clave).
 
-`METABASE_SITE_URL` debe ser la dirección con la que **el navegador** llega a Metabase (por defecto
-`http://localhost:3000`): el iframe la carga directamente. Desde otro equipo de la red usa la IP del PC; la demo por
-túnel (`demo-tunel.sh`) solo publica el frontend, así que desde internet el dashboard no carga.
+`METABASE_SITE_URL` es la dirección con la que **el navegador** llega a Metabase, porque el iframe la carga
+directamente. Con docker compose vale `/metabase`: el nginx del frontend reenvía esa ruta a Metabase, así que el
+dashboard se abre en la misma dirección del sitio (`http://localhost:5173/metabase/` en local, `https://tu-dominio/metabase/`
+en un servidor o con el túnel de la demo), con el mismo HTTPS y sin publicar el puerto 3000. Metabase sabe que vive en
+esa ruta porque su `MB_SITE_URL` es `FRONTEND_URL` + `/metabase`. Sin Docker, usa la dirección directa de Metabase
+(por ejemplo `http://localhost:3000`). Para publicarlo en internet, ver [azure.md](azure.md).
 
 ## 7. Verificación de datos
 

@@ -6,11 +6,16 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -28,26 +33,45 @@ public class MetabaseService {
     // HS256 exige una clave de al menos 256 bits; la que genera Metabase tiene 64 caracteres.
     private static final int BYTES_MINIMOS_CLAVE = 32;
 
+    // Archivos que deja el servicio metabase-setup de docker compose (configurar-metabase.py --auto).
+    static final String ARCHIVO_CLAVE = "secret-key";
+    static final String ARCHIVO_DASHBOARD = "dashboard-id";
+
     private final String siteUrl;
-    private final String secretKey;
-    private final String dashboardId;
+    private final String secretKeyFija;
+    private final String dashboardIdFijo;
+    private final Path configDir;
     private final long tokenMinutos;
 
+    /**
+     * La clave y el número del dashboard se toman de las variables (configuración a mano) o, si están vacías, de los
+     * archivos de {@code configDir}. Los archivos se leen en cada petición: el dashboard queda disponible en cuanto
+     * metabase-setup termina, sin reiniciar el backend.
+     */
+    @Autowired
     public MetabaseService(@Value("${app.metabase.site-url:}") String siteUrl,
                            @Value("${app.metabase.secret-key:}") String secretKey,
                            @Value("${app.metabase.dashboard-id:}") String dashboardId,
+                           @Value("${app.metabase.config-dir:}") String configDir,
                            @Value("${app.metabase.token-minutos:10}") long tokenMinutos) {
         this.siteUrl = siteUrl.strip().replaceAll("/+$", "");
-        this.secretKey = secretKey.strip();
-        this.dashboardId = dashboardId.strip();
+        this.secretKeyFija = secretKey.strip();
+        this.dashboardIdFijo = dashboardId.strip();
+        this.configDir = configDir.isBlank() ? null : Path.of(configDir.strip());
         this.tokenMinutos = Math.max(1, tokenMinutos);
     }
 
+    MetabaseService(String siteUrl, String secretKey, String dashboardId, long tokenMinutos) {
+        this(siteUrl, secretKey, dashboardId, "", tokenMinutos);
+    }
+
     public DashboardResponse urlDashboard() {
+        String secretKey = secretKeyFija.isEmpty() ? leerArchivo(ARCHIVO_CLAVE) : secretKeyFija;
+        String dashboardId = dashboardIdFijo.isEmpty() ? leerArchivo(ARCHIVO_DASHBOARD) : dashboardIdFijo;
         if (siteUrl.isEmpty() || secretKey.isEmpty() || dashboardId.isEmpty()) {
             throw new ServicioNoDisponibleException(SIN_CONFIGURAR);
         }
-        long dashboard = numeroDashboard();
+        long dashboard = numeroDashboard(dashboardId);
         byte[] clave = secretKey.getBytes(StandardCharsets.UTF_8);
         if (clave.length < BYTES_MINIMOS_CLAVE) {
             log.warn("METABASE_SECRET_KEY es demasiado corta: cópiala completa de Admin > Embedding de Metabase");
@@ -68,7 +92,21 @@ public class MetabaseService {
         return new DashboardResponse(siteUrl + "/embed/dashboard/" + token + "#bordered=false&titled=true&refresh=60", expiraEn);
     }
 
-    private long numeroDashboard() {
+    private String leerArchivo(String nombre) {
+        if (configDir == null) {
+            return "";
+        }
+        try {
+            return Files.readString(configDir.resolve(nombre), StandardCharsets.UTF_8).strip();
+        } catch (NoSuchFileException todaviaNo) {
+            return "";  // metabase-setup aún no termina (o no se usa docker compose)
+        } catch (IOException error) {
+            log.warn("No se pudo leer {} en {}: {}", nombre, configDir, error.getMessage());
+            return "";
+        }
+    }
+
+    private static long numeroDashboard(String dashboardId) {
         try {
             return Long.parseLong(dashboardId);
         } catch (NumberFormatException noEsNumero) {

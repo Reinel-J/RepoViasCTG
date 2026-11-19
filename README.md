@@ -133,7 +133,7 @@ Detalle en [ViasCTG/README.md](ViasCTG/README.md#base-secundaria-en-postgresql).
 ```text
 ViasCTG/             API Spring Boot (código, pruebas, colección de Postman, scripts SQL locales)
 FrontEnd/            Cliente React (pantallas públicas y panel de administración)
-docs/                Guías de Metabase y Power BI (con datos de ejemplo para Power BI)
+docs/                Guías de Metabase, Power BI (con datos de ejemplo) y despliegue en Azure
 docker-compose.yml   Mongo, PostgreSQL, backend, frontend, Metabase y túnel opcional para la demo
 configurar-metabase.py, exportar-powerbi.py, demo-tunel.sh   Utilidades del dashboard y la demo pública
 ```
@@ -176,10 +176,16 @@ Abre `http://localhost:5173` y entra al panel con el administrador de `local.pro
 
 ```bash
 cp .env.example .env            # define JWT_SECRET y SQL_PASSWORD (openssl rand -base64 32)
-docker compose up -d --build    # Mongo, PostgreSQL, backend, frontend (http://localhost:5173) y Metabase (:3000)
+docker compose up -d --build    # Mongo, PostgreSQL, backend, frontend (http://localhost:5173) y Metabase (:3000) con el dashboard ya armado
 ```
 
 En los dos casos, el primer arranque llena las bases con los datos de demostración.
+
+### Opción C: en un servidor con HTTPS (por ejemplo, Azure)
+
+Con `DOMINIO` y `FRONTEND_URL=https://<DOMINIO>` en el `.env`, `docker compose --profile https up -d --build` agrega
+Caddy delante del sitio, con certificado de Let's Encrypt automático, y el dashboard queda en la misma dirección.
+Paso a paso en una VM de Azure: [docs/azure.md](docs/azure.md).
 
 ## Datos de demostración
 
@@ -224,16 +230,20 @@ backend. El panel pide otra URL antes de que venza y el dashboard se actualiza c
 responde `503` «El dashboard no está configurado». El botón **Descargar estadísticas (.csv)** baja las cifras de la
 pestaña Estadísticas.
 
-Para armarlo sigue [docs/metabase.md](docs/metabase.md) (conectar la base, ocultar colecciones sensibles, crear las ocho
-preguntas y publicar el dashboard) o, tras crear la cuenta de administrador de Metabase, `python3 configurar-metabase.py`,
-que hace el resto y escribe `METABASE_SECRET_KEY` y `METABASE_DASHBOARD_ID` en el `.env`. Hay una versión en Power BI de
+**Con docker compose se configura solo**: el servicio `metabase-setup` crea la cuenta de administrador de Metabase,
+conecta la base, oculta las colecciones sensibles, crea las ocho preguntas, publica el dashboard y le pasa la clave y el
+número al backend por el volumen `metabase_config`. Así lo ven todos los administradores y moderadores en cualquier
+máquina donde se levante el proyecto, sin pasos manuales; si ya está armado, solo lo comprueba. Sin Docker, sigue
+[docs/metabase.md](docs/metabase.md) o, tras crear la cuenta de administrador de Metabase, ejecuta
+`python3 configurar-metabase.py`, que escribe `METABASE_SECRET_KEY` y `METABASE_DASHBOARD_ID` en el `.env`. Hay una versión en Power BI de
 los mismos indicadores en [docs/powerbi.md](docs/powerbi.md), con `python3 exportar-powerbi.py` para exportar los datos.
 
 | Variable | Por defecto | Para qué |
 | --- | --- | --- |
-| `METABASE_SITE_URL` | `http://localhost:3000` | Dirección de Metabase tal como la abre el navegador. |
-| `METABASE_SECRET_KEY` | vacía | Clave de embebido de *Admin › Embedding* de Metabase. |
-| `METABASE_DASHBOARD_ID` | vacía | Número del dashboard publicado (`/dashboard/<id>`). |
+| `METABASE_SITE_URL` | `/metabase` | Dirección de Metabase tal como la abre el navegador. Con docker compose, `/metabase`: el nginx del frontend la reenvía a Metabase en la misma dirección del sitio. |
+| `METABASE_SECRET_KEY` | vacía | Clave de embebido de *Admin › Embedding* de Metabase. Vacía con docker compose: la pone `metabase-setup`. |
+| `METABASE_DASHBOARD_ID` | vacía | Número del dashboard publicado (`/dashboard/<id>`). Vacío con docker compose: lo pone `metabase-setup`. |
+| `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD` | `ADMIN_EMAIL` y una aleatoria | Cuenta de administrador de Metabase que crea `metabase-setup` ([docs/metabase.md](docs/metabase.md) explica cómo ver la contraseña). |
 | `METABASE_TOKEN_MINUTOS` | `10` | Vigencia de cada URL firmada. |
 
 ## Pruebas
@@ -261,3 +271,4 @@ backend y, en el frontend, lint, pruebas y build.
 - [FrontEnd/README.md](FrontEnd/README.md): pantallas y organización del cliente.
 - [ViasCTG/postman/](ViasCTG/postman): colección de Postman con todas las rutas.
 - [docs/metabase.md](docs/metabase.md) y [docs/powerbi.md](docs/powerbi.md): analítica.
+- [docs/azure.md](docs/azure.md): publicar el proyecto en una VM de Azure con HTTPS.

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest"
 import * as adminApi from "../../api/admin"
 import { DashboardAdmin } from "./DashboardAdmin"
+import { inicioMetabase } from "./metabase"
 
 vi.mock("../../api/admin", () => ({ obtenerDashboard: vi.fn(), estadisticas: vi.fn() }))
 
@@ -57,7 +58,12 @@ describe("DashboardAdmin", () => {
 
     render(<DashboardAdmin esAdmin />)
 
-    expect((await screen.findByText("Abrir en Metabase")).getAttribute("href")).toBe("http://localhost:3000")
+    expect((await screen.findByText("Abrir en Metabase")).getAttribute("href")).toBe("http://localhost:3000/")
+  })
+
+  it("el enlace a Metabase funciona con la ruta relativa que usa docker compose", () => {
+    expect(inicioMetabase("/metabase/embed/dashboard/abc.def.ghi#bordered=false")).toBe("/metabase/")
+    expect(inicioMetabase("https://viactg.example/metabase/embed/dashboard/abc#x")).toBe("https://viactg.example/metabase/")
   })
 
   it("descarga las estadísticas en un CSV con BOM", async () => {

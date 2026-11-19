@@ -7,8 +7,12 @@ import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -92,5 +96,40 @@ class MetabaseServiceTests {
         assertThatThrownBy(new MetabaseService(SITIO, "corta", "7", 10)::urlDashboard)
                 .isInstanceOf(ServicioNoDisponibleException.class)
                 .hasMessage("El dashboard no está configurado");
+    }
+
+    @Test
+    void sinVariablesUsaLosArchivosQueDejaMetabaseSetup(@TempDir Path carpeta) throws IOException {
+        Files.writeString(carpeta.resolve("secret-key"), CLAVE + "\n");
+        Files.writeString(carpeta.resolve("dashboard-id"), "7\n");
+        MetabaseService automatico = new MetabaseService(SITIO, "", "", carpeta.toString(), 10);
+
+        Claims claims = verificar(token(automatico.urlDashboard())).getPayload();
+
+        assertThat(claims.get("resource", Map.class)).containsEntry("dashboard", 7);
+    }
+
+    @Test
+    void losArchivosSeLeenEnCadaPeticionSinReiniciar(@TempDir Path carpeta) throws IOException {
+        MetabaseService automatico = new MetabaseService(SITIO, "", "", carpeta.toString(), 10);
+        assertThatThrownBy(automatico::urlDashboard)
+                .isInstanceOf(ServicioNoDisponibleException.class)
+                .hasMessage("El dashboard no está configurado");
+
+        Files.writeString(carpeta.resolve("secret-key"), CLAVE);
+        Files.writeString(carpeta.resolve("dashboard-id"), "7");
+
+        assertThat(automatico.urlDashboard().url()).startsWith("http://localhost:3000/embed/dashboard/");
+    }
+
+    @Test
+    void lasVariablesDelEnvTienenPrioridadSobreLosArchivos(@TempDir Path carpeta) throws IOException {
+        Files.writeString(carpeta.resolve("secret-key"), "otra-clave-de-metabase-que-no-se-debe-usar-0000000000000000");
+        Files.writeString(carpeta.resolve("dashboard-id"), "99");
+        MetabaseService manual = new MetabaseService(SITIO, CLAVE, "7", carpeta.toString(), 10);
+
+        Claims claims = verificar(token(manual.urlDashboard())).getPayload();
+
+        assertThat(claims.get("resource", Map.class)).containsEntry("dashboard", 7);
     }
 }
